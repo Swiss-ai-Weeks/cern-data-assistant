@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { RecordSummary } from "../types";
 
 interface Props {
@@ -86,6 +87,7 @@ export default function ResultRow({ record, showRelevance }: Props) {
           <div className="usage-block">
             <span className="label">How to get it</span>
             <code className="usage-cmd">{record.usage}</code>
+            <CopyButton text={record.usage} />
           </div>
         )}
 
@@ -104,5 +106,25 @@ export default function ResultRow({ record, showRelevance }: Props) {
         </a>
       </div>
     </div>
+  );
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <button type="button" className="copy-btn" onClick={copy}>
+      {copied ? "copied" : "copy"}
+    </button>
   );
 }

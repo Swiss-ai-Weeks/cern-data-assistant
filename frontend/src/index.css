@@ -335,6 +335,93 @@ a {
   border-top: 1px solid var(--border-soft);
 }
 
+.facet-bar {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.facet-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.facet-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-right: 4px;
+  min-width: 7.5em;
+}
+.facet-chip {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.facet-chip.active,
+.facet-chip:hover {
+  border-color: var(--accent-2);
+  color: var(--text);
+}
+.facet-chip.active {
+  background: var(--accent-2-soft);
+  color: var(--accent-2);
+}
+.facet-clear {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  cursor: pointer;
+  padding: 4px 0;
+}
+.facet-clear:hover {
+  color: var(--text);
+}
+
+.usage-block {
+  margin-top: 12px;
+}
+.usage-cmd {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent-2);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  overflow-x: auto;
+  white-space: pre;
+}
+.copy-btn {
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.copy-btn:hover {
+  color: var(--text);
+  border-color: var(--accent-2);
+}
+
 .record-row {
   display: grid;
   grid-template-columns: 84px 1fr;
@@ -627,22 +714,6 @@ a {
 .format-row .label {
   display: inline;
   margin: 0 4px 0 0;
-}
-
-.usage-block {
-  margin-top: 12px;
-}
-.usage-cmd {
-  display: block;
-  font-family: var(--font-mono);
-  font-size: 13px;
-  color: var(--accent-2);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 8px 10px;
-  overflow-x: auto;
-  white-space: pre;
 }
 
 .cite-block {

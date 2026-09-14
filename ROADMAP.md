@@ -45,11 +45,14 @@ A plan-and-execute agent that can use multiple tools in one turn.
 - ✅ **Search resilience**: `_fetch_with_broadening` retries with progressively fewer keywords when CERN's strict AND-matching returns 0 hits (e.g. "CMS muon proton collisions 13 TeV" → "CMS muon proton collisions"); response flags `broadened`.
 - ✅ UI: the default **Assistant (agent)** tab shows the interpreted goal + tools used, and renders a grounded answer and/or dataset cards together.
 
-## Phase 5 — Polish
-- Cache CERN calls, stream answers, facet filters (experiment/energy/format), dataset preview/download.
-- Deploy backend on the H100 (drop the laptop tunnel).
-- Basic tests for `cern_client` / `ollama_client`.
+## Phase 5 — Polish (DONE)
+Demo-speed and judge-visible finish:
+- ✅ In-process TTL cache on CERN search + record lookups (`cache.py`, `CERN_CACHE_TTL`); health reports hit/miss stats. Repeat queries skip the public API.
+- ✅ Facet filters on result lists: experiment / energy / format / kind, plus a "query broadened" note.
+- ✅ Copy-to-clipboard on the `cernopendata-client` usage command.
+- ✅ Unit tests (no network): guardrails, CERN flattening, search broadening, TTL cache. `python -m unittest discover -s tests -v` from `backend/`.
+- Skipped for the lab: streaming answers and running Flask on the H100 (the laptop + tunnel setup is already the working demo).
 
 ## Build order (hackathon)
 Judges reward grounding + the RAG/AIQ/Guardrails trio:
-**Phase 1 → Phase 2 → Phase 2.5 → Phase 3 → Phase 4** — all DONE. Phase 5 (polish) if time remains.
+**Phase 1 → Phase 2 → Phase 2.5 → Phase 3 → Phase 4 → Phase 5** — all DONE.

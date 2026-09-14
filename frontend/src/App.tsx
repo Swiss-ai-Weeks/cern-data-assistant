@@ -26,15 +26,16 @@ export default function App() {
   }, []);
 
   return (
-    <div className="app-shell product">
-      <header className="app-header">
-        <div>
-          <p className="brand-kicker">NVIDIA LaunchPad · CERN Open Data</p>
-          <h1 className="app-title">Beamline</h1>
-          <p className="app-subtitle">
-            The research assistant for LHC open data — search datasets, inspect
-            files, and ask about detectors. Ungrounded physics is refused.
-          </p>
+    <div className="cockpit">
+      <header className="topbar">
+        <div className="brand">
+          <div className="beam-track" aria-hidden>
+            <span className="beam-pulse" />
+          </div>
+          <div>
+            <div className="brand-name">Beamline</div>
+            <div className="brand-sub">CERN Data Assistant</div>
+          </div>
         </div>
         <StatusBar health={health} />
       </header>

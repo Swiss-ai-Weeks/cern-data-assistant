@@ -37,6 +37,7 @@ export interface RecordDetail extends RecordSummary {
 export interface SearchResponse {
   query: string;
   search_terms: string;
+  broadened?: boolean;
   total_matches: number;
   returned: number;
   model_used: string | null;
@@ -73,3 +74,15 @@ export interface AskResponse {
 export type AssistantResponse =
   | (SearchResponse & { mode: "search"; route_confidence: number })
   | (AskResponse & { mode: "ask"; route_confidence: number });
+
+export interface AgentResponse {
+  query: string;
+  goal: string;
+  plan?: {
+    search_query: string | null;
+    ask_query: string | null;
+  };
+  tools_used: string[];
+  search: SearchResponse | null;
+  answer: AskResponse | null;
+}

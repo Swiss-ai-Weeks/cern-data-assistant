@@ -38,8 +38,12 @@ Three deterministic rails wrap the RAG flow (`guardrails.py`) plus an LLM fact-c
 - ✅ **Grounding rail** — second-pass `verify_grounding` fact-check rejects answers with claims not supported by the cited passages (caught e.g. a hallucinated Hawking-radiation answer).
 - ✅ Graceful refusals instead of hallucinating; every kept answer shows citations. Rail decision surfaced in the UI + `/api/health`.
 
-## Phase 4 — Agentic (AIQ)
-- Wrap router + tools (search, record fetch, RAG retrieve) as an agent that chains: interpret → search → fetch metadata → explain → cite.
+## Phase 4 — Agentic (AIQ) (DONE)
+A plan-and-execute agent that can use multiple tools in one turn.
+- ✅ **Planner** (`ollama_client.plan_tasks`) decomposes a message into optional `search_query` + `ask_query`, so multi-part requests like *"find CMS muon datasets and explain why CMS uses a solenoid"* run both tools; falls back to the router when planning is empty.
+- ✅ **`POST /api/agent`** orchestrates: input rail → plan → run dataset search and/or grounded Q&A (all Phase-3 guardrails applied) → combined `{goal, tools_used, search, answer}`.
+- ✅ **Search resilience**: `_fetch_with_broadening` retries with progressively fewer keywords when CERN's strict AND-matching returns 0 hits (e.g. "CMS muon proton collisions 13 TeV" → "CMS muon proton collisions"); response flags `broadened`.
+- ✅ UI: the default **Assistant (agent)** tab shows the interpreted goal + tools used, and renders a grounded answer and/or dataset cards together.
 
 ## Phase 5 — Polish
 - Cache CERN calls, stream answers, facet filters (experiment/energy/format), dataset preview/download.
@@ -48,4 +52,4 @@ Three deterministic rails wrap the RAG flow (`guardrails.py`) plus an LLM fact-c
 
 ## Build order (hackathon)
 Judges reward grounding + the RAG/AIQ/Guardrails trio:
-**Phase 1 → Phase 2 → Phase 3 → Phase 4**, Phase 5 if time remains.
+**Phase 1 → Phase 2 → Phase 2.5 → Phase 3 → Phase 4** — all DONE. Phase 5 (polish) if time remains.

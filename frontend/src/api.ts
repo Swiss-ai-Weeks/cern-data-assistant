@@ -1,4 +1,5 @@
 import type {
+  AgentResponse,
   AskResponse,
   AssistantResponse,
   HealthResponse,
@@ -60,4 +61,13 @@ export async function runAssistant(query: string): Promise<AssistantResponse> {
     body: JSON.stringify({ query }),
   });
   return asJson<AssistantResponse>(res);
+}
+
+export async function runAgent(query: string): Promise<AgentResponse> {
+  const res = await fetch(`${API_BASE}/api/agent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query }),
+  });
+  return asJson<AgentResponse>(res);
 }

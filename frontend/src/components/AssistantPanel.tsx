@@ -1,13 +1,13 @@
 import { FormEvent, useState } from "react";
-import { runAssistant } from "../api";
-import type { AssistantResponse } from "../types";
+import { runAgent } from "../api";
+import type { AgentResponse } from "../types";
 import ResultsFeed from "./ResultsFeed";
 import AnswerCard from "./AnswerCard";
 
 const EXAMPLES = [
   "proton-proton collisions at 13 TeV with muons",
   "Why does CMS use a solenoid?",
-  "ATLAS data about the Higgs boson",
+  "find CMS muon datasets and explain why CMS uses a solenoid",
   "What is the difference between AOD, MiniAOD and NanoAOD?",
 ];
 
@@ -15,14 +15,14 @@ export default function AssistantPanel() {
   const [value, setValue] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<AssistantResponse | null>(null);
+  const [result, setResult] = useState<AgentResponse | null>(null);
 
   async function run(query: string) {
     if (!query.trim() || loading) return;
     setLoading(true);
     setError(null);
     try {
-      setResult(await runAssistant(query.trim()));
+      setResult(await runAgent(query.trim()));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -44,7 +44,7 @@ export default function AssistantPanel() {
             className="console-input"
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="Ask anything — find datasets or ask about CERN. It auto-routes."
+            placeholder="Ask anything — find datasets, ask about CERN, or both. The agent plans it."
             autoFocus
           />
           <button className="console-submit" type="submit" disabled={loading}>
@@ -54,9 +54,19 @@ export default function AssistantPanel() {
         {result && (
           <div className="console-meta">
             <span>
-              routed to <strong>{result.mode === "search" ? "dataset search" : "grounded answer"}</strong>
+              goal: <strong>{result.goal}</strong>
             </span>
-            <span>confidence <strong>{result.route_confidence}</strong></span>
+            <span className="agent-tools">
+              {result.tools_used.length > 0 ? (
+                result.tools_used.map((t) => (
+                  <span key={t} className="tool-chip">
+                    {t === "search" ? "dataset search" : "grounded answer"}
+                  </span>
+                ))
+              ) : (
+                <span className="tool-chip">no tools run</span>
+              )}
+            </span>
           </div>
         )}
       </form>
@@ -84,12 +94,25 @@ export default function AssistantPanel() {
       {loading && (
         <div className="loading-state">
           <div className="loading-bar" />
-          routing your request…
+          planning and running tools…
         </div>
       )}
 
-      {!loading && result && result.mode === "search" && <ResultsFeed result={result} />}
-      {!loading && result && result.mode === "ask" && <AnswerCard result={result} />}
+      {!loading && result && (
+        <>
+          {result.answer && <AnswerCard result={result.answer} />}
+          {result.search && result.search.results.length > 0 && (
+            <ResultsFeed result={result.search} />
+          )}
+          {!result.answer &&
+            (!result.search || result.search.results.length === 0) && (
+              <div className="empty-state">
+                No results for that. Try rephrasing toward a CERN experiment,
+                particle, energy, or detector.
+              </div>
+            )}
+        </>
+      )}
     </div>
   );
 }

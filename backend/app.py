@@ -77,6 +77,32 @@ def health():
 # Each helper returns (payload_dict, http_status).
 # ---------------------------------------------------------------------------
 
+def _fetch_with_broadening(terms: str, pool: int):
+    """CERN Open Data search is strict AND-matching, so over-specific keyword
+    queries ("CMS muon proton collisions 13 TeV") collapse to 0 hits. Retry
+    with progressively fewer trailing keywords until we get results — this is
+    the agent's search-resilience step. Returns (raw, used_terms, broadened)."""
+    words = terms.split()
+    attempts = [" ".join(words[:n]) for n in range(len(words), 1, -1)]
+    if words:
+        attempts.append(words[0])
+    seen, ordered = set(), []
+    for a in attempts:
+        if a and a not in seen:
+            seen.add(a)
+            ordered.append(a)
+    if not ordered:
+        ordered = [terms]
+
+    last_raw = None
+    for attempt in ordered:
+        raw = cern_client.search_records(attempt, size=pool)
+        if raw.get("hits", {}).get("total", 0):
+            return raw, attempt, attempt != terms
+        last_raw = raw
+    return last_raw, ordered[-1], True
+
+
 def _run_search(user_query: str, requested_size=None, use_llm_rank: bool = True):
     size = requested_size if isinstance(requested_size, int) else DEFAULT_SIZE
     size = max(1, min(size, MAX_SIZE))
@@ -92,15 +118,17 @@ def _run_search(user_query: str, requested_size=None, use_llm_rank: bool = True)
     except ollama_client.OllamaUnavailable:
         log.warning("Ollama unavailable — falling back to raw query as search terms")
 
-    # 2. Query CERN Open Data (fetch a larger pool so the ranker has choices)
+    # 2. Query CERN Open Data (fetch a larger pool so the ranker has choices),
+    #    broadening the query if the first, most-specific attempt returns 0.
     fetch_pool = min(size * 3, 60) if use_llm_rank and model_used else size
     try:
-        raw = cern_client.search_records(search_terms, size=fetch_pool)
+        raw, used_terms, broadened = _fetch_with_broadening(search_terms, fetch_pool)
     except cern_client.CernApiError as exc:
         return {"error": f"CERN Open Data API unreachable: {exc}"}, 502
 
-    hits = raw.get("hits", {}).get("hits", [])
-    total = raw.get("hits", {}).get("total", 0)
+    search_terms = used_terms
+    hits = raw.get("hits", {}).get("hits", []) if raw else []
+    total = raw.get("hits", {}).get("total", 0) if raw else 0
     summaries = [cern_client.summarize_hit(h) for h in hits]
 
     # 3. Optionally rank/annotate with the local LLM
@@ -127,6 +155,7 @@ def _run_search(user_query: str, requested_size=None, use_llm_rank: bool = True)
     return {
         "query": user_query,
         "search_terms": search_terms,
+        "broadened": broadened,
         "total_matches": total,
         "returned": len(summaries),
         "model_used": model_used,
@@ -288,6 +317,60 @@ def assistant():
     if status == 200:
         payload = {"mode": intent, "route_confidence": route["confidence"], **payload}
     return jsonify(payload), status
+
+
+@app.post("/api/agent")
+def agent():
+    """Agentic entry point (Phase 4): plan a request over the available tools
+    (dataset search + grounded Q&A), run the needed ones in a single turn, and
+    return a combined result. Handles multi-part queries like
+    "find CMS muon datasets and explain why CMS uses a solenoid"."""
+    body = request.get_json(silent=True) or {}
+    user_query = (body.get("query") or "").strip()
+    if not user_query:
+        return jsonify({"error": "Field 'query' is required."}), 400
+
+    # INPUT rail first — one refusal covers every downstream tool.
+    blocked = guardrails.screen_query(user_query)
+    if blocked:
+        refusal, _ = _refusal(user_query, blocked["message"], f"input:{blocked['category']}")
+        return jsonify({
+            "query": user_query,
+            "goal": user_query,
+            "tools_used": [],
+            "search": None,
+            "answer": refusal,
+        }), 200
+
+    plan = ollama_client.plan_tasks(user_query)
+
+    tools_used: list[str] = []
+    search_payload = None
+    answer_payload = None
+
+    if plan.get("search_query"):
+        sp, sstatus = _run_search(plan["search_query"], body.get("size"))
+        if sstatus == 200:
+            search_payload = sp
+            tools_used.append("search")
+
+    if plan.get("ask_query"):
+        ap, astatus = _run_ask(plan["ask_query"], body.get("k"))
+        if astatus == 200:
+            answer_payload = ap
+            tools_used.append("ask")
+
+    return jsonify({
+        "query": user_query,
+        "goal": plan.get("goal", user_query),
+        "plan": {
+            "search_query": plan.get("search_query"),
+            "ask_query": plan.get("ask_query"),
+        },
+        "tools_used": tools_used,
+        "search": search_payload,
+        "answer": answer_payload,
+    }), 200
 
 
 @app.get("/api/record/<recid>")

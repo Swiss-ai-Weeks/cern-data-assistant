@@ -216,6 +216,62 @@ def _heuristic_intent(msg: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Phase 4 — agentic planner (decompose a request into tool calls)
+# ---------------------------------------------------------------------------
+
+PLAN_SYSTEM_PROMPT = """You are the planner for the CERN Data Assistant. You \
+turn one user message into a plan over TWO tools, and may use one, the other, \
+or BOTH in a single turn.
+
+Tools:
+- "search_query": a short keyword query for the CERN Open Data portal, used to
+  FIND datasets/files (e.g. "CMS muon proton collisions 13 TeV"). null if the
+  user isn't asking to find data.
+- "ask_query": a self-contained QUESTION about physics / detectors / experiments
+  to be answered from CERN documentation (e.g. "Why does CMS use a solenoid?").
+  null if the user isn't asking to understand something.
+
+Use BOTH when the message has two parts, e.g. "find CMS muon datasets and
+explain why CMS uses a solenoid" -> search_query for the data, ask_query for
+the explanation.
+
+Respond with ONLY a JSON object of this exact shape:
+{"goal": "<one short sentence restating the user's goal>",
+ "search_query": "<keywords>" | null,
+ "ask_query": "<question>" | null}
+
+If both would be null, put the user's message in ask_query."""
+
+
+def plan_tasks(user_message: str, model: Optional[str] = None) -> dict:
+    """Decompose a request into optional search + ask sub-tasks. Falls back to
+    the single-intent router if planning fails."""
+    try:
+        data = _chat_json(PLAN_SYSTEM_PROMPT, user_message, model=model)
+    except OllamaUnavailable:
+        data = {}
+
+    def _clean(v):
+        if isinstance(v, str) and v.strip() and v.strip().lower() != "null":
+            return v.strip()
+        return None
+
+    search_q = _clean(data.get("search_query"))
+    ask_q = _clean(data.get("ask_query"))
+    goal = _clean(data.get("goal"))
+
+    # Fallback: if the planner gave us nothing usable, route with the classifier.
+    if not search_q and not ask_q:
+        intent = classify_intent(user_message, model=model)["intent"]
+        if intent == "search":
+            search_q = user_message
+        else:
+            ask_q = user_message
+
+    return {"goal": goal or user_message, "search_query": search_q, "ask_query": ask_q}
+
+
+# ---------------------------------------------------------------------------
 # Phase 2 — embeddings + grounded (RAG) answering
 # ---------------------------------------------------------------------------
 

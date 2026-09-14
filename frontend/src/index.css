@@ -209,6 +209,21 @@ a {
   font-weight: 500;
 }
 
+.agent-tools {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.tool-chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--accent-2);
+  background: var(--accent-2-soft);
+}
+
 /* ---------------------------------------------------------------- chips */
 
 .examples {

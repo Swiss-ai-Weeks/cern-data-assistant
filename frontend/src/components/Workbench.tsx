@@ -76,7 +76,7 @@ function activeNode(live: LiveTurn | null): string | null {
 
 export default function Workbench({ idle, live, onStarter, onOpenRecord }: Props) {
   const node = activeNode(live);
-  const result = live?.result;
+  const result = live?.result ?? null;
   const hero = heroRecord(result);
   const datasets = (result?.search?.results ?? []).filter(
     (r) => !hero || String(r.recid) !== String(hero.recid),

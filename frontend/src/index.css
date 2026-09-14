@@ -448,3 +448,99 @@ a {
     margin: 0;
   }
 }
+
+/* ---------------------------------------------------- Phase 1 card fields */
+.kind-badge {
+  margin-left: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  vertical-align: middle;
+  border: 1px solid var(--border);
+}
+.kind-dataset {
+  color: var(--accent-2);
+  background: var(--accent-2-soft);
+  border-color: transparent;
+}
+.kind-doc {
+  color: var(--text-muted);
+  background: var(--panel-raised);
+}
+
+.format-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 4px;
+}
+.format-chip {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 4px;
+  padding: 1px 8px;
+}
+
+.record-suggestion {
+  margin: 10px 0 0;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.record-suggestion .label,
+.format-row .label,
+.usage-block .label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 4px;
+}
+.format-row .label {
+  display: inline;
+  margin: 0 4px 0 0;
+}
+
+.usage-block {
+  margin-top: 12px;
+}
+.usage-cmd {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent-2);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.cite-block {
+  margin-top: 12px;
+  font-size: 13px;
+}
+.cite-block summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+.cite-block summary:hover {
+  color: var(--text);
+}
+.cite-text {
+  margin: 8px 0 4px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}

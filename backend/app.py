@@ -109,10 +109,16 @@ def search():
                     info = ranked.get(s["recid"], {})
                     s["relevance"] = info.get("relevance", 0)
                     s["why"] = info.get("why", "")
-                summaries.sort(key=lambda s: s.get("relevance", 0), reverse=True)
                 ranking_used = True
         except ollama_client.OllamaUnavailable:
             log.warning("Ollama became unavailable during ranking step")
+
+    # ---- 4. Order results: real datasets first, then relevance ------------
+    # Stable sorts, applied least-significant first, so relevance dominates
+    # and (fix for "atom -> glossary") datasets outrank documentation on ties.
+    summaries.sort(key=lambda s: 0 if s.get("is_dataset") else 1)
+    if ranking_used:
+        summaries.sort(key=lambda s: s.get("relevance", 0), reverse=True)
 
     summaries = summaries[:size]
 

@@ -2,19 +2,36 @@
 
 HPE & NVIDIA Agentic AI Hackathon — [Swiss-ai-Weeks/cern-data-assistant](https://github.com/Swiss-ai-Weeks/cern-data-assistant).
 
-Natural-language search over [CERN Open Data](https://opendata.cern.ch/). You type something like *“I need proton-proton collisions at 13 TeV with muons”*. A model on the LaunchPad H100 turns that into search terms, the backend queries CERN, and the same model ranks the hits.
+Natural-language search over [CERN Open Data](https://opendata.cern.ch/). Type *“I need proton-proton collisions at 13 TeV with muons”* or *“Why does CMS use a solenoid?”*. A model on the LaunchPad H100 plans the request, searches CERN, and answers detector questions **only** when a CERN source supports them.
 
-**Do not run the LLM on your laptop.** The GPUs are on NVIDIA LaunchPad. Your machine only runs the UI + Flask, and tunnels to Ollama on the H100.
+**Do not run the LLM on your laptop.** The GPUs are on NVIDIA LaunchPad.
+
+### Demo (preferred)
+
+One process on the H100 serves UI + API. Laptop only tunnels port **5001**.
 
 ```
-Laptop                         LaunchPad H100
-------                         --------------
+Laptop                              LaunchPad H100 (2× H100)
+------                              ------------------------
+http://127.0.0.1:5001  <---SSH 5001---  gunicorn :5001  (React + Flask)
+                                        Ollama :11434   (qwen2.5:32b, nomic-embed-text)
+                                        CERN API is public (opendata.cern.ch)
+```
+
+Pitch script: [DEMO.md](DEMO.md) (four queries). On the GPU box: `scripts/start_h100.sh` then `scripts/warm_h100.sh`.
+
+### Dev from a laptop
+
+UI and Flask stay local; only Ollama is remote.
+
+```
+Laptop                              LaunchPad H100
+------                              --------------
 http://127.0.0.1:5173  UI
-http://127.0.0.1:5001  Flask  --SSH tunnel 11434-->  Ollama (llama3.2, 2× H100)
-                                 CERN API is public (opendata.cern.ch)
+http://127.0.0.1:5001  Flask  --SSH tunnel 11434-->  Ollama (qwen2.5:32b, fallback llama3.2)
 ```
 
-If Ollama is down, search still works; ranking is off.
+If Ollama is down, search still works; ranking and Ask are off.
 
 ---
 
@@ -75,14 +92,21 @@ Confirm it sees the GPUs in `/tmp/ollama.log` (`NVIDIA H100 NVL`). Ollama listen
 
 ## 3. Tunnel (every time you work from a laptop)
 
-On **your** machine, leave this running:
+**Demo (H100 serves UI+API):**
+
+```bash
+ssh -N -L 5001:127.0.0.1:5001 launchpad-cern
+```
+
+Open http://127.0.0.1:5001 — nothing else to start locally. See [DEMO.md](DEMO.md).
+
+**Dev (Flask+Vite on the laptop, Ollama on the H100):**
 
 ```bash
 ssh -N -L 11434:127.0.0.1:11434 launchpad-cern
 ```
 
-`localhost:11434` is now the H100. If this dies, the UI shows **ollama offline**.
-
+`localhost:11434` is now the H100. If this dies, the UI shows **ollama offline**. Do not bind both tunnels to local **5001** at once — stop the laptop Flask first if you switch to the demo tunnel.
 ---
 
 ## 4. Backend (laptop)
@@ -207,6 +231,13 @@ scripts/start_h100.sh      # starts Ollama if needed, pulls models, builds index
 
 `start_h100.sh --rebuild` also rebuilds the RAG index and the UI bundle after a `git pull`.
 The script writes `backend/.env` with `OLLAMA_MODEL=qwen2.5:32b`, `SERVE_FRONTEND=1`, `FLASK_DEBUG=0`.
+Before a pitch, warm the 32B model so the first question is not a GPU cold-start:
+
+```bash
+scripts/warm_h100.sh
+```
+
+Judge queries (spoken + API): [DEMO.md](DEMO.md) · `./scripts/judge_demo.sh`
 
 From your laptop:
 
@@ -239,6 +270,12 @@ cern-data-assistant/
 │   │   └── chunks.json     # built chunk texts (gitignored)
 │   ├── tests/              # unittest (no network): rails, cache, flattening
 │   └── requirements.txt
+├── scripts/
+│   ├── start_h100.sh       # one-box demo on the GPU node
+│   ├── warm_h100.sh        # keep 32B + embed model loaded
+│   └── judge_demo.sh       # four pitch queries against /api/agent
+├── DEMO.md                 # spoken judge script
+├── ROADMAP.md              # what's left
 ├── frontend/
 │   └── src/                # React + Vite UI (Beamline)
 └── dataset/                # optional local CERN JSON dumps (gitignored)

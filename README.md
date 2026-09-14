@@ -213,9 +213,18 @@ Try:
 Flow:
 
 1. The agent plans: dataset search, grounded Q&A, or both
-2. Ollama extracts CERN search keywords; if CERN's AND-search returns 0 hits, terms are broadened
-3. Backend queries `https://opendata.cern.ch/api/records/` (cached ~5 min)
-4. Ollama ranks hits and writes a one-line *why*
+2. Ollama extracts CERN search keywords. Exact filters are pulled out of the request
+   deterministically and sent to CERN as **facets** (`collision_energy=13TeV`,
+   `collision_type=pp`, `experiment=CMS`, `type=Dataset`), so "13 TeV" no longer has
+   to appear as a keyword; the keyword query keeps only the physics terms. Physics
+   keywords are also expanded to CMS primary-dataset names ("muons" → `DoubleMuon`,
+   `SingleMuon`), which a keyword search would never match.
+3. Backend queries `https://opendata.cern.ch/api/records/` (cached ~5 min). If the
+   AND-search returns 0 hits the keywords are broadened first, then the facets are
+   loosened one at a time (collision type → energy → experiment → none).
+4. The pool is pre-ordered (collision data before simulated unless you asked for
+   simulation, keyword in title, readable titles), then Ollama ranks it and writes a
+   one-line *why*. The header shows the filters that were actually sent.
 5. Knowledge questions go through RAG + guardrails (no CERN source → no answer)
 6. UI shows experiment, size, format, how to download, citations, plus facet filters
 

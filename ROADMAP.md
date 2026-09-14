@@ -76,8 +76,12 @@ Three tools, visible plan, retry if CERN returns nothing.
 - Streaming tokens so the 32B model doesn’t look “stuck”.
 - In-app **record preview** for every row (top hit already fetched by the agent).
 - Follow-up chat (“and the ATLAS one?”) — needs session memory.
-- Facets **sent to CERN** (`experiment:CMS`, energy) instead of filter-after-fetch.
-- A couple of mocked `ollama_client` tests.
+- ✅ Facets **sent to CERN** (`collision_energy`, `collision_type`, `experiment`, `type=Dataset`) extracted
+  deterministically from the request; keywords stripped of facet words; facet ladder when empty; CMS
+  primary-dataset aliases ("muons" → DoubleMuon/SingleMuon); collision-first pool ordering; cards now show
+  energy / collision type / run period from `collision_information`. "proton-proton collisions at 13 TeV with
+  muons" → DoubleMuon 2016 NanoAOD/MiniAOD instead of 1 hit. (`subtype` is ignored by the portal API.)
+- ✅ Mocked `ollama_client` tests (`tests/test_ollama_client.py`) + facet tests (`tests/test_facets.py`), 55 total.
 
 ---
 

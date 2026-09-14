@@ -8,6 +8,7 @@ export interface RecordSummary {
   subtype: string;
   collision_energy: string;
   collision_type: string;
+  run_period?: string;
   date_published: string;
   file_count: number;
   size_bytes: number | null;
@@ -40,6 +41,11 @@ export interface RecordDetail extends RecordSummary {
 export interface SearchResponse {
   query: string;
   search_terms: string;
+  /** Exact filters sent to the CERN API (collision_energy, collision_type, experiment, type). */
+  facets?: Record<string, string>;
+  facets_requested?: Record<string, string>;
+  /** CMS primary-dataset aliases merged into the pool ("muons" -> DoubleMuon, SingleMuon). */
+  aliases?: string[];
   broadened?: boolean;
   total_matches: number;
   returned: number;

@@ -84,6 +84,14 @@ export default function ResultsFeed({ result, onOpenRecord }: Props) {
             ? "Ranked by relevance to your request"
             : "Ordered by CERN Open Data's own relevance score"}
           {result.broadened ? " · query broadened to find matches" : ""}
+          {result.facets && Object.keys(result.facets).length > 0 && (
+            <span className="facets-sent" title="Filters sent to the CERN Open Data API">
+              {" · filters: "}
+              {Object.entries(result.facets).map(([k, v]) => (
+                <code key={k}>{k}={v}</code>
+              ))}
+            </span>
+          )}
         </span>
         <span className="count">
           {visible.length} of {result.total_matches.toLocaleString()}

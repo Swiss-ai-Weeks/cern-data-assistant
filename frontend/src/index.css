@@ -1596,3 +1596,13 @@ a {
     font-size: 5rem;
   }
 }
+
+/* facets the backend sent to CERN as exact filters (ResultsFeed header) */
+.facets-sent code {
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.78em;
+  opacity: 0.85;
+}

@@ -97,17 +97,42 @@ def broadening_attempts(terms: str) -> list[str]:
     return cern_client.broadening_attempts(terms)
 
 
-def _fetch_with_broadening(terms: str, pool: int):
-    """Retry with progressively fewer keywords until CERN returns hits.
-    Returns (raw, used_terms, broadened)."""
+def _fetch_with_broadening(terms: str, pool: int, facets: dict | None = None):
+    """Retry with progressively fewer keywords until CERN returns hits, and
+    if the whole keyword ladder is empty, loosen the facets one at a time
+    (collision type -> energy -> experiment -> none) and climb again.
+    Returns (raw, used_terms, broadened, used_facets)."""
     ordered = broadening_attempts(terms)
     last_raw = None
-    for attempt in ordered:
-        raw = cern_client.search_records(attempt, size=pool)
-        if raw.get("hits", {}).get("total", 0):
-            return raw, attempt, attempt != terms
-        last_raw = raw
-    return last_raw, ordered[-1], True
+    for fac in cern_client.facet_ladder(facets or {}):
+        for attempt in ordered:
+            raw = cern_client.search_records(attempt, size=pool, facets=fac)
+            if raw.get("hits", {}).get("total", 0):
+                _merge_alias_hits(raw, attempt, pool, fac)
+                return raw, attempt, (attempt != terms or fac != (facets or {})), fac
+            last_raw = raw
+    return last_raw, ordered[-1], True, {}
+
+
+def _merge_alias_hits(raw: dict, terms: str, pool: int, facets: dict) -> None:
+    """Add CMS primary-dataset hits (/DoubleMuon, /SingleMuon, ...) for the
+    physics keywords in `terms` to the pool, de-duplicated by record id.
+    Best effort: an alias search failure never breaks the main search."""
+    seen = {h.get("id") for h in raw.get("hits", {}).get("hits", [])}
+    extra: list[dict] = []
+    for alias in cern_client.alias_queries(terms):
+        try:
+            more = cern_client.search_records(alias, size=min(pool, 10), facets=facets)
+        except cern_client.CernApiError:
+            continue
+        for h in more.get("hits", {}).get("hits", []):
+            if h.get("id") not in seen:
+                seen.add(h.get("id"))
+                extra.append(h)
+    if extra:
+        raw["hits"]["hits"] = raw["hits"]["hits"] + extra
+        raw["hits"]["total"] = raw["hits"].get("total", 0) + len(extra)
+        raw["aliases"] = cern_client.alias_queries(terms)
 
 
 def _run_search(user_query: str, requested_size=None, use_llm_rank: bool = True):
@@ -125,17 +150,28 @@ def _run_search(user_query: str, requested_size=None, use_llm_rank: bool = True)
     except ollama_client.OllamaUnavailable:
         log.warning("Ollama unavailable — falling back to raw query as search terms")
 
-    # 2. Query CERN Open Data (fetch a larger pool so the ranker has choices),
-    #    broadening the query if the first, most-specific attempt returns 0.
+    # 2. Facets: energy / collision type / experiment / dataset-only are sent
+    #    to CERN as exact filters, and removed from the keyword query so the
+    #    strict AND search only has to match the physics terms.
+    facets = cern_client.extract_facets(user_query)
+    if facets:
+        search_terms = cern_client.strip_facet_terms(search_terms, facets)
+
+    # 3. Query CERN Open Data (fetch a larger pool so the ranker has choices),
+    #    broadening keywords, then facets, if the most specific attempt is empty.
     fetch_pool = min(size * 3, 60) if use_llm_rank and model_used else size
     try:
-        raw, used_terms, broadened = _fetch_with_broadening(search_terms, fetch_pool)
+        raw, used_terms, broadened, facets_used = _fetch_with_broadening(
+            search_terms, fetch_pool, facets)
     except cern_client.CernApiError as exc:
         return {"error": f"CERN Open Data API unreachable: {exc}"}, 502
 
     search_terms = used_terms
     hits = raw.get("hits", {}).get("hits", []) if raw else []
     total = raw.get("hits", {}).get("total", 0) if raw else 0
+    # Deterministic pre-rank (collision data first, keyword in title, readable
+    # title) so the LLM ranker and the size cut see the useful records first.
+    hits = cern_client.order_pool(hits, user_query, search_terms)[:fetch_pool]
     summaries = [cern_client.summarize_hit(h) for h in hits]
 
     # 3. Optionally rank/annotate with the local LLM
@@ -162,6 +198,9 @@ def _run_search(user_query: str, requested_size=None, use_llm_rank: bool = True)
     return {
         "query": user_query,
         "search_terms": search_terms,
+        "facets": facets_used,
+        "facets_requested": facets,
+        "aliases": (raw or {}).get("aliases", []),
         "broadened": broadened,
         "total_matches": total,
         "returned": len(summaries),

@@ -51,3 +51,21 @@ class SummarizeHitTests(unittest.TestCase):
         self.assertIn("cernopendata-client", s["usage"])
         self.assertIn("opendata.cern.ch/record/42", s["url"])
         self.assertIn("10.7483/OPENDATA.CMS.TEST", s["citation"])
+
+
+class CollisionInformationTests(unittest.TestCase):
+    def test_reads_nested_collision_information(self):
+        hit = {"id": 30522, "metadata": {"title": "/DoubleMuon/Run2016G/MINIAOD",
+               "type": {"primary": "Dataset", "secondary": ["Collision"]},
+               "collision_information": {"energy": "13TeV", "type": "pp"},
+               "run_period": ["Run2016G"]}}
+        out = c.summarize_hit(hit)
+        self.assertEqual(out["collision_energy"], "13TeV")
+        self.assertEqual(out["collision_type"], "pp")
+        self.assertEqual(out["run_period"], "Run2016G")
+
+    def test_falls_back_to_flat_keys(self):
+        out = c.summarize_hit({"id": 1, "metadata": {"collision_energy": "7TeV"}})
+        self.assertEqual(out["collision_energy"], "7TeV")
+        self.assertEqual(out["collision_type"], "—")
+

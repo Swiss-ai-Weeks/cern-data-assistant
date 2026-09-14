@@ -80,6 +80,16 @@ export function StatusIcon({ className = "icon" }: IconProps) {
   );
 }
 
+export function HelpIcon({ className = "icon" }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
+      <circle cx="12" cy="12" r="8.5" />
+      <path strokeLinecap="round" d="M9.5 9.25a2.75 2.75 0 0 1 5 1.5c0 1.75-2.75 2-2.75 3.25" />
+      <circle cx="12" cy="16.75" r="0.75" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 export function SearchIcon({ className = "icon" }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>

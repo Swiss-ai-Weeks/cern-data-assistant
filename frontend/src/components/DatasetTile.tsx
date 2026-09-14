@@ -1,3 +1,4 @@
+import { glanceFromRecord } from "../lib/recordVisual";
 import type { RecordSummary } from "../types";
 
 interface Props {
@@ -6,21 +7,22 @@ interface Props {
 }
 
 export default function DatasetTile({ record, onOpen }: Props) {
+  const g = glanceFromRecord(record);
   return (
     <button type="button" className="ds-tile" onClick={onOpen} aria-label={`Open record ${record.recid}`}>
       <div className="ds-tile-top">
         <span className="ds-exp">{record.experiment || "CERN"}</span>
         <span className="ds-recid">{record.recid}</span>
       </div>
-      <h3>{record.title}</h3>
+      <h3>{g.headline}</h3>
       <div className="ds-meta">
-        <span>{record.size}</span>
-        <span>{record.file_count} files</span>
-        {(record.formats || []).slice(0, 2).map((f) => (
-          <span key={f} className="ds-fmt">
-            {f}
+        <span>{g.sizeLabel}</span>
+        {g.energyLabel !== "—" && <span>{g.energyLabel}</span>}
+        {g.formatLabel !== "—" && (
+          <span className="ds-fmt">
+            {g.formatLabel}
           </span>
-        ))}
+        )}
       </div>
     </button>
   );

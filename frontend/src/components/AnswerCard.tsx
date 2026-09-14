@@ -11,7 +11,7 @@ interface Props {
 /** @deprecated import EvidenceBrief directly — kept for legacy panel imports */
 export default function AnswerCard({ result, query = "", onTryGrounded, generatedAt }: Props) {
   return (
-    <div className="answer-card">
+    <div className="answer-card answer-card-beamline">
       <EvidenceBrief
         result={result}
         query={query}

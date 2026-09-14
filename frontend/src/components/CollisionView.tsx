@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { cn } from "../lib/utils";
 
 interface Props {
   hot?: boolean;
@@ -6,10 +7,18 @@ interface Props {
   telemetry?: boolean;
   /** Conceptual detector layer labels */
   labels?: boolean;
+  compact?: boolean;
+  className?: string;
 }
 
 /** Paper-and-ink event display. Two bunches collide; tracks curve like muons. */
-export default function CollisionView({ hot = false, telemetry = false, labels = false }: Props) {
+export default function CollisionView({
+  hot = false,
+  telemetry = false,
+  labels = false,
+  compact = false,
+  className,
+}: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -19,8 +28,9 @@ export default function CollisionView({ hot = false, telemetry = false, labels =
     if (!ctx) return;
 
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const tracks = Array.from({ length: 32 }, (_, i) => ({
-      a: (i / 32) * Math.PI * 2 + 0.11,
+    const count = compact ? 16 : 32;
+    const tracks = Array.from({ length: count }, (_, i) => ({
+      a: (i / count) * Math.PI * 2 + 0.11,
       curve: ((i % 5) - 2) * 0.22,
       ink: i % 3 !== 0,
       len: 0.38 + (i % 7) * 0.08,
@@ -98,10 +108,10 @@ export default function CollisionView({ hot = false, telemetry = false, labels =
 
     paint(0);
     return () => cancelAnimationFrame(raf);
-  }, [hot]);
+  }, [hot, compact]);
 
   return (
-    <div className="collision-wrap">
+    <div className={cn("collision-wrap", compact && "collision-compact", className)}>
       <canvas ref={ref} className="collision" aria-hidden />
       {telemetry && (
         <div className="collision-hud" aria-hidden>

@@ -1,0 +1,376 @@
+/**
+ * Beamline motion language — transform/opacity only.
+ * Identity (color, type, layout) lives in tokens; this file only times and eases.
+ */
+
+@keyframes motion-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes motion-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes motion-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(var(--motion-distance));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes motion-slide-in-right {
+  from {
+    opacity: 0.96;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes motion-slide-out-right {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}
+@keyframes motion-slide-in-left {
+  from {
+    opacity: 0.96;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes motion-slide-out-left {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+}
+@keyframes motion-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes motion-modal-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
+@keyframes motion-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--motion-distance-sm)) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.motion-page {
+  animation: motion-fade-in var(--duration-section) var(--ease-out) backwards;
+}
+
+.motion-section {
+  animation: motion-fade-up var(--duration-component) var(--ease-out) backwards;
+}
+
+.overlay-shell[data-motion="exit"] {
+  pointer-events: none;
+}
+
+.overlay-shell[data-motion="enter"] .drawer-backdrop {
+  animation: motion-fade-in var(--duration-overlay) var(--ease-out) both;
+}
+.overlay-shell[data-motion="exit"] .drawer-backdrop {
+  animation: motion-fade-out var(--duration-exit) var(--ease-in) forwards;
+}
+
+.overlay-shell[data-motion="enter"] .help-panel,
+.overlay-shell[data-motion="enter"] .trust-panel,
+.overlay-shell[data-motion="enter"] .drawer {
+  animation: motion-slide-in-right var(--duration-overlay) var(--ease-out) both;
+}
+.overlay-shell[data-motion="exit"] .help-panel,
+.overlay-shell[data-motion="exit"] .trust-panel,
+.overlay-shell[data-motion="exit"] .drawer {
+  animation: motion-slide-out-right var(--duration-exit) var(--ease-in) forwards;
+}
+
+.overlay-shell[data-motion="enter"] .history-panel {
+  animation: motion-slide-in-left var(--duration-overlay) var(--ease-out) both;
+}
+.overlay-shell[data-motion="exit"] .history-panel {
+  animation: motion-slide-out-left var(--duration-exit) var(--ease-in) forwards;
+}
+
+.overlay-shell[data-motion="enter"] .palette-panel {
+  animation: motion-modal-in var(--duration-overlay) var(--ease-out) both;
+}
+.overlay-shell[data-motion="exit"] .palette-panel {
+  animation: motion-modal-out var(--duration-exit) var(--ease-in) forwards;
+}
+
+.simple-chat-idle .beamline-status-strip {
+  animation: motion-fade-in var(--duration-component) var(--ease-out) backwards;
+}
+.simple-chat-idle .beamline-hero {
+  animation: motion-fade-up var(--duration-section) var(--ease-out) backwards;
+  animation-delay: 40ms;
+}
+.simple-chat-idle .simple-chat-input-wrap {
+  animation: motion-fade-up var(--duration-section) var(--ease-out) backwards;
+  animation-delay: 80ms;
+}
+.simple-chat-idle .demo-beats {
+  animation: motion-fade-up var(--duration-component) var(--ease-out) backwards;
+  animation-delay: 120ms;
+}
+.simple-chat-idle .demo-beat-btn:nth-child(1) { animation: motion-fade-up var(--duration-component) var(--ease-out) backwards; animation-delay: 140ms; }
+.simple-chat-idle .demo-beat-btn:nth-child(2) { animation: motion-fade-up var(--duration-component) var(--ease-out) backwards; animation-delay: 180ms; }
+.simple-chat-idle .demo-beat-btn:nth-child(3) { animation: motion-fade-up var(--duration-component) var(--ease-out) backwards; animation-delay: 220ms; }
+.simple-chat-idle .simple-chat-chips {
+  animation: motion-fade-up var(--duration-component) var(--ease-out) backwards;
+  animation-delay: 240ms;
+}
+.simple-chat-idle .simple-chat-onboarding {
+  animation: motion-fade-in var(--duration-component) var(--ease-out) backwards;
+  animation-delay: 280ms;
+}
+.bottom-dock-wrap {
+  animation: motion-fade-up var(--duration-section) var(--ease-out) backwards;
+  animation-delay: 160ms;
+}
+.system-banner {
+  animation: motion-fade-in var(--duration-ui) var(--ease-out) backwards;
+}
+
+.simple-chat-results > * {
+  animation: motion-fade-up var(--duration-component) var(--ease-out) backwards;
+}
+.simple-chat-results > *:nth-child(1) { animation-delay: 0ms; }
+.simple-chat-results > *:nth-child(2) { animation-delay: 30ms; }
+.simple-chat-results > *:nth-child(3) { animation-delay: 60ms; }
+.simple-chat-results > *:nth-child(4) { animation-delay: 90ms; }
+.simple-chat-results > *:nth-child(5) { animation-delay: 120ms; }
+.simple-chat-results > *:nth-child(6) { animation-delay: 140ms; }
+.simple-chat-results > *:nth-child(n + 7) { animation-delay: 150ms; }
+
+.brief-passage,
+.citation-drawer {
+  animation: motion-pop-in var(--duration-ui) var(--ease-out) backwards;
+}
+
+.brief-unused[open] summary + * {
+  animation: motion-fade-up var(--duration-ui) var(--ease-out) backwards;
+}
+.brief-unused summary {
+  list-style: none;
+}
+.brief-unused summary::-webkit-details-marker {
+  display: none;
+}
+.brief-unused summary::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 8px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform var(--duration-ui) var(--ease-out);
+  vertical-align: 2px;
+}
+.brief-unused[open] summary::after {
+  transform: rotate(225deg);
+}
+
+.demo-beat-btn,
+.other-record-btn,
+.palette-action,
+.session-thread-chip,
+.ds-tile,
+.launch-tile,
+.starter-card {
+  transition:
+    transform var(--duration-ui) var(--ease-out),
+    box-shadow var(--duration-ui) var(--ease-out),
+    border-color var(--duration-ui) var(--ease-out),
+    background var(--duration-ui) var(--ease-out),
+    color var(--duration-ui) var(--ease-out);
+}
+.demo-beat-btn:hover:not(:disabled),
+.other-record-btn:hover,
+.palette-action:hover,
+.session-thread-chip:hover:not(:disabled),
+.ds-tile:hover,
+.launch-tile:hover,
+.starter-card:hover {
+  transform: translateY(-2px);
+}
+
+.example-chip,
+.follow-chip,
+.cite-chip,
+.brief-source,
+.btn-passport,
+.ghost-btn,
+.dash-tab,
+.rail-btn {
+  transition:
+    transform var(--duration-micro) var(--ease-out),
+    background var(--duration-ui) var(--ease-out),
+    border-color var(--duration-ui) var(--ease-out),
+    color var(--duration-ui) var(--ease-out),
+    box-shadow var(--duration-ui) var(--ease-out);
+}
+.example-chip:hover:not(:disabled),
+.follow-chip:hover,
+.brief-source:hover {
+  transform: translateY(-1px);
+}
+
+.btn-primary,
+.send-btn,
+.prompt-send,
+.drawer-close,
+.dock-btn,
+.punch-btn,
+.punch-ghost,
+.copy-btn,
+.console-submit {
+  transition:
+    transform var(--duration-micro) var(--ease-out),
+    background var(--duration-ui) var(--ease-out),
+    color var(--duration-ui) var(--ease-out),
+    opacity var(--duration-ui) var(--ease-out),
+    box-shadow var(--duration-ui) var(--ease-out),
+    border-color var(--duration-ui) var(--ease-out);
+}
+.btn-primary:active:not(:disabled),
+.send-btn:active:not(:disabled),
+.prompt-send-ready:active:not(:disabled),
+.drawer-close:active,
+.dock-btn:active,
+.example-chip:active:not(:disabled),
+.demo-beat-btn:active:not(:disabled),
+.palette-action:active,
+.btn-passport:active,
+.ghost-btn:active {
+  transform: scale(0.98);
+}
+
+.prompt-send-ready:hover:not(:disabled) {
+  transform: scale(1.04);
+}
+
+.input-base,
+.composer-input,
+.instrument-input,
+.file-filter,
+.console-input,
+.prompt-card {
+  transition:
+    border-color var(--duration-ui) var(--ease-out),
+    box-shadow var(--duration-ui) var(--ease-out),
+    background var(--duration-ui) var(--ease-out);
+}
+
+.inline-cite {
+  transition: background var(--duration-micro) var(--ease-out), transform var(--duration-micro) var(--ease-out);
+}
+.inline-cite:active {
+  transform: scale(0.94);
+}
+
+.send-btn.copied {
+  animation: motion-pop-in var(--duration-ui) var(--ease-out);
+}
+
+.text-link,
+.app-footer-link,
+.how-link {
+  transition: color var(--duration-micro) var(--ease-out), opacity var(--duration-micro) var(--ease-out);
+}
+
+.dock-btn .icon {
+  transition: transform var(--duration-ui) var(--ease-out);
+}
+.dock-btn-active .icon {
+  transform: scale(1.06);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-page,
+  .motion-section,
+  .system-banner,
+  .bottom-dock-wrap,
+  .simple-chat-idle .beamline-status-strip,
+  .simple-chat-idle .beamline-hero,
+  .simple-chat-idle .simple-chat-input-wrap,
+  .simple-chat-idle .demo-beats,
+  .simple-chat-idle .demo-beat-btn,
+  .simple-chat-idle .simple-chat-chips,
+  .simple-chat-idle .simple-chat-onboarding,
+  .simple-chat-results > *,
+  .brief-passage,
+  .citation-drawer,
+  .brief-unused[open] summary + *,
+  .overlay-shell[data-motion] .drawer-backdrop,
+  .overlay-shell[data-motion] .help-panel,
+  .overlay-shell[data-motion] .trust-panel,
+  .overlay-shell[data-motion] .drawer,
+  .overlay-shell[data-motion] .history-panel,
+  .overlay-shell[data-motion] .palette-panel,
+  .send-btn.copied {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .demo-beat-btn:hover:not(:disabled),
+  .other-record-btn:hover,
+  .palette-action:hover,
+  .session-thread-chip:hover:not(:disabled),
+  .ds-tile:hover,
+  .launch-tile:hover,
+  .starter-card:hover,
+  .example-chip:hover:not(:disabled),
+  .follow-chip:hover,
+  .brief-source:hover,
+  .btn-primary:active:not(:disabled),
+  .send-btn:active:not(:disabled),
+  .prompt-send-ready:hover:not(:disabled),
+  .prompt-send-ready:active:not(:disabled),
+  .drawer-close:active,
+  .dock-btn:active,
+  .dock-btn-active .icon {
+    transform: none !important;
+  }
+}

@@ -1,75 +1,97 @@
-# Judge demo — two beats
+# Judge demo — Beamline (current UI)
 
-Pitch in ~3 minutes. Hard-refresh **http://127.0.0.1:5001**. You should see a live collision, not a chat form.
+Hard-refresh **http://127.0.0.1:5001** (H100 tunnel) or **http://127.0.0.1:5173** (local dev).
 
-**Say nothing about RAG.** Two buttons: **Fire 13 TeV muons** and **Show the GPU lying**.
+You should see: **hero → search bar → three demo beat buttons** → bottom dock.
 
-If the first query hangs: the 32B model is still loading. Wait, or run `scripts/warm_h100.sh` on the GPU box.
+**Do not lead with “RAG” or “agent”.** Lead with objects: catalog record, citations, refusal.
+
+If the first query hangs, the 32B model may still be loading — wait or run `scripts/warm_h100.sh` on the GPU box.
+
+Full product plan: [PRODUCT_PLAN.md](PRODUCT_PLAN.md).
 
 ---
 
-## 1. Boarding pass (~50s)
+## 1. Dataset handoff (~50s)
 
-Click **Fire 13 TeV muons**.
+Click **Find 13 TeV muons** (or type the same query).
 
 > proton-proton collisions at 13 TeV with muons
 
-**Say:** ChatGPT will invent a CMS muon dataset. This HTTP hit opendata.cern.ch. Recid, files, DOI, download — not a language model.
+**Say:** ChatGPT can invent a CMS dataset. This hit **opendata.cern.ch**. Recid, size, files, DOI, and `cernopendata-client` — not a language model.
 
-**Do:** copy the `cernopendata-client` command. Export the notebook. Optionally inspect files.
+**Do:** Copy the download command. Open portal or inspect files. Point at **Other catalog matches** if useful.
 
-**Expect:** boarding pass on the stage, real CMS/ATLAS record, copy download works.
+**Expect:** White **dataset handoff** card, no raw HTML in the abstract.
 
 ---
 
-## 2. The rail (~40s)
+## 2. Integrity rail (~40s)
 
-Click **Show the GPU lying**.
+Click **GPU lying demo**.
 
 > How do black holes evaporate?
 
-**Say:** same GPU. No CERN passage clears the floor, so the lecture is not the product. Left is what llama3.2 wanted to say. Right is Beamline.
+**Say:** Same stack. No CERN passage clears the floor, so the cosmology lecture is **not** the product. Left: what the small model drafted. Right: Beamline refusal + rail id + score vs floor.
 
-**Expect:** split panel. Left: ungrounded draft. Right: `grounded: false`, rail `retrieval:no_source` (or similar). Not a confident cosmology lecture as the answer.
+**Expect:** Integrity card on the same page — no separate “stage”.
 
 ---
 
-## 3. Optional if they still look (~40s)
+## 3. Grounded answer (~40s)
 
-> Why does CMS use a solenoid?
+Click **CMS solenoid** (or ask *Why does CMS use a solenoid?*).
 
-**Say:** every `[n]` is a portal page. The receipt is the score versus the floor.
+**Say:** Every **[n]** is a retrieved CERN page. Open the grounding receipt.
 
-**Expect:** grounded answer + grounding receipt.
+**Expect:** Answer card with citations; receipt at the bottom.
 
-Backup combo: `find CMS muon datasets and explain why CMS uses a solenoid` — pass and receipt in one turn.
+---
 
-Rescue beat (if they ask "what if the word isn't in the docs?"):
+## 4. Backup combo
+
+> find CMS muon datasets and explain why CMS uses a solenoid
+
+**Expect:** Dataset handoff **and** grounded answer in one turn; follow-up chips may appear.
+
+---
+
+## Optional: glossary rescue
 
 > What is an atom made of?
 
-**Say:** "atom" is not a CERN glossary term, so the floor would refuse. The glossary graph maps it to
-proton / electron / ion and retries once; the answer still comes only from those CERN entries.
+**Say:** “Atom” is not in the glossary; expansion maps to proton/electron/hadron entries once — still CERN-sourced, often low-confidence band.
 
-**Expect:** low-confidence grounded answer citing Electron + Hadron, receipt line
-`expanded via CERN glossary: Proton, Electron, Ion, …`. Black holes still refuse — no glossary vocabulary to expand into.
+---
+
+## Navigation (for you)
+
+| Control | Action |
+|---------|--------|
+| Bottom **Home** | Investigate (main chat) |
+| **New** (file icon) | Clear thread |
+| **Datasets** | Full list for current turn |
+| **Search** | Focus query bar |
+| **History** | Prior turns |
+| **Ctrl+K** | Command palette |
+| **?** | How Beamline earns trust |
+| **Shift+P** then **1/2/3** | Same as demo beats (presenter) |
 
 ---
 
 ## If something dies
 
 | Symptom | Fix |
-|---|---|
-| UI won't load | On laptop: `ssh -N -L 5001:127.0.0.1:5001 launchpad-cern` |
-| `ollama offline` / slow first token | On H100: `tmux attach -t app` then `scripts/start_h100.sh` |
-| Empty knowledge | On H100: `scripts/start_h100.sh --rebuild` |
-| Draft column empty | llama3.2 not pulled — refusal still works; skip the left-column line |
+|---------|-----|
+| UI won't load | Laptop: `ssh -N -L 5001:127.0.0.1:5001 launchpad-cern` |
+| Model offline in status strip | H100: `scripts/start_h100.sh` + `scripts/warm_h100.sh` |
+| Empty knowledge | H100: `scripts/start_h100.sh --rebuild` |
+| Draft column empty on refusal | llama3.2 missing — refusal still works |
 
-Rehearse:
+Rehearse API path:
 
 ```bash
-# laptop, tunnel up:
 ./scripts/judge_demo.sh
-# or against the GPU box:
+# on GPU:
 ssh launchpad-cern 'cd ~/cern-data-assistant && ./scripts/judge_demo.sh http://127.0.0.1:5001'
 ```

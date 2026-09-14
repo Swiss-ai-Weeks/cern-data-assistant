@@ -1,19 +1,22 @@
-import { useEffect } from "react";
+import { useRef } from "react";
+import { useOverlayA11y } from "../hooks/useOverlayA11y";
+import { usePresence } from "../hooks/usePresence";
 
 interface Props {
   open: boolean;
   onClose: () => void;
   onNewInvestigation: () => void;
   onOpenTrust: () => void;
+  onOpenHelp: () => void;
   onOpenAbout?: () => void;
 }
 
 const SHORTCUTS = [
-  { keys: "Enter", desc: "Submit query" },
-  { keys: "Shift+P", desc: "Presenter mode" },
-  { keys: "?", desc: "How Beamline earns trust" },
-  { keys: "Esc", desc: "Close drawer / palette" },
-  { keys: "1 / 2 / 3", desc: "Demo scenes (presenter on)" },
+  { keys: "Enter", desc: "Send query" },
+  { keys: "Shift + Enter", desc: "New line in query" },
+  { keys: "Ctrl + K", desc: "Open this menu" },
+  { keys: "?", desc: "Trust & safety" },
+  { keys: "Esc", desc: "Close panels" },
 ];
 
 export default function CommandPalette({
@@ -21,36 +24,69 @@ export default function CommandPalette({
   onClose,
   onNewInvestigation,
   onOpenTrust,
+  onOpenHelp,
   onOpenAbout,
 }: Props) {
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: globalThis.KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  const panelRef = useRef<HTMLElement>(null);
+  const { shown, motion } = usePresence(open);
+  useOverlayA11y(open, onClose, panelRef);
 
-  if (!open) return null;
+  if (!shown) return null;
 
   return (
-    <div className="palette-root">
-      <button type="button" className="drawer-backdrop" aria-label="Close command palette" onClick={onClose} />
-      <div className="palette-panel" role="dialog" aria-modal="true" aria-labelledby="palette-title">
+    <div className="palette-root overlay-shell" data-motion={motion}>
+      <button type="button" className="drawer-backdrop" aria-label="Close menu" onClick={onClose} />
+      <aside
+        ref={panelRef}
+        className="palette-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="palette-title"
+      >
         <h2 id="palette-title" className="palette-title">
-          Command palette
+          Menu
         </h2>
         <div className="palette-actions">
-          <button type="button" className="palette-action" onClick={() => { onNewInvestigation(); onClose(); }}>
+          <button
+            type="button"
+            className="palette-action"
+            onClick={() => {
+              onNewInvestigation();
+              onClose();
+            }}
+          >
             New investigation
           </button>
-          <button type="button" className="palette-action" onClick={() => { onOpenTrust(); onClose(); }}>
-            How Beamline earns trust
+          <button
+            type="button"
+            className="palette-action"
+            onClick={() => {
+              onOpenHelp();
+              onClose();
+            }}
+          >
+            Help
+          </button>
+          <button
+            type="button"
+            className="palette-action"
+            onClick={() => {
+              onOpenTrust();
+              onClose();
+            }}
+          >
+            Trust &amp; safety
           </button>
           {onOpenAbout && (
-            <button type="button" className="palette-action" onClick={() => { onOpenAbout(); onClose(); }}>
-              About &amp; system status
+            <button
+              type="button"
+              className="palette-action"
+              onClick={() => {
+                onOpenAbout();
+                onClose();
+              }}
+            >
+              About Beamline
             </button>
           )}
         </div>
@@ -62,7 +98,7 @@ export default function CommandPalette({
             </li>
           ))}
         </ul>
-      </div>
+      </aside>
     </div>
   );
 }

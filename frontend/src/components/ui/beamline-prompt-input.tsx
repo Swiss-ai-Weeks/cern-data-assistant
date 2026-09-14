@@ -21,11 +21,11 @@ export interface BeamlinePromptInputProps {
 
 function ArrowUpIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path
-        d="M7 12V2M7 2L2.5 6.5M7 2L11.5 6.5"
+        d="M12 19V5M12 5L5 12M12 5l7 7"
         stroke="currentColor"
-        strokeWidth="1.75"
+        strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -55,9 +55,10 @@ export const BeamlinePromptInput = forwardRef<BeamlinePromptInputHandle, Beamlin
     useEffect(() => {
       const el = textareaRef.current;
       if (!el) return;
-      el.style.height = "auto";
-      const next = Math.min(Math.max(el.scrollHeight, 22), 120);
+      el.style.height = "0px";
+      const next = Math.min(Math.max(el.scrollHeight, 24), 120);
       el.style.height = `${next}px`;
+      el.style.overflowY = el.scrollHeight > 120 ? "auto" : "hidden";
     }, [value]);
 
     const submit = () => {
@@ -67,7 +68,15 @@ export const BeamlinePromptInput = forwardRef<BeamlinePromptInputHandle, Beamlin
 
     return (
       <div className={cn("prompt-root", className)}>
-        <div className="prompt-card prompt-card-single">
+        <div
+          className="prompt-card prompt-card-single"
+          onClick={(e) => {
+            const target = e.target as HTMLElement;
+            if (target === e.currentTarget || !target.closest("button, textarea")) {
+              textareaRef.current?.focus();
+            }
+          }}
+        >
           <textarea
             ref={textareaRef}
             value={value}
@@ -84,15 +93,20 @@ export const BeamlinePromptInput = forwardRef<BeamlinePromptInputHandle, Beamlin
             rows={1}
             className="prompt-textarea prompt-textarea-single"
           />
-          <button
-            type="button"
-            className={cn("prompt-send prompt-send-inline", hasValue && "prompt-send-ready")}
-            onClick={submit}
-            disabled={busy || !hasValue}
-            aria-label={busy ? "Working" : "Send query"}
-          >
-            {busy ? <span className="prompt-dots" aria-hidden /> : <ArrowUpIcon />}
-          </button>
+          <div className="prompt-toolbar">
+            <p className="prompt-hint">
+              {busy ? "Working…" : hasValue ? "Enter to send" : "Shift+Enter for a new line"}
+            </p>
+            <button
+              type="button"
+              className={cn("prompt-send prompt-send-inline", (hasValue || busy) && "prompt-send-ready")}
+              onClick={submit}
+              disabled={busy || !hasValue}
+              aria-label={busy ? "Working" : "Send query"}
+            >
+              {busy ? <span className="prompt-dots" aria-hidden /> : <ArrowUpIcon />}
+            </button>
+          </div>
         </div>
       </div>
     );

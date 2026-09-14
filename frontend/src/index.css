@@ -1,9 +1,15 @@
 @import "./styles/tokens.css";
 @import "./styles/dashboard.css";
 @import "./styles/components.css";
+@import "./styles/motion.css";
 
 * {
   box-sizing: border-box;
+}
+
+html {
+  scroll-padding-top: 52px;
+  scroll-padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
 }
 
 html,
@@ -14,19 +20,38 @@ body,
   height: 100%;
   background: var(--bg);
   color: var(--text);
-  font-family: var(--font-body);
+  font-family: var(--font-body, var(--font-ui));
   font-size: 16px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 body {
-  background-image: radial-gradient(
-    1000px 460px at 50% -12%,
-    rgba(99, 134, 219, 0.18),
-    transparent 70%
-  );
+  background-image:
+    radial-gradient(920px 420px at 50% -14%, color-mix(in srgb, var(--cobalt) 16%, transparent), transparent 72%),
+    radial-gradient(640px 280px at 88% 8%, color-mix(in srgb, var(--citation-gold) 7%, transparent), transparent 70%);
   background-repeat: no-repeat;
   background-attachment: fixed;
+}
+
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -48px;
+  z-index: 400;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--ink-scholarly);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-decoration: none;
+  transition: top var(--duration-ui) var(--ease-out);
+}
+
+.skip-link:focus {
+  top: 12px;
 }
 
 button,
@@ -41,13 +66,24 @@ a {
 }
 
 ::selection {
-  background: var(--ink);
+  background: var(--ink-scholarly);
   color: var(--paper);
 }
 
 *:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 3px;
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+button,
+[role="button"],
+a,
+.example-chip,
+.session-thread-chip,
+.dock-btn,
+.text-link,
+.drawer-close {
+  cursor: pointer;
 }
 
 .app-shell {
@@ -1062,7 +1098,7 @@ a {
   text-transform: uppercase;
 }
 .drawer-close {
-  background: var(--ink);
+  background: var(--ink-scholarly);
   color: var(--paper);
   border: none;
   border-radius: 999px;
@@ -1100,7 +1136,7 @@ a {
   inset: -50%;
   z-index: 200;
   pointer-events: none;
-  opacity: 0.04;
+  opacity: 0.035;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 .microlabel {
@@ -2252,14 +2288,27 @@ a {
   margin: 12px 0;
 }
 .inline-cite {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35em;
+  height: 1.35em;
+  margin: 0 2px;
+  padding: 0 5px;
   border: none;
-  background: none;
-  padding: 0 1px;
-  color: var(--cobalt);
-  font: inherit;
+  border-radius: 999px;
+  background: var(--ink-scholarly);
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  vertical-align: 2px;
   cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  text-decoration: none;
+}
+.inline-cite:hover {
+  background: var(--cobalt);
 }
 .citation-drawer {
   border: 1px solid var(--border);

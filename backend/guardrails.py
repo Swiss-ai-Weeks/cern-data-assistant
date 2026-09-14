@@ -145,14 +145,36 @@ def check_citations(answer: str, passages: list[dict]) -> dict:
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'(])")
 
 
+_SECTION_HEADER = re.compile(r"^(METRICS|COMPARE)\s*$", re.I)
+
+
 def strip_uncited_sentences(answer: str) -> dict:
     """Cite-or-drop rail for the low-confidence band: keep only the sentences
     that carry at least one [n] citation, so a weakly supported answer never
     shows a bare physics claim. Returns {answer, removed (int)}; the caller
     refuses if nothing survives."""
-    sentences = [x.strip() for x in _SENTENCE_SPLIT.split(answer.strip()) if x.strip()]
-    kept = [x for x in sentences if _CITATION_RE.search(x)]
-    return {"answer": " ".join(kept), "removed": len(sentences) - len(kept)}
+    chunks: list[str] = []
+    for raw_line in (answer or "").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if _SECTION_HEADER.match(line):
+            chunks.append(line)
+            continue
+        parts = [x.strip() for x in _SENTENCE_SPLIT.split(line) if x.strip()]
+        chunks.extend(parts or [line])
+    kept: list[str] = []
+    for x in chunks:
+        if _SECTION_HEADER.match(x):
+            kept.append(x)
+            continue
+        if _CITATION_RE.search(x):
+            kept.append(x)
+    cleaned = [x for x in kept]
+    while cleaned and cleaned[-1].upper() in {"METRICS", "COMPARE"}:
+        cleaned.pop()
+    joiner = "\n" if "\n" in (answer or "") else " "
+    return {"answer": joiner.join(cleaned), "removed": max(0, len(chunks) - len(kept))}
 
 
 _WORD_RE = re.compile(r"[a-z0-9][a-z0-9_\-]{2,}")

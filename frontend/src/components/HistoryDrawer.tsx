@@ -1,4 +1,6 @@
-import type { RefObject } from "react";
+import { useRef, type RefObject } from "react";
+import { useOverlayA11y } from "../hooks/useOverlayA11y";
+import { usePresence } from "../hooks/usePresence";
 import type { AgentResponse } from "../types";
 
 export type HistoryTurn = {
@@ -40,12 +42,22 @@ export default function HistoryDrawer({
   onSubmit,
   scroller,
 }: Props) {
-  if (!open) return null;
+  const panelRef = useRef<HTMLElement>(null);
+  const { shown, motion } = usePresence(open);
+  useOverlayA11y(open, onClose, panelRef);
+
+  if (!shown) return null;
 
   return (
-    <div className="history-root">
+    <div className="history-root overlay-shell" data-motion={motion}>
       <button type="button" className="drawer-backdrop" aria-label="Close history" onClick={onClose} />
-      <aside className="history-panel" role="dialog" aria-modal="true" aria-label="Investigation history">
+      <aside
+        ref={panelRef}
+        className="history-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Investigation history"
+      >
         <header className="drawer-head">
           <h2 className="thread-head-title">History</h2>
           <button type="button" className="drawer-close" onClick={onClose}>

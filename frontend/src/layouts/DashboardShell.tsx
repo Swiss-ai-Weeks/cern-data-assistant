@@ -10,6 +10,8 @@ interface Props {
   onToggleHistory: () => void;
   historyOpen: boolean;
   onFocusComposer: () => void;
+  onOpenHelp: () => void;
+  helpOpen: boolean;
   children: ReactNode;
 }
 
@@ -20,13 +22,17 @@ export default function DashboardShell({
   onToggleHistory,
   historyOpen,
   onFocusComposer,
+  onOpenHelp,
+  helpOpen,
   children,
 }: Props) {
   return (
     <div className="dash-app sky-aurora dash-app-dock">
       <div className="grain" aria-hidden />
       <div className="dash-main-wrap">
-        <main className="dash-main dash-main-dock">{children}</main>
+        <main id="main" className="dash-main dash-main-dock motion-page" tabIndex={-1}>
+          {children}
+        </main>
       </div>
       <BottomDock
         activeTab={activeTab}
@@ -35,6 +41,8 @@ export default function DashboardShell({
         onNewInvestigation={onNewInvestigation}
         onToggleHistory={onToggleHistory}
         onFocusComposer={onFocusComposer}
+        onOpenHelp={onOpenHelp}
+        helpOpen={helpOpen}
       />
     </div>
   );

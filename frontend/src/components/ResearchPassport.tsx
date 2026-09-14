@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { catalogPlainText } from "../lib/catalogText";
 import { downloadNotebook } from "../lib/notebook";
+import { glanceFromRecord, LHC_TEV, sizeBars } from "../lib/recordVisual";
 import type { HealthResponse, RecordSummary, SearchResponse } from "../types";
+import CollisionView from "./CollisionView";
 
 interface Props {
   record: RecordSummary;
   search: SearchResponse | null;
   health: HealthResponse | null;
-  alternates?: RecordSummary[];
+  peers?: RecordSummary[];
   variant?: "beamline" | "handoff";
   onOpen?: () => void;
 }
@@ -16,19 +18,25 @@ export default function ResearchPassport({
   record,
   search,
   health,
-  alternates = [],
+  peers = [],
   variant = "beamline",
   onOpen,
 }: Props) {
   const [copied, setCopied] = useState(false);
   const cmd = record.usage || `cernopendata-client download-files --recid ${record.recid}`;
   const portal = record.url || `https://opendata.cern.ch/record/${record.recid}`;
-  const formatLabel = record.formats?.length ? record.formats.join(", ") : record.subtype || "—";
   const catalogLive = health?.cern_api === "ok" && Boolean(search?.results?.length);
   const broadened = search?.broadened;
   const missingMeta = !record.experiment && !record.collision_energy && !record.size;
-  const title = catalogPlainText(record.title);
-  const abstract = record.abstract ? catalogPlainText(record.abstract, 420) : "";
+  const glance = glanceFromRecord(record);
+  const chart = sizeBars(peers.length ? peers : [record], record.recid);
+  const why = record.why
+    ? catalogPlainText(record.why, 160)
+    : record.relevance != null
+      ? `Top live catalog match (${Math.round(record.relevance * 100)}% relevance).`
+      : "";
+  const abstract = record.abstract ? catalogPlainText(record.abstract, 140) : "";
+  const showAbstract = abstract && (!why || abstract.slice(0, 40) !== why.slice(0, 40));
 
   async function copyCmd() {
     try {
@@ -87,16 +95,63 @@ export default function ResearchPassport({
           )}
         </div>
 
-        <h2 className="passport-title">{title}</h2>
-
-        <div className="passport-meta-table">
-          <MetaCell label="Collision type" value={record.collision_type || "—"} />
-          <MetaCell label="√s" value={record.collision_energy || "—"} />
-          <MetaCell label="Run period" value={record.run_period || record.date_published || "—"} />
-          <MetaCell label="Size" value={record.size || "—"} />
-          <MetaCell label="Files" value={record.file_count != null ? String(record.file_count) : "—"} />
-          <MetaCell label="Format" value={formatLabel} />
+        <div className="passport-viz" aria-hidden>
+          <CollisionView hot compact />
+          <div className="passport-viz-overlay">
+            <span>{glance.collisionLabel || "collision data"}</span>
+            <strong>{glance.energyLabel !== "—" ? glance.energyLabel : glance.headline}</strong>
+          </div>
         </div>
+
+        <h2 className="passport-title">{glance.headline}</h2>
+        {glance.context && <p className="passport-context">{glance.context}</p>}
+
+        <ul className="passport-kpis">
+          <Kpi
+            label="Collision energy"
+            value={glance.energyLabel}
+            bar={glance.energyPct || null}
+            hint={glance.energyTev != null ? `of LHC ${LHC_TEV} TeV` : undefined}
+          />
+          <Kpi label="Volume" value={glance.sizeLabel} />
+          <Kpi label="Run" value={glance.runLabel} />
+          <Kpi label="Format" value={glance.formatLabel} />
+        </ul>
+
+        {chart.length >= 2 && (
+          <section className="passport-chart" aria-label="Dataset size in this search">
+            <p className="microlabel">Volume in this search</p>
+            <ul>
+              {chart.map((row) => (
+                <li key={String(row.recid)} className={row.current ? "on" : ""}>
+                  <span className="passport-chart-label">{row.current ? "This record" : row.label}</span>
+                  <div className="passport-chart-track" aria-hidden>
+                    <div className="passport-chart-fill" style={{ width: `${row.pct}%` }} />
+                  </div>
+                  <span className="passport-chart-val tnum">{row.sizeLabel}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {why && (
+          <section className="passport-fit passport-takeaway">
+            <p className="microlabel">Why this record</p>
+            <p className="passport-takeaway-text">{why}</p>
+          </section>
+        )}
+
+        {showAbstract && (
+          <p className="passport-abstract">{abstract}</p>
+        )}
+
+        {glance.path && (
+          <details className="passport-path">
+            <summary>Catalog path</summary>
+            <code>{glance.path}</code>
+          </details>
+        )}
 
         {record.doi && (
           <p className="passport-doi">
@@ -105,26 +160,6 @@ export default function ResearchPassport({
               {record.doi}
             </a>
           </p>
-        )}
-
-        {(record.why || record.relevance != null) && (
-          <section className="passport-fit">
-            <p className="microlabel">Why this matches</p>
-            <p>
-              {record.why
-                ? catalogPlainText(record.why, 280)
-                : record.relevance != null
-                  ? `Ranked from live catalog metadata (relevance ${Math.round(record.relevance * 100)}%).`
-                  : "Top dataset match from search and ranking."}
-            </p>
-          </section>
-        )}
-
-        {abstract && (
-          <section className="passport-fit muted">
-            <p className="microlabel">Catalog abstract</p>
-            <p className="passport-abstract">{abstract}</p>
-          </section>
         )}
 
         <div className="passport-cmd-block">
@@ -154,7 +189,7 @@ export default function ResearchPassport({
             onClick={() =>
               downloadNotebook({
                 recid: record.recid,
-                title,
+                title: glance.headline,
                 url: portal,
                 usage: cmd,
                 experiment: record.experiment,
@@ -168,34 +203,35 @@ export default function ResearchPassport({
 
         {record.license && (
           <p className="passport-license">
-            License: <strong>{record.license}</strong>
+            License {record.license}
           </p>
-        )}
-
-        {alternates.length > 0 && (
-          <section className="passport-alts">
-            <p className="microlabel">Close alternatives</p>
-            <ul>
-              {alternates.slice(0, 3).map((a) => (
-                <li key={a.recid}>
-                  <span className="mono">{a.recid}</span> — {catalogPlainText(a.title, 120)}
-                </li>
-              ))}
-            </ul>
-          </section>
         )}
       </div>
     </article>
   );
 }
 
-function MetaCell({ label, value, span }: { label: string; value: string; span?: number }) {
+function Kpi({
+  label,
+  value,
+  bar,
+  hint,
+}: {
+  label: string;
+  value: string;
+  bar?: number | null;
+  hint?: string;
+}) {
   return (
-    <div
-      className={`passport-meta-cell ${span === 2 ? "span-2" : ""} ${span === 3 ? "span-3" : ""}`}
-    >
+    <li className="passport-kpi">
       <span className="cell-label">{label}</span>
-      <span className="cell-value">{value}</span>
-    </div>
+      <strong className="cell-value">{value}</strong>
+      {bar != null && bar > 0 && (
+        <div className="passport-kpi-track" aria-hidden>
+          <div className="passport-kpi-fill" style={{ width: `${bar}%` }} />
+        </div>
+      )}
+      {hint && <span className="passport-kpi-hint">{hint}</span>}
+    </li>
   );
 }

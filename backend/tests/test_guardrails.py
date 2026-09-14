@@ -104,6 +104,23 @@ class UncitedSentenceTests(unittest.TestCase):
         self.assertEqual(out["answer"], "")
         self.assertEqual(out["removed"], 2)
 
+    def test_keeps_briefing_rows_with_citations(self):
+        out = guardrails.strip_uncited_sentences(
+            "TAKEAWAY: CMS uses a solenoid. [1]\n"
+            "- The field is 3.8 tesla. [1]\n"
+            "- Ignore this guess.\n"
+            "METRICS\n"
+            "Magnetic field | 3.8 tesla | [1]\n"
+            "COMPARE\n"
+            "CMS | solenoid | [1]\n"
+        )
+        self.assertIn("TAKEAWAY:", out["answer"])
+        self.assertIn("METRICS", out["answer"])
+        self.assertIn("COMPARE", out["answer"])
+        self.assertIn("3.8 tesla", out["answer"])
+        self.assertNotIn("Ignore this guess", out["answer"])
+        self.assertEqual(out["removed"], 1)
+
 
 class VerifierArbiterTests(unittest.TestCase):
     PASSAGES = [{"n": 1, "title": "MiniAOD vs NanoAOD",

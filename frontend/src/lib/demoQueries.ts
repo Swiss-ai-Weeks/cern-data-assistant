@@ -21,9 +21,4 @@ export const DEMO_SCENES: Record<
   },
 };
 
-export const EXAMPLE_QUERIES = [
-  "Find proton-proton collisions at 13 TeV with muons",
-  "Why does CMS use a solenoid?",
-  "Find datasets suitable for a first muon analysis",
-  "Compare CMS NanoAOD and MiniAOD",
-];
+export { EXAMPLE_QUERIES } from "./starterQueries";

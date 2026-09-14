@@ -1,3 +1,5 @@
+import LogoMark from "../LogoMark";
+
 interface Props {
   compact?: boolean;
 }
@@ -8,6 +10,7 @@ export default function BeamlineHero({ compact = false }: Props) {
       {!compact && <div className="beamline-hero-glow" aria-hidden />}
 
       <p className="beamline-hero-eyebrow">
+        <LogoMark className="beamline-hero-mark" />
         <span className="beamline-hero-brand">Beamline</span>
         <span className="beamline-hero-dot" aria-hidden>
           ·
@@ -22,8 +25,8 @@ export default function BeamlineHero({ compact = false }: Props) {
 
       {!compact && (
         <p className="beamline-hero-lede">
-          Plain-language search over the live catalog and grounded detector docs — with citations you
-          can verify.
+          Ask in everyday language. Beamline searches the live CERN catalog, answers from indexed
+          documentation with citations, and refuses when nothing authoritative supports the claim.
         </p>
       )}
     </header>

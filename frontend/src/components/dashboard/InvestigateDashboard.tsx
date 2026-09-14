@@ -12,7 +12,9 @@ import SimpleChatLayout from "../chat/SimpleChatLayout";
 import EvidenceCoveragePanel from "./EvidenceCoveragePanel";
 import RecordsListPanel from "./RecordsListPanel";
 import ResearchBriefPanel from "./ResearchBriefPanel";
-import BeamlineHero from "../ui/BeamlineHero";
+import BeamlineComposerStrip from "../chat/BeamlineComposerStrip";
+import SessionThread, { type ThreadItem } from "../chat/SessionThread";
+import TurnSummary from "../chat/TurnSummary";
 
 interface LiveTurn {
   steps: string[];
@@ -38,6 +40,12 @@ interface Props {
   onOpenRecord: (recid: number | string) => void;
   onFocusEvidence: () => void;
   promptInputRef?: Ref<BeamlinePromptInputHandle>;
+  followups?: string[];
+  onOpenHelp: () => void;
+  onOpenTrust: () => void;
+  threadItems?: ThreadItem[];
+  activeAsstId?: string | null;
+  onSelectThread?: (asstId: string) => void;
 }
 
 function heroRecord(result: AgentResponse | null): RecordSummary | null {
@@ -55,10 +63,17 @@ function heroRecord(result: AgentResponse | null): RecordSummary | null {
   return results.find((r) => r.is_dataset) || results[0] || null;
 }
 
-function TrustAbout() {
+function TrustAbout({ onOpenTrust }: { onOpenTrust: () => void }) {
   return (
-    <Panel title="How Beamline earns trust">
-      <ol className="trust-steps trust-inline">
+    <Panel title="About Beamline">
+      <p className="about-lede">
+        Beamline is a hosted assistant for CERN Open Data: catalog search, cited documentation answers, and explicit
+        refusals when sources do not support a claim.
+      </p>
+      <button type="button" className="text-link about-trust-link" onClick={onOpenTrust}>
+        Trust &amp; safety details
+      </button>
+      <ol className="trust-steps trust-inline about-trust-list">
         <li>
           <strong>English intent</strong>
           <span>Planner routes to live catalog search, CERN docs, or both.</span>
@@ -94,6 +109,12 @@ export default function InvestigateDashboard({
   onOpenRecord,
   onFocusEvidence,
   promptInputRef,
+  followups = [],
+  onOpenHelp,
+  onOpenTrust,
+  threadItems = [],
+  activeAsstId = null,
+  onSelectThread,
 }: Props) {
   if (activeTab === "investigate") {
     return (
@@ -106,9 +127,14 @@ export default function InvestigateDashboard({
         busy={busy}
         idle={idle}
         live={live}
+        followups={followups}
         onStarter={onStarter}
         onOpenRecord={onOpenRecord}
         promptInputRef={promptInputRef}
+        onOpenHelp={onOpenHelp}
+        threadItems={threadItems}
+        activeAsstId={activeAsstId}
+        onSelectThread={onSelectThread}
       />
     );
   }
@@ -124,12 +150,24 @@ export default function InvestigateDashboard({
     !result?.search;
 
   return (
-    <>
-      <div className="dash-secondary-head card-enter">
-        <BeamlineHero compact />
-      </div>
+    <div className="dash-tab-view motion-section" key={activeTab}>
+      <BeamlineComposerStrip
+        health={health}
+        value={composerValue}
+        onChange={onComposerChange}
+        onSubmit={onSubmitComposer}
+        busy={busy}
+        promptInputRef={promptInputRef}
+        compact
+      />
 
-      {activeTab === "about" && <TrustAbout />}
+      <div className="simple-chat-results dash-tab-results">
+        {threadItems.length > 0 && onSelectThread && (
+          <SessionThread items={threadItems} activeAsstId={activeAsstId} onSelect={onSelectThread} />
+        )}
+        {query && <TurnSummary query={query} result={result} goal={live?.text || undefined} />}
+
+      {activeTab === "about" && <TrustAbout onOpenTrust={onOpenTrust} />}
 
       {activeTab === "evidence" && answer?.grounded && (
         <div className="dash-focus-block card-enter">
@@ -152,9 +190,18 @@ export default function InvestigateDashboard({
               search={result?.search ?? null}
               health={health}
               onOpen={() => onOpenRecord(hero.recid)}
+              peers={allRecords}
             />
           )}
-          {!hero && !searchPending && <p className="dash-muted">No dataset handoff yet — run a catalog search.</p>}
+          {!hero && !searchPending && (
+            <div className="beamline-card beamline-empty-result">
+              <p className="microlabel">No datasets yet</p>
+              <p>
+                Run a catalog search from Home — for example, collisions at 13 TeV with muons — then return here for
+                the full list.
+              </p>
+            </div>
+          )}
           <RecordsListPanel records={allRecords} heroRecid={hero?.recid} onOpen={onOpenRecord} />
         </div>
       )}
@@ -180,6 +227,7 @@ export default function InvestigateDashboard({
           onTryGrounded={() => onStarter("Why does CMS use a solenoid?")}
         />
       )}
-    </>
+      </div>
+    </div>
   );
 }

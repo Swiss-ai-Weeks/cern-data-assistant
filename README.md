@@ -18,7 +18,9 @@ http://127.0.0.1:5001  <---SSH 5001---  gunicorn :5001  (React + Flask)
                                         CERN API is public (opendata.cern.ch)
 ```
 
-Pitch script: [DEMO.md](DEMO.md) (four queries). On the GPU box: `scripts/start_h100.sh` then `scripts/warm_h100.sh`.
+Product spec: [PRODUCT_PLAN.md](PRODUCT_PLAN.md). Production deploy: [HOSTING.md](HOSTING.md). On the GPU box: `scripts/start_h100.sh` then `scripts/warm_h100.sh`. Before you push, run `./scripts/ship.sh` (frontend build + backend tests).
+
+**UI/UX:** [UI UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) is installed under `.cursor/skills/ui-ux-pro-max/`. Design tokens and page rules live in [`design-system/beamline/`](design-system/beamline/MASTER.md). Regenerate: `python3 .cursor/skills/ui-ux-pro-max/scripts/search.py "…" --design-system --persist -p Beamline --force`.
 
 ### Dev from a laptop
 

@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { checkHealth } from "./api";
 import type { HealthResponse } from "./types";
 import Chat from "./components/Chat";
+import HelpSheet from "./components/HelpSheet";
 import TrustFlow from "./components/TrustFlow";
-import { usePresenterMode } from "./hooks/usePresenterMode";
+import SystemBanner from "./components/ui/SystemBanner";
 
 export default function App() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
-  const { presenterOn, trustOpen, setTrustOpen } = usePresenterMode();
+  const [trustOpen, setTrustOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -27,19 +29,37 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "?" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA") return;
+        e.preventDefault();
+        setTrustOpen((v) => !v);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   return (
-    <div className={presenterOn ? "presenter-mode" : ""}>
+    <>
+      <SystemBanner health={health} />
       <Chat
         health={health}
-        presenterOn={presenterOn}
-        onOpenTrust={() => setTrustOpen(true)}
+        helpOpen={helpOpen}
+        onOpenHelp={() => {
+          setHelpOpen(true);
+          setTrustOpen(false);
+        }}
+        onCloseHelp={() => setHelpOpen(false)}
+        onOpenTrust={() => {
+          setTrustOpen(true);
+          setHelpOpen(false);
+        }}
       />
-      {presenterOn && (
-        <div className="presenter-shortcuts" aria-hidden>
-          <kbd>1</kbd> discovery · <kbd>2</kbd> grounded · <kbd>3</kbd> integrity · <kbd>?</kbd> trust
-        </div>
-      )}
+      <HelpSheet open={helpOpen} onClose={() => setHelpOpen(false)} />
       <TrustFlow open={trustOpen} onClose={() => setTrustOpen(false)} />
-    </div>
+    </>
   );
 }

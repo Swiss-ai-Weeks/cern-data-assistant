@@ -28,18 +28,26 @@ Grounding is judged. Inventing physics is a fail.
 
 ## B — What you see when it opens
 
-Not a chat form.
+A **centered chat home** (paper `#ECEDE8`, ink, cobalt serif accents):
 
-Full-stage **event display**: two bunches collide, tracks curve like muons, detector rings. Paper-and-ink (Folio language: cream `#ECEDE8`, ink, cobalt italic serif). **No chat column** until you have asked something.
+1. **Status strip** — Catalog online/offline · model name · source count  
+2. **Hero** — “Find the evidence, not just an answer.”  
+3. **Search bar** (sticky while you scroll results)  
+4. **Three demo beats** — Find 13 TeV muons · CMS solenoid · GPU lying demo  
+5. Example query chips  
+6. **Bottom dock** — Home · New · Datasets · Search · History  
 
-Two punches:
+After you ask:
 
-1. **Fire 13 TeV muons** → live CERN search → **boarding pass** (ticket with barcode stub, recid, experiment, energy, size, files, DOI, copy download, export notebook, open portal, inspect files).
-2. **Show the GPU lying** → *How do black holes evaporate?* → split panel: llama3.2’s ungrounded lecture vs Beamline refusal + rail name + score vs floor.
+- **You asked** — your question + plan/tools chips  
+- **Live progress** — one compact card while the agent runs  
+- **One of three outcomes** on the same column:  
+  - **Dataset handoff** (recid, metadata, download, portal)  
+  - **Grounded answer** (citations + receipt)  
+  - **Integrity rail** (draft vs refusal)  
+- **Other catalog matches** and **suggested follow-ups** on the main page  
 
-Header: **beamline**, pills for CERN / `qwen2.5:32b` / ~1639 sources. Left rail: logo mark.
-
-After the first question, a **thread** appears on the left (history, follow-up chips, composer). The **stage** on the right is still the product.
+History drawer and Datasets tab are secondary; the pitch lives on **Investigate**.
 
 ---
 

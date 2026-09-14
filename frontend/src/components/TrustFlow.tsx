@@ -1,15 +1,23 @@
+import { useRef } from "react";
+import { useOverlayA11y } from "../hooks/useOverlayA11y";
+import { usePresence } from "../hooks/usePresence";
+
 interface Props {
   open: boolean;
   onClose: () => void;
 }
 
 export default function TrustFlow({ open, onClose }: Props) {
-  if (!open) return null;
+  const panelRef = useRef<HTMLElement>(null);
+  const { shown, motion } = usePresence(open);
+  useOverlayA11y(open, onClose, panelRef);
+
+  if (!shown) return null;
 
   return (
-    <div className="trust-root">
+    <div className="trust-root overlay-shell" data-motion={motion}>
       <button type="button" className="drawer-backdrop" aria-label="Close" onClick={onClose} />
-      <aside className="trust-panel" role="dialog" aria-modal="true" aria-labelledby="trust-title">
+      <aside ref={panelRef} className="trust-panel" role="dialog" aria-modal="true" aria-labelledby="trust-title">
         <header className="trust-head">
           <h2 id="trust-title">How Beamline earns trust</h2>
           <button type="button" className="drawer-close" onClick={onClose}>

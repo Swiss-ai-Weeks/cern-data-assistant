@@ -9,55 +9,64 @@ interface Props {
 
 const RECOVERY = "Why does CMS use a solenoid?";
 
+function reasonCopy(result: AskResponse): { title: string; body: string } {
+  if (result.guardrail === "retrieval:no_source") {
+    return {
+      title: "No CERN source above the evidence floor",
+      body: "The index had nothing close enough to this question. Beamline did not let the model invent an answer.",
+    };
+  }
+  if (result.guardrail?.startsWith("input:")) {
+    return {
+      title: "Outside the CERN Open Data brief",
+      body: "This request was stopped before retrieval. Ask about datasets, collisions, or documented detectors.",
+    };
+  }
+  if (result.guardrail === "citation:none") {
+    return {
+      title: "No valid citations",
+      body: "The model could not attach its claims to retrieved CERN passages, so nothing was released.",
+    };
+  }
+  if (result.guardrail === "grounding:unsupported") {
+    return {
+      title: "Claims not supported by the sources",
+      body: "A fact-check found statements the retrieved CERN text does not back. Those claims were not published.",
+    };
+  }
+  return {
+    title: "Not verified against CERN evidence",
+    body: "Beamline only ships an answer when indexed CERN documentation can support it.",
+  };
+}
+
 export default function IntegrityRail({ result, onTryGrounded }: Props) {
   const draft = result.ungrounded_draft?.trim();
   const d = result.guardrail_detail;
-  const reason =
-    result.guardrail === "retrieval:no_source"
-      ? "No authoritative CERN source above the retrieval floor."
-      : result.guardrail?.startsWith("input:")
-        ? "Request blocked by input safety rail."
-        : result.guardrail === "citation:none"
-          ? "No valid citations to retrieved passages."
-          : result.guardrail === "grounding:unsupported"
-            ? "Fact-check flagged unsupported claims."
-            : "Beamline could not verify this against CERN evidence.";
+  const copy = reasonCopy(result);
 
   return (
     <div className="integrity-rail">
       {draft && (
         <div className="integrity-draft" aria-label="Ungrounded model output — not authoritative">
-          <p className="microlabel">Ungrounded model output</p>
+          <p className="microlabel">What the model wanted to say</p>
+          <p className="integrity-draft-kicker">Not a Beamline answer · not from CERN sources</p>
           <p className="draft-text">{draft}</p>
-          <p className="answer-meta">
-            Not verified · {result.draft_model || "llama3.2"} · not a CERN product answer
-          </p>
         </div>
       )}
 
       <div className="integrity-proven">
-        <p className="microlabel">Beamline evidence rail</p>
-        <p className="integrity-tagline">
-          A language model can write an answer. Beamline only delivers answers CERN evidence can
-          support.
-        </p>
+        <p className="microlabel">Held back</p>
+        <h3 className="integrity-title">{copy.title}</h3>
+        <p className="integrity-reason">{copy.body}</p>
         <p className="integrity-refusal">{result.answer}</p>
 
-        {d && (
-          <ScoreGauge score={d.top_score} floor={d.threshold} label="Retrieval instrument" />
-        )}
+        {d && <ScoreGauge score={d.top_score} floor={d.threshold} label="Closest retrieval" />}
 
         <GroundingReceipt result={result} generatedAt={null} compact />
-        <p className="integrity-meta">
-          Rail ID <code>{result.guardrail ?? "—"}</code>
-        </p>
-        <p className="integrity-reason">{reason}</p>
+
         {onTryGrounded && (
-          <button
-            type="button"
-            className="send-btn integrity-recover"
-            onClick={() => onTryGrounded(RECOVERY)}
-          >
+          <button type="button" className="send-btn integrity-recover" onClick={() => onTryGrounded(RECOVERY)}>
             Try a CERN-grounded question
           </button>
         )}

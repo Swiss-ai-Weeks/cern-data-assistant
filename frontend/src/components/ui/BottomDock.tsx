@@ -1,6 +1,13 @@
 import type { ReactNode } from "react";
 import type { DashTab } from "../../layouts/DashboardShell";
-import { DatasetIcon, FilePlusIcon, HistoryIcon, HomeIcon, SearchIcon } from "../icons/BeamlineIcons";
+import {
+  DatasetIcon,
+  FilePlusIcon,
+  HelpIcon,
+  HistoryIcon,
+  HomeIcon,
+  SearchIcon,
+} from "../icons/BeamlineIcons";
 
 interface Props {
   activeTab: DashTab;
@@ -9,6 +16,8 @@ interface Props {
   onNewInvestigation: () => void;
   onToggleHistory: () => void;
   onFocusComposer: () => void;
+  onOpenHelp: () => void;
+  helpOpen: boolean;
 }
 
 function DockBtn({
@@ -27,6 +36,7 @@ function DockBtn({
       type="button"
       className={`dock-btn ${active ? "dock-btn-active" : ""}`}
       aria-label={label}
+      aria-current={active ? "page" : undefined}
       title={label}
       onClick={onClick}
     >
@@ -46,6 +56,8 @@ export default function BottomDock({
   onNewInvestigation,
   onToggleHistory,
   onFocusComposer,
+  onOpenHelp,
+  helpOpen,
 }: Props) {
   const homeActive = activeTab === "investigate" && !historyOpen;
 
@@ -81,6 +93,9 @@ export default function BottomDock({
         <div className="dock-group dock-group-end">
           <DockBtn label="Conversation history" active={historyOpen} onClick={onToggleHistory}>
             <HistoryIcon />
+          </DockBtn>
+          <DockBtn label="Help" active={helpOpen} onClick={onOpenHelp}>
+            <HelpIcon />
           </DockBtn>
         </div>
       </nav>

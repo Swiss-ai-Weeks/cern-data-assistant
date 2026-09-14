@@ -44,18 +44,6 @@ function heroRecord(result: AgentResponse | null): RecordSummary | null {
   return results.find((r) => r.is_dataset) || results[0] || null;
 }
 
-function tieAlternates(hero: RecordSummary | null, results: RecordSummary[]): RecordSummary[] {
-  if (!hero) return [];
-  const rel = hero.relevance ?? 0;
-  return results.filter(
-    (r) =>
-      String(r.recid) !== String(hero.recid) &&
-      r.is_dataset &&
-      r.relevance != null &&
-      rel - r.relevance < 0.08,
-  );
-}
-
 export default function Workbench({
   idle,
   live,
@@ -71,7 +59,6 @@ export default function Workbench({
   const datasets = (result?.search?.results ?? []).filter(
     (r) => !hero || String(r.recid) !== String(hero.recid),
   );
-  const alts = tieAlternates(hero, result?.search?.results ?? []);
   const used = result?.answer?.sources.filter((s) => s.used) ?? [];
   const searchError =
     result?.search === null && live?.error?.includes("CERN")
@@ -147,7 +134,7 @@ export default function Workbench({
             record={hero}
             search={result?.search ?? null}
             health={health}
-            alternates={alts}
+            peers={result?.search?.results ?? []}
             onOpen={() => onOpenRecord(hero.recid)}
           />
         </div>

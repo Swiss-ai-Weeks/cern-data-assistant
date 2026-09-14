@@ -1,7 +1,8 @@
 import type { Ref } from "react";
 import type { AgentStreamEvent } from "../../api";
 import type { AgentResponse, HealthResponse, RecordSummary } from "../../types";
-import { EXAMPLE_QUERIES } from "../../lib/demoQueries";
+import { STARTER_QUERIES } from "../../lib/starterQueries";
+import { DEMO_SCENES, type DemoScene } from "../../lib/demoQueries";
 import AgentTimeline from "../AgentTimeline";
 import AnswerCard from "../AnswerCard";
 import IntegrityRail from "../IntegrityRail";
@@ -12,7 +13,12 @@ import {
   type BeamlinePromptInputHandle,
 } from "../ui/beamline-prompt-input";
 import BeamlineHero from "../ui/BeamlineHero";
+import BeamlineStatusStrip from "../ui/BeamlineStatusStrip";
 import { cn } from "../../lib/utils";
+import BeamlineComposerStrip from "./BeamlineComposerStrip";
+import OtherRecordsList from "./OtherRecordsList";
+import SessionThread, { type ThreadItem } from "./SessionThread";
+import TurnSummary from "./TurnSummary";
 
 interface LiveTurn {
   steps: string[];
@@ -33,10 +39,17 @@ interface Props {
   busy: boolean;
   idle: boolean;
   live: LiveTurn | null;
+  followups: string[];
   onStarter: (q: string) => void;
   onOpenRecord: (recid: number | string) => void;
+  onOpenHelp: () => void;
   promptInputRef?: Ref<BeamlinePromptInputHandle>;
+  threadItems?: ThreadItem[];
+  activeAsstId?: string | null;
+  onSelectThread?: (asstId: string) => void;
 }
+
+const DEMO_BEATS: DemoScene[] = ["discovery", "grounded", "integrity"];
 
 function heroRecord(result: AgentResponse | null): RecordSummary | null {
   if (!result?.search?.results?.length && !result?.picked) return null;
@@ -62,12 +75,18 @@ export default function SimpleChatLayout({
   busy,
   idle,
   live,
+  followups,
   onStarter,
   onOpenRecord,
+  onOpenHelp,
   promptInputRef,
+  threadItems = [],
+  activeAsstId = null,
+  onSelectThread,
 }: Props) {
   const result = live?.result ?? null;
   const hero = heroRecord(result);
+  const allRecords = result?.search?.results ?? [];
   const answer = result?.answer ?? null;
   const answerGrounded = answer ? answer.grounded : null;
   const searchPending =
@@ -76,60 +95,83 @@ export default function SimpleChatLayout({
     !hero &&
     !result?.search;
 
-  const cernOnline = health?.cern_api === "ok";
-  const modelName =
-    health?.ollama === "ok" ? health.ollama_model : health ? "Model offline" : null;
-  const kbChunks = health?.knowledge_chunks;
-
   return (
     <div className={cn("simple-chat", idle && "simple-chat-idle")}>
-      {idle && <BeamlineHero />}
-
-      <div className="simple-chat-input-stack">
-        <div className="simple-chat-input-wrap">
-          <BeamlinePromptInput
-            ref={promptInputRef}
-            value={composerValue}
-            onChange={onComposerChange}
-            onSubmit={onSubmitComposer}
-            busy={busy}
-            placeholder="Collisions, datasets, detectors…"
-          />
-        </div>
-
-        {idle && health && (
-          <p className="simple-chat-context" aria-label="System context">
-            <span className={cernOnline ? "ctx-ok" : "ctx-warn"}>
-              Catalog {cernOnline ? "online" : "offline"}
-            </span>
-            <span className="ctx-sep" aria-hidden>
-              ·
-            </span>
-            {modelName && <span>{modelName}</span>}
-            {kbChunks != null && kbChunks > 0 && (
-              <>
-                <span className="ctx-sep" aria-hidden>
-                  ·
-                </span>
-                <span>{kbChunks.toLocaleString()} doc sources</span>
-              </>
+      {idle ? (
+        <>
+          <BeamlineStatusStrip health={health} />
+          <div className="beamline-sticky-composer">
+            <BeamlineHero />
+            <div className="simple-chat-input-wrap">
+              <BeamlinePromptInput
+                ref={promptInputRef}
+                value={composerValue}
+                onChange={onComposerChange}
+                onSubmit={onSubmitComposer}
+                busy={busy}
+                placeholder="Ask about CERN datasets or detectors…"
+              />
+            </div>
+            {busy && (
+              <p className="composer-busy-hint" role="status" aria-live="polite">
+                Beamline is working on your question…
+              </p>
             )}
-          </p>
-        )}
-      </div>
-
-      {idle && (
-        <div className="simple-chat-chips">
-          {EXAMPLE_QUERIES.map((q) => (
-            <button key={q} type="button" className="example-chip" disabled={busy} onClick={() => onStarter(q)}>
-              {q}
+          </div>
+          <div className="demo-beats">
+            <p className="microlabel demo-beats-label">Pitch paths</p>
+            <div className="demo-beats-row">
+              {DEMO_BEATS.map((key) => {
+                const scene = DEMO_SCENES[key];
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    className="demo-beat-btn"
+                    disabled={busy}
+                    onClick={() => onStarter(scene.queries[0])}
+                  >
+                    <span className="demo-beat-kicker">{String(DEMO_BEATS.indexOf(key) + 1).padStart(2, "0")}</span>
+                    <strong className="demo-beat-title">{scene.title.replace(" demo", "")}</strong>
+                    <span className="demo-beat-hint">{scene.description}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="simple-chat-chips">
+            <p className="microlabel simple-chat-chips-label">Or try a question</p>
+            {STARTER_QUERIES.map((q) => (
+              <button key={q} type="button" className="example-chip" disabled={busy} onClick={() => onStarter(q)}>
+                {q}
+              </button>
+            ))}
+          </div>
+          <p className="simple-chat-onboarding">
+            New here?{" "}
+            <button type="button" className="text-link" onClick={onOpenHelp}>
+              Read how Beamline works
             </button>
-          ))}
-        </div>
+          </p>
+        </>
+      ) : (
+        <BeamlineComposerStrip
+          health={health}
+          value={composerValue}
+          onChange={onComposerChange}
+          onSubmit={onSubmitComposer}
+          busy={busy}
+          promptInputRef={promptInputRef}
+        />
       )}
 
       {!idle && (
         <div className="simple-chat-results">
+          {threadItems.length > 0 && onSelectThread && (
+            <SessionThread items={threadItems} activeAsstId={activeAsstId} onSelect={onSelectThread} />
+          )}
+          {query && <TurnSummary query={query} result={result} goal={live?.text || undefined} />}
+
           {live?.live && (
             <AgentTimeline
               events={live.events}
@@ -157,19 +199,50 @@ export default function SimpleChatLayout({
               search={result?.search ?? null}
               health={health}
               onOpen={() => onOpenRecord(hero.recid)}
+              peers={allRecords}
             />
           )}
 
           {answer?.grounded && (
-            <AnswerCard
-              result={answer}
-              query={query}
-              onTryGrounded={onStarter}
-              generatedAt={live?.generatedAt}
-            />
+            <div className="beamline-card beamline-result-card">
+              <AnswerCard
+                result={answer}
+                query={query}
+                onTryGrounded={onStarter}
+                generatedAt={live?.generatedAt}
+              />
+            </div>
           )}
 
-          {answer && !answer.grounded && <IntegrityRail result={answer} onTryGrounded={onStarter} />}
+          {answer && !answer.grounded && (
+            <div className="beamline-card beamline-result-card beamline-integrity-card">
+              <IntegrityRail result={answer} onTryGrounded={onStarter} />
+            </div>
+          )}
+
+          {!hero && !answer && !live?.live && !live?.error && result && (
+            <div className="beamline-card beamline-empty-result">
+              <p className="microlabel">No structured result</p>
+              <p>Try rephrasing your question, or open Help for examples of dataset vs detector queries.</p>
+            </div>
+          )}
+
+          {allRecords.length > 0 && (
+            <OtherRecordsList records={allRecords} heroRecid={hero?.recid} onOpen={onOpenRecord} />
+          )}
+
+          {followups.length > 0 && !busy && (
+            <section className="beamline-card beamline-followups" aria-label="Suggested follow-ups">
+              <p className="microlabel">Continue with</p>
+              <div className="followups-row">
+                {followups.map((q) => (
+                  <button key={q} type="button" className="example-chip" onClick={() => onStarter(q)}>
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       )}
     </div>

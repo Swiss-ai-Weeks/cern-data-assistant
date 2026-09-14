@@ -1,13 +1,20 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  clearInvestigationSession,
+  loadInvestigationSession,
+  saveInvestigationSession,
+  type SessionTurn,
+} from "../lib/investigationSession";
+import type { ThreadItem } from "./chat/SessionThread";
 import type { BeamlinePromptInputHandle } from "./ui/beamline-prompt-input";
 import { streamAgent, type AgentStreamEvent } from "../api";
 import type { AgentResponse, HealthResponse } from "../types";
-import { DEMO_SCENES, type DemoScene } from "../lib/demoQueries";
 import DashboardShell, { type DashTab } from "../layouts/DashboardShell";
 import CommandPalette from "./CommandPalette";
 import HistoryDrawer from "./HistoryDrawer";
 import InvestigateDashboard from "./dashboard/InvestigateDashboard";
 import RecordDrawer from "./RecordDrawer";
+import AppFooter from "./ui/AppFooter";
 
 type Turn = {
   id: string;
@@ -45,6 +52,26 @@ function blankResult(query: string): AgentResponse {
   return { query, goal: query, tools_used: [], search: null, answer: null, picked: null };
 }
 
+function hydrateTurn(st: SessionTurn): Turn {
+  return {
+    ...st,
+    events: [],
+    live: false,
+  };
+}
+
+function toSessionTurn(t: Turn): SessionTurn {
+  return {
+    id: t.id,
+    role: t.role,
+    text: t.text,
+    steps: t.steps,
+    result: t.result,
+    error: t.error,
+    generatedAt: t.generatedAt,
+  };
+}
+
 function applyEvent(t: Turn, ev: AgentStreamEvent, query: string): Turn {
   const events = [...t.events, ev];
   if (ev.type === "status") return { ...t, events, steps: [...t.steps, ev.label] };
@@ -79,21 +106,40 @@ function applyEvent(t: Turn, ev: AgentStreamEvent, query: string): Turn {
 
 interface ChatProps {
   health: HealthResponse | null;
-  presenterOn: boolean;
+  helpOpen: boolean;
+  onOpenHelp: () => void;
+  onCloseHelp: () => void;
   onOpenTrust: () => void;
 }
 
-export default function Chat({ health, presenterOn, onOpenTrust }: ChatProps) {
-  const [turns, setTurns] = useState<Turn[]>([]);
+export default function Chat({ health, helpOpen, onOpenHelp, onCloseHelp, onOpenTrust }: ChatProps) {
+  const [turns, setTurns] = useState<Turn[]>(() => {
+    const saved = loadInvestigationSession();
+    if (!saved) return [];
+    return saved.map(hydrateTurn);
+  });
   const [value, setValue] = useState("");
   const promptRef = useRef<BeamlinePromptInputHandle>(null);
   const [busy, setBusy] = useState(false);
   const [openRecid, setOpenRecid] = useState<number | string | null>(null);
-  const [focusId, setFocusId] = useState<string | null>(null);
+  const [focusId, setFocusId] = useState<string | null>(() => {
+    const saved = loadInvestigationSession();
+    if (!saved) return null;
+    const last = [...saved].reverse().find((t) => t.role === "assistant");
+    return last?.id ?? null;
+  });
   const [activeTab, setActiveTab] = useState<DashTab>("investigate");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (turns.length === 0) {
+      clearInvestigationSession();
+      return;
+    }
+    saveInvestigationSession(turns.map(toSessionTurn));
+  }, [turns]);
 
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
@@ -118,6 +164,8 @@ export default function Chat({ health, presenterOn, onOpenTrust }: ChatProps) {
     setValue("");
     setBusy(true);
     setHistoryOpen(false);
+    onCloseHelp();
+    setActiveTab("investigate");
     const user: Turn = {
       id: uid(),
       role: "user",
@@ -140,13 +188,14 @@ export default function Chat({ health, presenterOn, onOpenTrust }: ChatProps) {
       live: true,
       generatedAt: null,
     };
-    setFocusId(asst.id);
     setTurns((prev) => [...prev, user, asst]);
-    const hist = historyForApi([...turns, user]);
+    setFocusId(asst.id);
 
     try {
-      for await (const ev of streamAgent(query, hist)) {
-        setTurns((prev) => prev.map((t) => (t.id === asst.id ? applyEvent(t, ev, query) : t)));
+      for await (const ev of streamAgent(query, historyForApi([...turns, user]))) {
+        setTurns((prev) =>
+          prev.map((t) => (t.id === asst.id ? applyEvent(t, ev, query) : t)),
+        );
       }
     } catch (err) {
       setTurns((prev) =>
@@ -163,10 +212,16 @@ export default function Chat({ health, presenterOn, onOpenTrust }: ChatProps) {
   }
 
   function newInvestigation() {
+    if (busy) return;
+    if (turns.length > 0 && !window.confirm("Start a new investigation? This clears the current session.")) {
+      return;
+    }
     setTurns([]);
     setFocusId(null);
     setValue("");
     setActiveTab("investigate");
+    setHistoryOpen(false);
+    clearInvestigationSession();
   }
 
   const followups = stageAsst?.result?.followups ?? [];
@@ -174,6 +229,21 @@ export default function Chat({ health, presenterOn, onOpenTrust }: ChatProps) {
     stageAsst &&
     turns[Math.max(0, turns.findIndex((t) => t.id === stageAsst.id) - 1)];
   const stageQuery = stageUser?.role === "user" ? stageUser.text : stageAsst?.result?.query ?? "";
+
+  const threadItems = useMemo((): ThreadItem[] => {
+    const items: ThreadItem[] = [];
+    for (let i = 0; i < turns.length; i++) {
+      const t = turns[i];
+      if (t.role !== "user") continue;
+      const next = turns[i + 1];
+      items.push({
+        userId: t.id,
+        asstId: next?.role === "assistant" ? next.id : null,
+        label: t.text,
+      });
+    }
+    return items;
+  }, [turns]);
 
   useEffect(() => {
     function onKey(e: globalThis.KeyboardEvent) {
@@ -186,20 +256,6 @@ export default function Chat({ health, presenterOn, onOpenTrust }: ChatProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  useEffect(() => {
-    if (!presenterOn) return;
-    function onKey(e: globalThis.KeyboardEvent) {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const map: Record<string, DemoScene> = { "1": "discovery", "2": "grounded", "3": "integrity" };
-      const scene = map[e.key];
-      if (!scene) return;
-      e.preventDefault();
-      void send(DEMO_SCENES[scene].queries[0]);
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [presenterOn, busy]);
-
   function submitComposer() {
     const q = value.trim();
     if (q) void send(q);
@@ -208,7 +264,13 @@ export default function Chat({ health, presenterOn, onOpenTrust }: ChatProps) {
   function focusComposer() {
     setActiveTab("investigate");
     setHistoryOpen(false);
+    onCloseHelp();
     requestAnimationFrame(() => promptRef.current?.focus());
+  }
+
+  function openHelp() {
+    setHistoryOpen(false);
+    onOpenHelp();
   }
 
   return (
@@ -217,15 +279,22 @@ export default function Chat({ health, presenterOn, onOpenTrust }: ChatProps) {
         activeTab={activeTab}
         onTabChange={(tab) => {
           setHistoryOpen(false);
+          onCloseHelp();
           setActiveTab(tab);
         }}
         onNewInvestigation={newInvestigation}
-        onToggleHistory={() => setHistoryOpen((v) => !v)}
+        onToggleHistory={() => {
+          onCloseHelp();
+          setHistoryOpen((v) => !v);
+        }}
         historyOpen={historyOpen}
         onFocusComposer={focusComposer}
+        onOpenHelp={openHelp}
+        helpOpen={helpOpen}
       >
         <InvestigateDashboard
           promptInputRef={promptRef}
+          followups={followups}
           activeTab={activeTab}
           health={health}
           query={stageQuery}
@@ -234,6 +303,8 @@ export default function Chat({ health, presenterOn, onOpenTrust }: ChatProps) {
           onSubmitComposer={submitComposer}
           busy={busy}
           idle={turns.length === 0}
+          onOpenHelp={openHelp}
+          onOpenTrust={onOpenTrust}
           live={
             stageAsst
               ? {
@@ -250,7 +321,14 @@ export default function Chat({ health, presenterOn, onOpenTrust }: ChatProps) {
           onStarter={send}
           onOpenRecord={setOpenRecid}
           onFocusEvidence={() => setActiveTab("evidence")}
+          threadItems={threadItems}
+          activeAsstId={stageAsst?.id ?? null}
+          onSelectThread={(id) => {
+            setFocusId(id);
+            setActiveTab("investigate");
+          }}
         />
+        <AppFooter onOpenHelp={openHelp} onOpenTrust={onOpenTrust} />
       </DashboardShell>
 
       <HistoryDrawer
@@ -277,8 +355,10 @@ export default function Chat({ health, presenterOn, onOpenTrust }: ChatProps) {
         onClose={() => setPaletteOpen(false)}
         onNewInvestigation={newInvestigation}
         onOpenTrust={onOpenTrust}
+        onOpenHelp={openHelp}
         onOpenAbout={() => {
           setHistoryOpen(false);
+          onCloseHelp();
           setActiveTab("about");
         }}
       />

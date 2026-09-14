@@ -1,3 +1,4 @@
+import { glanceFromRecord } from "../../lib/recordVisual";
 import type { RecordSummary } from "../../types";
 import Panel from "../ui/Panel";
 
@@ -16,6 +17,7 @@ export default function RecordsListPanel({ records, heroRecid, onOpen }: Props) 
         <ul className="records-list">
           {records.slice(0, 6).map((r) => {
             const top = heroRecid != null && String(r.recid) === String(heroRecid);
+            const g = glanceFromRecord(r);
             return (
               <li key={r.recid}>
                 <button
@@ -26,9 +28,9 @@ export default function RecordsListPanel({ records, heroRecid, onOpen }: Props) 
                   <span className="tnum record-recid-tag">{r.recid}</span>
                   <span className="record-row-body">
                     <strong>{r.experiment || "CERN"}</strong>
-                    <span className="record-row-title">{r.title}</span>
+                    <span className="record-row-title">{g.headline}</span>
                     <span className="record-row-meta tnum">
-                      {[r.collision_energy, r.run_period || r.date_published, r.file_count != null ? `${r.file_count} files` : null]
+                      {[g.energyLabel !== "—" ? g.energyLabel : null, g.runLabel !== "—" ? g.runLabel : null, g.sizeLabel !== "—" ? g.sizeLabel : null]
                         .filter(Boolean)
                         .join(" · ")}
                     </span>

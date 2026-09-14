@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getRecord } from "../api";
 import { downloadNotebook } from "../lib/notebook";
+import { useOverlayA11y } from "../hooks/useOverlayA11y";
+import { usePresence } from "../hooks/usePresence";
 import type { RecordDetail } from "../types";
 import ResultRow from "./ResultRow";
 
@@ -23,6 +25,10 @@ export default function RecordDrawer({ recid, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState("");
   const [copied, setCopied] = useState(false);
+  const panelRef = useRef<HTMLElement>(null);
+  const open = recid != null;
+  const { shown, motion } = usePresence(open);
+  useOverlayA11y(open, onClose, panelRef);
 
   useEffect(() => {
     if (recid == null) return;
@@ -35,15 +41,6 @@ export default function RecordDrawer({ recid, onClose }: Props) {
       .catch((err) => setError(err instanceof Error ? err.message : "Could not load record."))
       .finally(() => setLoading(false));
   }, [recid]);
-
-  useEffect(() => {
-    if (recid == null) return;
-    function onKey(e: globalThis.KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [recid, onClose]);
 
   const files = useMemo(() => {
     const list = detail?.files ?? [];
@@ -68,12 +65,12 @@ export default function RecordDrawer({ recid, onClose }: Props) {
     }
   }
 
-  if (recid == null) return null;
+  if (!shown) return null;
 
   return (
-    <div className="drawer-root">
+    <div className="drawer-root overlay-shell" data-motion={motion}>
       <button type="button" className="drawer-backdrop" aria-label="Close record archive" onClick={onClose} />
-      <aside className="drawer archive-drawer" role="dialog" aria-modal="true" aria-label="CERN record archive">
+      <aside ref={panelRef} className="drawer archive-drawer" role="dialog" aria-modal="true" aria-label="CERN record archive">
         <header className="drawer-head">
           <div>
             <div className="drawer-kicker">CERN Open Data archive · recid {recid}</div>

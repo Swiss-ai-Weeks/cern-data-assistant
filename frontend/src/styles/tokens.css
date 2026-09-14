@@ -1,42 +1,96 @@
 /**
- * Beamline design tokens — aligned with Folio / reference dashboard polish
+ * Beamline design tokens — Swiss Modernism 2.0 / Research Lab (ui-ux-pro-max MASTER)
+ * Density 8 · Motion 4 · Variance 3
  */
 :root {
-  --paper: #ecede8;
-  --surface: #f7f7f4;
+  --paper: #ecece6;
+  --surface: #f7f6f1;
   --surface-muted: #ffffff;
   --bone: var(--surface);
-  --ink: #131410;
-  --ink-muted: color-mix(in srgb, var(--ink) 52%, transparent);
-  --line: color-mix(in srgb, var(--ink) 10%, transparent);
-  --line-soft: color-mix(in srgb, var(--ink) 7%, transparent);
-  --cobalt: #3f63c9;
-  --cobalt-soft: #e7edfb;
-  --sky: #cdd9f4;
+  --ink: #0f172a;
+  --ink-scholarly: #1e3a5f;
+  --ink-muted: #475569;
+  --line: #d5d8d0;
+  --line-soft: #e4e6df;
+  --cobalt: #2563eb;
+  --cobalt-deep: #1e3a5f;
+  --citation-gold: #b45309;
+  --cobalt-soft: #e8eefc;
+  --sky: #d7e2f8;
   --sky-soft: var(--cobalt-soft);
   --signal-warning: #9a6700;
-  --signal-danger: #c4453c;
+  --signal-danger: #dc2626;
+  --signal-ok: #047857;
 
+  --radius-sm: 8px;
+  --radius-md: 12px;
   --radius-panel: 16px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
   --radius-pill: 999px;
-  --shadow-soft: 0 24px 48px -36px rgba(63, 99, 201, 0.4);
-  --shadow-active: 0 20px 40px -30px rgba(63, 99, 201, 0.5);
 
-  --font-display: "General Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Instrument Serif", Georgia, serif;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 12px -6px rgba(30, 58, 95, 0.18);
+  --shadow-lg: 0 16px 32px -20px rgba(30, 58, 95, 0.28);
+  --shadow-xl: 0 28px 48px -28px rgba(30, 58, 95, 0.38);
+  --shadow-soft: var(--shadow-lg);
+  --shadow-active: var(--shadow-xl);
+
+  --font-display: "General Sans", "Atkinson Hyperlegible", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Atkinson Hyperlegible", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Crimson Pro", "Iowan Old Style", Georgia, serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
-  --font-ui: var(--font-display);
+  --font-ui: var(--font-body);
 
-  /* Legacy aliases */
+  --focus-ring: 2px solid var(--ink-scholarly);
+  --focus-ring-offset: 3px;
+
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+  --space-3xl: 4rem;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  --text-xs: 0.6875rem;
+  --text-sm: 0.8125rem;
+  --text-md: 0.9375rem;
+  --text-lg: 1.125rem;
+  --text-display: clamp(2rem, 4vw, 3rem);
+  --tracking-micro: 0.16em;
+  --tracking-tight: -0.04em;
+  --leading-tight: 1.08;
+  --leading-normal: 1.55;
+  --stage-min-height: 420px;
+
+  --color-primary: var(--ink-scholarly);
+  --color-on-primary: #ffffff;
+  --color-secondary: var(--cobalt);
+  --color-accent: var(--citation-gold);
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
+  --color-card: var(--surface-muted);
+  --color-muted: #e9eef5;
+  --color-muted-foreground: var(--ink-muted);
+  --color-border: var(--line);
+  --color-destructive: var(--signal-danger);
+  --color-ring: var(--ink-scholarly);
+
   --color-bg: var(--paper);
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-muted);
-  --color-border: var(--line);
   --color-border-hairline: var(--line-soft);
   --color-text: var(--ink);
   --color-text-muted: var(--ink-muted);
-  --color-text-faint: color-mix(in srgb, var(--ink) 38%, transparent);
-  --color-accent: var(--cobalt);
+  --color-text-faint: #64748b;
   --color-accent-soft: var(--cobalt-soft);
   --color-refusal: var(--signal-danger);
   --bg: var(--paper);
@@ -54,6 +108,19 @@
   --danger: var(--signal-danger);
 
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
+  --duration-micro: 140ms;
+  --duration-fast: 160ms;
+  --duration-ui: 220ms;
   --duration-normal: 220ms;
+  --duration-component: 320ms;
+  --duration-slow: 360ms;
+  --duration-overlay: 380ms;
+  --duration-exit: 280ms;
+  --duration-section: 480ms;
+  --motion-distance: 8px;
+  --motion-distance-sm: 4px;
   --content-max: 80rem;
+  --composer-max: 32rem;
 }

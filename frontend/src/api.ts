@@ -66,11 +66,54 @@ export async function runAssistant(query: string): Promise<AssistantResponse> {
   return asJson<AssistantResponse>(res);
 }
 
-export async function runAgent(query: string): Promise<AgentResponse> {
+export async function runAgent(
+  query: string,
+  history?: { role: string; content: string }[],
+): Promise<AgentResponse> {
   const res = await fetch(`${API_BASE}/api/agent`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query }),
+    body: JSON.stringify({ query, history }),
   });
   return asJson<AgentResponse>(res);
+}
+
+export type AgentStreamEvent =
+  | { type: "status"; step: string; label: string }
+  | { type: "plan"; goal?: string; search_query?: string | null; ask_query?: string | null }
+  | { type: "tool_done"; tool: string; hits?: number; grounded?: boolean; recid?: string | number }
+  | { type: "result"; payload: AgentResponse }
+  | { type: "error"; error: string };
+
+export async function* streamAgent(
+  query: string,
+  history?: { role: string; content: string }[],
+): AsyncGenerator<AgentStreamEvent> {
+  const res = await fetch(`${API_BASE}/api/agent/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+    body: JSON.stringify({ query, history }),
+  });
+  if (!res.ok || !res.body) {
+    throw new Error(`Agent stream failed (${res.status})`);
+  }
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const chunks = buf.split("\n\n");
+    buf = chunks.pop() ?? "";
+    for (const chunk of chunks) {
+      const line = chunk.split("\n").find((l) => l.startsWith("data: "));
+      if (!line) continue;
+      try {
+        yield JSON.parse(line.slice(6)) as AgentStreamEvent;
+      } catch {
+        /* ignore a torn JSON frame */
+      }
+    }
+  }
 }

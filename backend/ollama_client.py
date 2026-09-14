@@ -346,6 +346,10 @@ Use BOTH when the message has two parts, e.g. "find CMS muon datasets and
 explain why CMS uses a solenoid" -> search_query for the data, ask_query for
 the explanation.
 
+If you are given a conversation, resolve follow-ups ("that one", "and ATLAS?",
+"how do I download it?") into a self-contained search_query and/or ask_query.
+Never leave pronouns unresolved.
+
 Respond with ONLY a JSON object of this exact shape:
 {"goal": "<one short sentence restating the user's goal>",
  "search_query": "<keywords>" | null,
@@ -354,11 +358,33 @@ Respond with ONLY a JSON object of this exact shape:
 If both would be null, put the user's message in ask_query."""
 
 
-def plan_tasks(user_message: str, model: Optional[str] = None) -> dict:
+def plan_tasks(
+    user_message: str,
+    model: Optional[str] = None,
+    history: Optional[list] = None,
+) -> dict:
     """Decompose a request into optional search + ask sub-tasks. Falls back to
-    the single-intent router if planning fails."""
+    the single-intent router if planning fails. `history` is prior turns
+    [{role, content}] so follow-ups resolve against the conversation."""
+    payload = user_message
+    if history:
+        lines = []
+        for turn in history[-6:]:
+            if not isinstance(turn, dict):
+                continue
+            role = turn.get("role")
+            content = (turn.get("content") or "").strip()[:500]
+            if role in ("user", "assistant") and content:
+                lines.append(f"{role}: {content}")
+        if lines:
+            payload = (
+                "Conversation so far:\n"
+                + "\n".join(lines)
+                + "\n\nLatest user message:\n"
+                + user_message
+            )
     try:
-        data = _chat_json(PLAN_SYSTEM_PROMPT, user_message, model=model)
+        data = _chat_json(PLAN_SYSTEM_PROMPT, payload, model=model)
     except OllamaUnavailable:
         data = {}
 

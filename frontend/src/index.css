@@ -63,9 +63,23 @@ a {
 }
 
 .app-shell {
-  max-width: 860px;
+  max-width: 920px;
   margin: 0 auto;
-  padding: 40px 24px 96px;
+  padding: 28px 24px 40px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.app-shell.product {
+  max-width: 980px;
+}
+.brand-kicker {
+  margin: 0 0 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
 }
 
 /* ---------------------------------------------------------------- header */
@@ -75,7 +89,7 @@ a {
   align-items: flex-start;
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: 36px;
+  margin-bottom: 20px;
 }
 
 .app-title {
@@ -796,4 +810,284 @@ a {
   border-radius: 8px;
   padding: 8px 12px;
   margin: 0 0 14px;
+}
+
+/* ---------------------------------------------------------------- product chat */
+.chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.chat-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 12px;
+}
+.welcome {
+  padding: 12px 0 8px;
+}
+.welcome h2 {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0 0 10px;
+  max-width: 22ch;
+  line-height: 1.2;
+}
+.welcome-kicker {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent-2);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 0 0 10px;
+}
+.welcome-lead {
+  color: var(--text-muted);
+  max-width: 58ch;
+  line-height: 1.6;
+  margin: 0 0 22px;
+}
+.starter-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.starter-card {
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.starter-card:hover {
+  border-color: var(--accent);
+}
+.starter-card strong {
+  font-size: 14.5px;
+}
+.starter-card span {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.starter-card em {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+.bubble {
+  margin: 18px 0;
+}
+.bubble-who {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 8px;
+}
+.bubble.user .bubble-text {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px 12px 12px 4px;
+  padding: 12px 16px;
+  margin: 0;
+  display: inline-block;
+  max-width: 72ch;
+}
+.bubble-goal {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 0 0 10px;
+}
+.timeline {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.timeline li {
+  position: relative;
+  padding: 3px 0 3px 18px;
+}
+.timeline li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--border);
+}
+.timeline li.done::before {
+  background: var(--accent-2);
+}
+.timeline li.now {
+  color: var(--accent);
+}
+.timeline li.now::before {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.chat .answer-card,
+.chat .results-header {
+  margin-top: 12px;
+}
+.chat .empty-state {
+  margin-top: 16px;
+}
+.followups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 10px;
+}
+.follow-chip {
+  font-size: 13px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.follow-chip:hover {
+  border-color: var(--accent-2);
+  color: var(--text);
+}
+.composer {
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(transparent, var(--bg) 18px);
+  padding-top: 16px;
+}
+.composer-input {
+  width: 100%;
+  resize: none;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 15px;
+  line-height: 1.45;
+  min-height: 56px;
+}
+.composer-input:focus {
+  outline: none;
+  border-color: var(--accent-2);
+}
+.composer-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+.composer-hint {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.ghost-btn {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+}
+.ghost-btn:hover {
+  color: var(--text);
+}
+.record-row.clickable {
+  cursor: pointer;
+  border-radius: 8px;
+  padding-left: 8px;
+  padding-right: 8px;
+  margin-left: -8px;
+  margin-right: -8px;
+}
+.record-row.clickable:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+.drawer-root {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+.drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 8, 12, 0.55);
+  border: none;
+  cursor: pointer;
+}
+.drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: min(520px, 100%);
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -20px 0 60px rgba(0, 0, 0, 0.35);
+}
+.drawer-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 22px 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.drawer-head h2 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  margin: 4px 0 0;
+  line-height: 1.3;
+}
+.drawer-kicker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-faint);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.drawer-close {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  height: fit-content;
+}
+.drawer-body {
+  overflow-y: auto;
+  padding: 8px 22px 32px;
+}
+.drawer-license {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+@media (max-width: 720px) {
+  .starter-grid {
+    grid-template-columns: 1fr;
+  }
+  .app-header {
+    flex-direction: column;
+  }
+  .status-bar {
+    align-items: flex-start;
+  }
 }

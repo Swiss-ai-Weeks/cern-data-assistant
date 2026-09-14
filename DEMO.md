@@ -1,6 +1,6 @@
 # Judge demo — 4 queries (rehearse once)
 
-Pitch in ~3 minutes. Open **http://127.0.0.1:5001** (H100 via SSH tunnel). Stay on **Assistant (agent)**.
+Pitch in ~3 minutes. Open **http://127.0.0.1:5001** (H100 via SSH tunnel). Stay in the chat. Tools stream live as they run. Click a dataset card to inspect files. Follow-up chips keep the thread.
 
 If the first answer hangs: the 32B model is still loading. Wait, or run `scripts/warm_h100.sh` on the GPU box first.
 

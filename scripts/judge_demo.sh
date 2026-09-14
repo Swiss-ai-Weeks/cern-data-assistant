@@ -28,10 +28,16 @@ if s:
     n = s.get('returned')
     title = (s['results'][0]['title'][:70] if s.get('results') else '—')
     print(f'search:      {n} hits  terms={s.get(\"search_terms\")!r}  broadened={s.get(\"broadened\")}  first={title}')
+    p = d.get('picked') or {}
+    if p:
+        print(f'picked:      recid={p.get(\"recid\")}  usage={p.get(\"usage\")!r}  doi={p.get(\"doi\")!r}')
 if a:
     ans = (a.get('answer') or '').replace('\n', ' ')
     print(f'answer:      grounded={a.get(\"grounded\")}  rail={a.get(\"guardrail\")}')
     print('             ', ans[:180])
+    draft = (a.get('ungrounded_draft') or '').replace('\n', ' ')
+    if draft:
+        print('draft:      ', draft[:160])
 "
 }
 

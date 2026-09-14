@@ -230,7 +230,7 @@ def _sources(hits: list[dict], cited: set[int]) -> list[dict]:
 def _refusal(question: str, message: str, rail: str, sources=None,
              detail: dict | None = None, timing: dict | None = None):
     """Uniform ungrounded response shape used by every guardrail refusal."""
-    return {
+    payload = {
         "question": question,
         "answer": message,
         "grounded": False,
@@ -240,8 +240,19 @@ def _refusal(question: str, message: str, rail: str, sources=None,
                              "threshold": guardrails.MIN_TOP_SCORE,
                              "citations_removed": 0, **(detail or {})},
         "sources": sources or [],
-        "timing_ms": timing or {},
-    }, 200
+        "timing_ms": dict(timing or {}),
+        "ungrounded_draft": None,
+        "draft_model": None,
+    }
+    # Never draft for injection / unsafe — only for "would have hallucinated physics".
+    if ollama_client.draft_allowed(rail):
+        t0 = time.time()
+        draft = ollama_client.ungrounded_draft(question)
+        payload["timing_ms"]["draft"] = int((time.time() - t0) * 1000)
+        if draft:
+            payload["ungrounded_draft"] = draft
+            payload["draft_model"] = ollama_client.OLLAMA_FALLBACK_MODEL
+    return payload, 200
 
 
 def _run_ask(question: str, k=None):
@@ -443,9 +454,13 @@ def _fetch_top_record(search_payload: dict) -> dict | None:
     return {
         "recid": detail.get("recid"),
         "title": detail.get("title"),
+        "experiment": detail.get("experiment"),
+        "collision_energy": detail.get("collision_energy"),
         "size": detail.get("size"),
         "file_count": detail.get("file_count"),
         "formats": detail.get("formats") or [],
+        "doi": detail.get("doi"),
+        "citation": detail.get("citation"),
         "usage": detail.get("usage"),
         "url": detail.get("url"),
         "license": detail.get("license"),

@@ -107,7 +107,9 @@ export interface AskResponse {
   guardrail?: string;
   guardrail_detail?: Guardrail;
   sources: AskSource[];
-  timing_ms?: { retrieve?: number; llm?: number; verify?: number };
+  timing_ms?: { retrieve?: number; llm?: number; verify?: number; draft?: number };
+  ungrounded_draft?: string | null;
+  draft_model?: string | null;
 }
 
 export type AssistantResponse =
@@ -128,9 +130,13 @@ export interface AgentResponse {
   picked?: {
     recid: number | string;
     title: string;
+    experiment?: string;
+    collision_energy?: string;
     size?: string;
     file_count?: number;
     formats?: string[];
+    doi?: string | null;
+    citation?: string;
     usage?: string;
     url?: string;
     license?: string | null;

@@ -1,52 +1,48 @@
-# Judge demo — 4 queries (rehearse once)
+# Judge demo — two beats
 
-Pitch in ~3 minutes. Open **http://127.0.0.1:5001** (H100 via SSH tunnel). Paper UI: thread on the left, stage on the right. Click a launch tile. Watch Plan → Search → Ground → Fetch. Datasets land as soon as search returns. Click a tile to inspect files. Click a thread message to put that turn back on the stage.
+Pitch in ~3 minutes. Open **http://127.0.0.1:5001** (H100 via SSH tunnel). Hard-refresh.
 
-If the first answer hangs: the 32B model is still loading. Wait, or run `scripts/warm_h100.sh` on the GPU box first.
+**Do not say** RAG, guardrails, or agent. Say the two objects: a real CERN record, and a lecture the GPU wanted to give.
+
+If the first query hangs: the 32B model is still loading. Wait, or run `scripts/warm_h100.sh` on the GPU box.
 
 ---
 
-## 1. Dataset search (~30s)
+## 1. Boarding pass (~50s)
 
-Type:
+Click **01** or type:
 
 > proton-proton collisions at 13 TeV with muons
 
-**Say:** natural language in, CERN Open Data out. Cards show size, format, how to download, citation. Facets if you need them.
+**Say:** ChatGPT will invent a CMS muon dataset. This HTTP hit opendata.cern.ch. Recid, files, DOI, download — not a language model.
 
-**Expect:** `tools_used: search`, real CMS/ATLAS datasets, not a glossary page.
+**Do:** copy the `cernopendata-client` command. Export the notebook. Optionally inspect files.
 
----
-
-## 2. Grounded detector question (~40s)
-
-> Why does CMS use a solenoid?
-
-**Say:** this is RAG. The answer is grounded in CERN sources; every `[n]` is a real portal page. Guardrails refuse if nothing in the index supports it.
-
-**Expect:** `grounded: true`, citations, rail `grounded` or `grounded:low_confidence`.
+**Expect:** boarding pass on the stage, real CMS/ATLAS record, copy download works.
 
 ---
 
-## 3. Agent (both tools) (~50s) — the AIQ slide
+## 2. The rail (~40s)
 
-> find CMS muon datasets and explain why CMS uses a solenoid
-
-**Say:** one box, two tools. The planner splits the request: dataset search **and** grounded Q&A in a single turn.
-
-**Expect:** `tools_used: [search, ask]`, an answer card **and** a result list.
-
----
-
-## 4. Refusal (~20s) — the money shot
+Click **02** or type:
 
 > How do black holes evaporate?
 
-(Backup: `What is the best way to cook pasta?`)
+**Say:** same GPU. No CERN passage clears the floor, so the lecture is not the product. Left is what llama3.2 wanted to say. Right is Beamline.
 
-**Say:** no CERN source → no physics. We would rather refuse than hallucinate Hawking radiation.
+**Expect:** split panel. Left: ungrounded draft. Right: `grounded: false`, rail `retrieval:no_source` (or similar). Not a confident cosmology lecture as the answer.
 
-**Expect:** `grounded: false`, rail like `retrieval:no_source` or `citation:none`. **Not** a confident cosmology lecture.
+---
+
+## 3. Optional if they still look (~40s)
+
+> Why does CMS use a solenoid?
+
+**Say:** every `[n]` is a portal page. The receipt is the score versus the floor.
+
+**Expect:** grounded answer + grounding receipt.
+
+Backup combo: `find CMS muon datasets and explain why CMS uses a solenoid` — pass and receipt in one turn.
 
 ---
 
@@ -57,8 +53,9 @@ Type:
 | UI won't load | On laptop: `ssh -N -L 5001:127.0.0.1:5001 launchpad-cern` |
 | `ollama offline` / slow first token | On H100: `tmux attach -t app` then `scripts/start_h100.sh` |
 | Empty knowledge | On H100: `scripts/start_h100.sh --rebuild` |
+| Draft column empty | llama3.2 not pulled — refusal still works; skip the left-column line |
 
-Rehearse the four queries without talking:
+Rehearse:
 
 ```bash
 # laptop, tunnel up:

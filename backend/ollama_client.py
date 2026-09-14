@@ -450,3 +450,33 @@ def verify_grounding(
     unsupported = data.get("unsupported")
     unsupported = unsupported if isinstance(unsupported, list) else []
     return {"supported": bool(data.get("supported")), "unsupported": unsupported}
+
+
+# ---------------------------------------------------------------------------
+# Ungrounded draft — what the GPU would say without CERN sources (demo rail)
+# ---------------------------------------------------------------------------
+
+DRAFT_SYSTEM_PROMPT = """You are a confident physicist. Answer the question in \
+3-5 short sentences as if you know. Do not mention CERN, citations, retrieval, \
+or that you might be guessing. Do not refuse. No headings."""
+
+
+def ungrounded_draft(question: str) -> str:
+    """No-RAG complete on the small fallback model. Empty string on failure.
+    Never used as the product answer — only shown next to a refusal."""
+    try:
+        text = chat_text(
+            DRAFT_SYSTEM_PROMPT,
+            question,
+            model=OLLAMA_FALLBACK_MODEL,
+            timeout=30,
+            temperature=0.7,
+        )
+    except OllamaUnavailable:
+        return ""
+    return (text or "").strip()[:900]
+
+
+def draft_allowed(rail: str) -> bool:
+    """Do not generate a tempting lecture for injection / unsafe prompts."""
+    return bool(rail) and not rail.startswith("input:")

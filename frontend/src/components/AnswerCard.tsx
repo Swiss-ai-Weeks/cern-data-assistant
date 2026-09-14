@@ -5,7 +5,6 @@ interface Props {
   result: AskResponse;
 }
 
-// Human-readable label for the guardrail that decided this response.
 const RAIL_LABEL: Record<string, string> = {
   grounded: "grounding verified",
   "grounded:low_confidence": "grounded — weak match, citations required",
@@ -30,7 +29,6 @@ function badge(result: AskResponse): { cls: string; label: string } {
   return { cls: "warn", label: "not grounded — held back" };
 }
 
-/** Render the answer text with every [n] turned into a link to source n. */
 function renderAnswer(text: string, sources: AskSource[]) {
   const byN = new Map(sources.map((s) => [s.n, s]));
   const parts = text.split(/(\[\d{1,3}\])/g);
@@ -54,15 +52,43 @@ function renderAnswer(text: string, sources: AskSource[]) {
   });
 }
 
+function Receipt({ result }: { result: AskResponse }) {
+  const d = result.guardrail_detail;
+  const cited = result.sources.filter((s) => s.used);
+  return (
+    <div className="receipt">
+      <p className="microlabel">Grounding receipt</p>
+      <ul>
+        {result.model_used && <li>model {result.model_used}</li>}
+        {d && (
+          <li>
+            best match {d.top_score} / floor {d.threshold}
+          </li>
+        )}
+        {result.guardrail && <li>rail {result.guardrail}</li>}
+        {cited.map((s) => (
+          <li key={s.n}>
+            [{s.n}]{" "}
+            <a href={s.source} target="_blank" rel="noreferrer">
+              {s.title}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function AnswerCard({ result }: Props) {
   const b = badge(result);
   const railLabel = result.guardrail
     ? RAIL_LABEL[result.guardrail] ?? result.guardrail
     : null;
   const d = result.guardrail_detail;
+  const draft = result.ungrounded_draft?.trim();
 
-  return (
-    <div className="answer-card">
+  const body = (
+    <>
       <div className="answer-badges">
         <span className={`answer-badge ${b.cls}`}>{b.label}</span>
         {railLabel && <span className="rail-badge">{railLabel}</span>}
@@ -75,42 +101,36 @@ export default function AnswerCard({ result }: Props) {
         </div>
       )}
 
-      {result.sources.length > 0 && (
-        <div className="answer-sources">
-          <div className="answer-sources-title">Sources (CERN Open Data)</div>
-          <ol>
-            {result.sources.map((s) => (
-              <li key={s.n} className={s.used ? "src-used" : "src-unused"}>
-                <a href={s.source} target="_blank" rel="noreferrer">
-                  {s.title}
-                  {s.section ? ` — ${s.section}` : ""}
-                </a>
-                {s.experiment && <span className="src-score">{s.experiment}</span>}
-                {s.kind === "glossary" && <span className="src-score">glossary</span>}
-                <span className="src-score">score {s.score}</span>
-                {s.used && <span className="src-cited">cited</span>}
-              </li>
-            ))}
-          </ol>
-        </div>
+      {result.grounded ? (
+        <Receipt result={result} />
+      ) : (
+        d && (
+          <p className="answer-meta">
+            best match {d.top_score} / floor {d.threshold}
+            {result.model_used ? ` · ${result.model_used} never wrote this` : ""}
+          </p>
+        )
       )}
-
-      <div className="answer-meta">
-        {result.model_used && <span>model {result.model_used}</span>}
-        {d && d.top_score > 0 && (
-          <span>
-            best match {d.top_score} / gate {d.threshold}
-            {d.citations_removed > 0 && ` · ${d.citations_removed} invalid citation(s) removed`}
-            {(d.sentences_removed ?? 0) > 0 &&
-              ` · ${d.sentences_removed} uncited sentence(s) dropped`}
-          </span>
-        )}
-        {result.timing_ms?.llm !== undefined && (
-          <span>
-            {(((result.timing_ms.llm ?? 0) + (result.timing_ms.verify ?? 0)) / 1000).toFixed(1)} s
-          </span>
-        )}
-      </div>
-    </div>
+    </>
   );
+
+  if (!result.grounded && draft) {
+    return (
+      <div className="answer-split">
+        <div className="draft-col">
+          <p className="microlabel">What the GPU wanted to say</p>
+          <p className="draft-text">{draft}</p>
+          <p className="answer-meta">
+            ungrounded · {result.draft_model || "llama3.2"} · no CERN passages
+          </p>
+        </div>
+        <div className="stamp-col">
+          <p className="microlabel">Beamline</p>
+          {body}
+        </div>
+      </div>
+    );
+  }
+
+  return <div className="answer-card">{body}</div>;
 }

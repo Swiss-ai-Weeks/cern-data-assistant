@@ -1,5 +1,6 @@
-import type { AgentResponse } from "../types";
+import type { AgentResponse, RecordSummary } from "../types";
 import AnswerCard from "./AnswerCard";
+import BoardingPass from "./BoardingPass";
 import DatasetTile from "./DatasetTile";
 
 const STARTERS = [
@@ -10,20 +11,35 @@ const STARTERS = [
   },
   {
     k: "02",
+    title: "Refuse a hallucination",
+    query: "How do black holes evaporate?",
+  },
+  {
+    k: "03",
     title: "Why CMS uses a solenoid",
     query: "Why does CMS use a solenoid?",
   },
   {
-    k: "03",
+    k: "04",
     title: "Search + explain, one turn",
     query: "find CMS muon datasets and explain why CMS uses a solenoid",
   },
-  {
-    k: "04",
-    title: "Refuse a hallucination",
-    query: "How do black holes evaporate?",
-  },
 ];
+
+function heroRecord(result: AgentResponse | null): RecordSummary | null {
+  if (!result?.search?.results?.length && !result?.picked) return null;
+  const results = result.search?.results ?? [];
+  if (result.picked) {
+    const match = results.find((r) => String(r.recid) === String(result.picked?.recid));
+    return {
+      ...(match || ({} as RecordSummary)),
+      ...result.picked,
+      title: result.picked.title || match?.title || `Record ${result.picked.recid}`,
+      picked: true,
+    } as RecordSummary;
+  }
+  return results.find((r) => r.is_dataset) || results[0] || null;
+}
 
 const NODES = [
   { id: "planning", label: "Plan" },
@@ -61,7 +77,10 @@ function activeNode(live: LiveTurn | null): string | null {
 export default function Workbench({ idle, live, onStarter, onOpenRecord }: Props) {
   const node = activeNode(live);
   const result = live?.result;
-  const datasets = result?.search?.results ?? [];
+  const hero = heroRecord(result);
+  const datasets = (result?.search?.results ?? []).filter(
+    (r) => !hero || String(r.recid) !== String(hero.recid),
+  );
   const used = result?.answer?.sources.filter((s) => s.used) ?? [];
 
   if (idle) {
@@ -138,9 +157,15 @@ export default function Workbench({ idle, live, onStarter, onOpenRecord }: Props
         </ol>
       )}
 
+      {hero && (
+        <div className="stage-block">
+          <BoardingPass record={hero} onOpen={() => onOpenRecord(hero.recid)} />
+        </div>
+      )}
+
       {result?.answer && (
         <div className="stage-block">
-          <div className="stage-label">Answer</div>
+          <div className="stage-label">{result.answer.grounded ? "Grounded answer" : "The rail"}</div>
           <AnswerCard result={result.answer} />
         </div>
       )}

@@ -52,6 +52,11 @@ export interface HealthResponse {
   ollama_models_installed: string[];
   knowledge_base?: "ready" | "empty";
   knowledge_chunks?: number;
+  guardrails?: { min_top_score: number; min_cite_score: number };
+  cern_cache?: {
+    search: { size: number; hits: number; misses: number };
+    record: { size: number; hits: number; misses: number };
+  };
 }
 
 export interface AskSource {

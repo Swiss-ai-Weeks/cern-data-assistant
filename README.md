@@ -169,18 +169,26 @@ Do **not** commit `node_modules`. If you cloned a copy that still has them, dele
 
 ## Using it
 
+The default **Assistant (agent)** tab plans the request and can search datasets,
+answer a detector question, or do both in one turn.
+
 Try:
 
 - `I need proton-proton collisions at 13 TeV with muons`
+- `Why does CMS use a solenoid?`
+- `find CMS muon datasets and explain why CMS uses a solenoid`
 - `ATLAS data about the Higgs boson`
-- `muon detector data from CMS, 8 TeV`
 
 Flow:
 
-1. Ollama extracts CERN search keywords
-2. Backend queries `https://opendata.cern.ch/api/records/`
-3. Ollama ranks hits and writes a one-line *why*
-4. UI shows experiment, type, energy, date, file count, abstract
+1. The agent plans: dataset search, grounded Q&A, or both
+2. Ollama extracts CERN search keywords; if CERN's AND-search returns 0 hits, terms are broadened
+3. Backend queries `https://opendata.cern.ch/api/records/` (cached ~5 min)
+4. Ollama ranks hits and writes a one-line *why*
+5. Knowledge questions go through RAG + guardrails (no CERN source → no answer)
+6. UI shows experiment, size, format, how to download, citations, plus facet filters
+
+Manual **Find datasets** / **Ask about CERN** tabs are still there.
 
 ---
 
@@ -218,19 +226,21 @@ If Ollama dies: `pkill ollama; nohup env OLLAMA_KEEP_ALIVE=-1 ollama serve > ~/o
 ```
 cern-data-assistant/
 ├── backend/
-│   ├── app.py              # /api/health  /api/search  /api/ask  /api/record/<id>
-│   ├── cern_client.py      # CERN Open Data REST + rich card fields
-│   ├── ollama_client.py    # query extract, ranking, embeddings, grounded answer
-│   ├── rag.py              # tiny local vector store (NumPy cosine + boosts)
-│   ├── guardrail.py        # retrieval gate + citation verification
+│   ├── app.py              # /api/health /search /ask /assistant /agent /record/<id>
+│   ├── cern_client.py      # CERN Open Data REST + rich card fields + cache
+│   ├── ollama_client.py    # extract, rank, route, plan, embeddings, grounded answer, fact-check
+│   ├── rag.py              # tiny local vector store (NumPy cosine + glossary/experiment boosts)
+│   ├── guardrails.py       # input rail, retrieval gate, citation rewrite, fact-check
+│   ├── cache.py            # in-process TTL cache for CERN HTTP
 │   ├── build_index.py      # build the RAG index: seed + CERN docs + glossary
 │   ├── knowledge/
 │   │   ├── seed.json       # curated authoritative CERN facts (+ sources)
 │   │   ├── index.npy       # built embeddings (gitignored)
 │   │   └── chunks.json     # built chunk texts (gitignored)
+│   ├── tests/              # unittest (no network): rails, cache, flattening
 │   └── requirements.txt
 ├── frontend/
-│   └── src/                # React + Vite UI (Beamline): Find datasets + Ask
+│   └── src/                # React + Vite UI (Beamline)
 └── dataset/                # optional local CERN JSON dumps (gitignored)
 ```
 
@@ -246,22 +256,37 @@ H100 scratch (not in git): `~/nvidia_hack/dataset/` (`fetch_cern.py`, `proton_fu
 { "query": "proton-proton collisions at 13 TeV with muons", "size": 8 }
 ```
 
-**POST `/api/ask`** — grounded Q&A (RAG) with citations
+**POST `/api/ask`** — grounded Q&A (RAG) with citations + guardrails
 
 ```json
 { "query": "Why does CMS use a solenoid?" }
 ```
 
-Returns `{ answer, grounded, sources[] }`; `grounded` is `false` when no CERN
-source supports the question.
+Returns `{ answer, grounded, guardrail, sources[] }`; `grounded` is `false` when
+no CERN source supports the question.
+
+**POST `/api/assistant`** — auto-route one query to search or ask  
+**POST `/api/agent`** — plan-and-execute; can run search **and** ask in one turn
+
+```json
+{ "query": "find CMS muon datasets and explain why CMS uses a solenoid" }
+```
+
+Returns `{ goal, tools_used, search, answer }`.
 
 **GET `/api/record/<recid>`** — full metadata + files  
-**GET `/api/health`** — CERN + Ollama + knowledge-base status
+**GET `/api/health`** — CERN + Ollama + knowledge-base + cache stats
+
+Run backend tests (no network, no GPU):
+
+```bash
+cd backend && python -m unittest discover -s tests -v
+```
 
 ---
 
 ## Team notes
 
-- Challenge next: dataset cards (size, format, how to use, citations), RAG over detector docs, NeMo Guardrails / AIQ.
+- RAG + Guardrails + AIQ agent are in; polish is cache, facets, and tests.
 - Model on the H100 is **qwen2.5:32b** (set via `OLLAMA_MODEL`); it falls back to **llama3.2** automatically if the bigger model is not pulled.
 - Keep `backend/.env` and `frontend/.env` local (gitignored).

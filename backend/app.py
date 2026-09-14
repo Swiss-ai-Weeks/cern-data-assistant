@@ -6,6 +6,7 @@ Endpoints:
   POST /api/search            -> { query, size?, use_llm_rank? } -> ranked results
   POST /api/ask               -> { query } -> grounded answer + citations (RAG)
   POST /api/assistant         -> { query } -> auto-routes to search or ask
+  POST /api/agent             -> { query } -> plan + run search and/or ask
   GET  /api/record/<recid>    -> full metadata + file list for one record
 
 Run with:
@@ -78,6 +79,7 @@ def health():
                 "min_cite_score": guardrails.MIN_CITE_SCORE,
             },
             "serving_frontend": SERVE_FRONTEND,
+            "cern_cache": cern_client.cache_stats(),
         }
     )
 
@@ -87,23 +89,16 @@ def health():
 # Each helper returns (payload_dict, http_status).
 # ---------------------------------------------------------------------------
 
-def _fetch_with_broadening(terms: str, pool: int):
-    """CERN Open Data search is strict AND-matching, so over-specific keyword
-    queries ("CMS muon proton collisions 13 TeV") collapse to 0 hits. Retry
-    with progressively fewer trailing keywords until we get results — this is
-    the agent's search-resilience step. Returns (raw, used_terms, broadened)."""
-    words = terms.split()
-    attempts = [" ".join(words[:n]) for n in range(len(words), 1, -1)]
-    if words:
-        attempts.append(words[0])
-    seen, ordered = set(), []
-    for a in attempts:
-        if a and a not in seen:
-            seen.add(a)
-            ordered.append(a)
-    if not ordered:
-        ordered = [terms]
+def broadening_attempts(terms: str) -> list[str]:
+    """Keyword ladder for CERN's strict AND search: full query, then drop
+    trailing words one by one, then the first word alone."""
+    return cern_client.broadening_attempts(terms)
 
+
+def _fetch_with_broadening(terms: str, pool: int):
+    """Retry with progressively fewer keywords until CERN returns hits.
+    Returns (raw, used_terms, broadened)."""
+    ordered = broadening_attempts(terms)
     last_raw = None
     for attempt in ordered:
         raw = cern_client.search_records(attempt, size=pool)

@@ -150,3 +150,18 @@ def valid_citations(answer: str, used: list, passages: list[dict]) -> list[int]:
         if n in by_n and by_n[n].get("score", 0.0) >= MIN_CITE_SCORE
     }
     return sorted(good)
+
+
+def valid_citations(answer: str, used: list, passages: list[dict]) -> list[int]:
+    """Compatibility helper (older call sites / tests): the set of citation
+    numbers that appear inline as [n] or in the model's `used` list, map to a
+    real passage, and clear MIN_CITE_SCORE. New code should use
+    check_citations(), which also rewrites the answer text."""
+    by_n = {p["n"]: p for p in passages}
+    inline = {int(m) for m in _CITATION_RE.findall(answer or "")}
+    listed = {int(n) for n in (used or []) if isinstance(n, (int, str)) and str(n).isdigit()}
+    candidates = (inline | listed) or listed
+    return sorted(
+        n for n in candidates
+        if n in by_n and by_n[n].get("score_raw", by_n[n].get("score", 0.0)) >= MIN_CITE_SCORE
+    )

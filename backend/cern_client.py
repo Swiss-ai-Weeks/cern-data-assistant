@@ -13,12 +13,17 @@ from __future__ import annotations
 
 import os
 import json
+import copy
 import urllib.request
 import urllib.parse
 from typing import Any
 
+from cache import TTLCache
+
 CERN_API_BASE = os.environ.get("CERN_API_BASE", "https://opendata.cern.ch/api/records/")
 REQUEST_TIMEOUT = 30
+SEARCH_CACHE = TTLCache(ttl=float(os.environ.get("CERN_CACHE_TTL", "300")), maxsize=128)
+RECORD_CACHE = TTLCache(ttl=float(os.environ.get("CERN_CACHE_TTL", "300")), maxsize=256)
 
 
 class CernApiError(RuntimeError):
@@ -41,14 +46,46 @@ def _get_json(url: str) -> dict:
 
 def search_records(query: str, page: int = 1, size: int = 10) -> dict:
     """Search opendata.cern.ch by free-text query. Returns the raw
-    search envelope (dict with `hits.hits` / `hits.total`)."""
+    search envelope (dict with `hits.hits` / `hits.total`). Cached so
+    repeat demo queries don't round-trip CERN every time."""
+    key = (query, page, size)
+    cached = SEARCH_CACHE.get(key)
+    if cached is not None:
+        return copy.deepcopy(cached)
     params = urllib.parse.urlencode({"q": query, "page": page, "size": size})
-    return _get_json(f"{CERN_API_BASE}?{params}")
+    data = _get_json(f"{CERN_API_BASE}?{params}")
+    SEARCH_CACHE.set(key, data)
+    return copy.deepcopy(data)
 
 
 def get_record(recid: int | str) -> dict:
     """Fetch the full metadata record for a single recid."""
-    return _get_json(f"{CERN_API_BASE}{recid}")
+    key = str(recid)
+    cached = RECORD_CACHE.get(key)
+    if cached is not None:
+        return copy.deepcopy(cached)
+    data = _get_json(f"{CERN_API_BASE}{recid}")
+    RECORD_CACHE.set(key, data)
+    return copy.deepcopy(data)
+
+
+def cache_stats() -> dict:
+    return {"search": SEARCH_CACHE.stats(), "record": RECORD_CACHE.stats()}
+
+
+def broadening_attempts(terms: str) -> list[str]:
+    """Keyword ladder for CERN's strict AND search: full query, then drop
+    trailing words one by one, then the first word alone."""
+    words = terms.split()
+    attempts = [" ".join(words[:n]) for n in range(len(words), 1, -1)]
+    if words:
+        attempts.append(words[0])
+    seen, ordered = set(), []
+    for a in attempts:
+        if a and a not in seen:
+            seen.add(a)
+            ordered.append(a)
+    return ordered or [terms]
 
 
 # ---------------------------------------------------------------------------

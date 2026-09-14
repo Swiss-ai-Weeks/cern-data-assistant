@@ -49,21 +49,18 @@ Three tools, visible plan, retry if CERN returns nothing.
 
 ---
 
-## Phase 8 — Grounding that survives a hostile question
+## Phase 8 — Grounding that survives a hostile question (DONE)
 
-Guardrails work; a few holes remain.
-
-1. **Calibrate `RAG_MIN_SCORE` on the new 1,185-chunk index** (floor is 0.65 from the old 60-chunk corpus). Re-run on-topic vs off-topic; tune so solenoid still answers and pasta still refuses.
-2. **Expand `seed.json`** for the exact demo questions (CMS solenoid, MiniAOD vs NanoAOD, 13 TeV, ATLAS magnet) so retrieval isn’t glossary-only.
-3. **Cite-or-refuse in the UI** even when `grounded:low_confidence` — judges should never see a naked physics claim.
-4. **Skip NeMo Guardrails** unless you have spare time; Colang + NIM is a day, and you already fact-check.
+- ✅ Recalibrated on the H100 1633-chunk index: on-topic 0.73–0.84, off-topic ≤ 0.64. Default `RAG_MIN_SCORE` is **0.67** (Hawking radiation 0.643 refuses; MiniAOD 0.729 still `ok`).
+- ✅ `seed.json` tagged with experiment (CMS/ATLAS/ALICE/LHCb) plus pile-up, ALICE TPC, LHCb forward spectrometer.
+- ✅ Low-confidence band must cite a passage that itself clears the floor, or we refuse (`grounding:low_confidence`) — no naked physics claim.
 
 ---
 
 ## Phase 9 — Only if there is time
 
 - Streaming tokens so the 32B model doesn’t look “stuck”.
-- In-app **record preview** (file list from `/api/record/<id>`).
+- In-app **record preview** for every row (top hit already fetched by the agent).
 - Follow-up chat (“and the ATLAS one?”) — needs session memory.
 - Facets **sent to CERN** (`experiment:CMS`, energy) instead of filter-after-fetch.
 - A couple of mocked `ollama_client` tests.
@@ -77,7 +74,7 @@ Phase 6 (H100 demo + 4-query script)   ← DONE
      ↓
 Phase 7.1–7.3 (record tool + visible plan)  ← DONE
      ↓
-Phase 8.1–8.2 (recalibrate floor + seed the demo questions)
+Phase 8.1–8.2 (recalibrate floor + seed the demo questions)  ← DONE
      ↓
 Phase 9 only if the pitch is already smooth
 ```

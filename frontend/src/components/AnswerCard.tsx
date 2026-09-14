@@ -8,7 +8,8 @@ interface Props {
 // Human-readable label for the guardrail that decided this response.
 const RAIL_LABEL: Record<string, string> = {
   grounded: "grounding verified",
-  "grounded:low_confidence": "grounded — weak match, fact-check passed",
+  "grounded:low_confidence": "grounded — weak match, citations required",
+  "grounding:low_confidence": "blocked: weak match without a strong citation",
   "grounded:unverified": "grounded (fact-check offline)",
   "retrieval:no_source": "blocked: no CERN source (LLM not called)",
   "model:not_in_sources": "blocked: model found no answer in sources",

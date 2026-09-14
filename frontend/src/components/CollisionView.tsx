@@ -2,10 +2,14 @@ import { useEffect, useRef } from "react";
 
 interface Props {
   hot?: boolean;
+  /** Honest HUD — not real DAQ telemetry */
+  telemetry?: boolean;
+  /** Conceptual detector layer labels */
+  labels?: boolean;
 }
 
 /** Paper-and-ink event display. Two bunches collide; tracks curve like muons. */
-export default function CollisionView({ hot = false }: Props) {
+export default function CollisionView({ hot = false, telemetry = false, labels = false }: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -96,5 +100,24 @@ export default function CollisionView({ hot = false }: Props) {
     return () => cancelAnimationFrame(raf);
   }, [hot]);
 
-  return <canvas ref={ref} className="collision" aria-hidden />;
+  return (
+    <div className="collision-wrap">
+      <canvas ref={ref} className="collision" aria-hidden />
+      {telemetry && (
+        <div className="collision-hud" aria-hidden>
+          <span>B× illustrative</span>
+          <span className="hud-pulse">{hot ? "beam on" : "standby"}</span>
+          <span>tracks · conceptual</span>
+        </div>
+      )}
+      {labels && (
+        <div className="collision-labels" aria-hidden>
+          <span className="lbl-tracker">Tracker</span>
+          <span className="lbl-ecal">ECAL</span>
+          <span className="lbl-muon">Muon sys.</span>
+          <span className="lbl-solenoid">Solenoid B</span>
+        </div>
+      )}
+    </div>
+  );
 }

@@ -1,0 +1,59 @@
+/**
+ * Beamline design tokens — aligned with Folio / reference dashboard polish
+ */
+:root {
+  --paper: #ecede8;
+  --surface: #f7f7f4;
+  --surface-muted: #ffffff;
+  --bone: var(--surface);
+  --ink: #131410;
+  --ink-muted: color-mix(in srgb, var(--ink) 52%, transparent);
+  --line: color-mix(in srgb, var(--ink) 10%, transparent);
+  --line-soft: color-mix(in srgb, var(--ink) 7%, transparent);
+  --cobalt: #3f63c9;
+  --cobalt-soft: #e7edfb;
+  --sky: #cdd9f4;
+  --sky-soft: var(--cobalt-soft);
+  --signal-warning: #9a6700;
+  --signal-danger: #c4453c;
+
+  --radius-panel: 16px;
+  --radius-pill: 999px;
+  --shadow-soft: 0 24px 48px -36px rgba(63, 99, 201, 0.4);
+  --shadow-active: 0 20px 40px -30px rgba(63, 99, 201, 0.5);
+
+  --font-display: "General Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Instrument Serif", Georgia, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-ui: var(--font-display);
+
+  /* Legacy aliases */
+  --color-bg: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-muted);
+  --color-border: var(--line);
+  --color-border-hairline: var(--line-soft);
+  --color-text: var(--ink);
+  --color-text-muted: var(--ink-muted);
+  --color-text-faint: color-mix(in srgb, var(--ink) 38%, transparent);
+  --color-accent: var(--cobalt);
+  --color-accent-soft: var(--cobalt-soft);
+  --color-refusal: var(--signal-danger);
+  --bg: var(--paper);
+  --panel: var(--surface);
+  --panel-raised: var(--surface-muted);
+  --border: var(--line);
+  --border-soft: var(--line-soft);
+  --text: var(--ink);
+  --text-muted: var(--ink-muted);
+  --text-faint: var(--color-text-faint);
+  --accent: var(--cobalt);
+  --accent-soft: var(--cobalt-soft);
+  --accent-2: var(--cobalt);
+  --accent-2-soft: var(--cobalt-soft);
+  --danger: var(--signal-danger);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-normal: 220ms;
+  --content-max: 80rem;
+}

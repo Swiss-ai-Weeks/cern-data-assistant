@@ -1,31 +1,33 @@
-import type { AgentResponse, RecordSummary } from "../types";
+import type { AgentStreamEvent } from "../api";
+import type { AgentResponse, HealthResponse, RecordSummary } from "../types";
+import AgentTimeline from "./AgentTimeline";
 import AnswerCard from "./AnswerCard";
-import BoardingPass from "./BoardingPass";
 import CollisionView from "./CollisionView";
+import ControlRoom from "./ControlRoom";
 import DatasetTile from "./DatasetTile";
+import PassportSkeleton from "./PassportSkeleton";
+import ResearchPassport from "./ResearchPassport";
 
-const STARTERS = [
-  {
-    k: "01",
-    title: "Find 13 TeV muon data",
-    query: "proton-proton collisions at 13 TeV with muons",
-  },
-  {
-    k: "02",
-    title: "Refuse a hallucination",
-    query: "How do black holes evaporate?",
-  },
-  {
-    k: "03",
-    title: "Why CMS uses a solenoid",
-    query: "Why does CMS use a solenoid?",
-  },
-  {
-    k: "04",
-    title: "Search + explain, one turn",
-    query: "find CMS muon datasets and explain why CMS uses a solenoid",
-  },
-];
+interface LiveTurn {
+  steps: string[];
+  text: string;
+  result: AgentResponse | null;
+  live: boolean;
+  error: string | null;
+  events: AgentStreamEvent[];
+  generatedAt: string | null;
+}
+
+interface Props {
+  idle: boolean;
+  live: LiveTurn | null;
+  health: HealthResponse | null;
+  query: string;
+  presenterOn?: boolean;
+  onStarter: (q: string) => void;
+  onOpenRecord: (recid: number | string) => void;
+  onOpenTrust?: () => void;
+}
 
 function heroRecord(result: AgentResponse | null): RecordSummary | null {
   if (!result?.search?.results?.length && !result?.picked) return null;
@@ -42,104 +44,79 @@ function heroRecord(result: AgentResponse | null): RecordSummary | null {
   return results.find((r) => r.is_dataset) || results[0] || null;
 }
 
-const NODES = [
-  { id: "planning", label: "Plan" },
-  { id: "search", label: "Search" },
-  { id: "ask", label: "Ground" },
-  { id: "fetch_record", label: "Fetch" },
-];
-
-interface LiveTurn {
-  steps: string[];
-  text: string;
-  result: AgentResponse | null;
-  live: boolean;
-  error: string | null;
+function tieAlternates(hero: RecordSummary | null, results: RecordSummary[]): RecordSummary[] {
+  if (!hero) return [];
+  const rel = hero.relevance ?? 0;
+  return results.filter(
+    (r) =>
+      String(r.recid) !== String(hero.recid) &&
+      r.is_dataset &&
+      r.relevance != null &&
+      rel - r.relevance < 0.08,
+  );
 }
 
-interface Props {
-  idle: boolean;
-  live: LiveTurn | null;
-  onStarter: (q: string) => void;
-  onOpenRecord: (recid: number | string) => void;
-}
-
-function activeNode(live: LiveTurn | null): string | null {
-  if (!live) return null;
-  if (live.result) return "done";
-  const last = live.steps[live.steps.length - 1] || "";
-  if (/fetch|Opening the top/i.test(last)) return "fetch_record";
-  if (/Retrieving CERN|grounded/i.test(last)) return "ask";
-  if (/Search|retry/i.test(last)) return "search";
-  if (/Plan/i.test(last)) return "planning";
-  return "planning";
-}
-
-export default function Workbench({ idle, live, onStarter, onOpenRecord }: Props) {
-  const node = activeNode(live);
+export default function Workbench({
+  idle,
+  live,
+  health,
+  query,
+  presenterOn,
+  onStarter,
+  onOpenRecord,
+  onOpenTrust,
+}: Props) {
   const result = live?.result ?? null;
   const hero = heroRecord(result);
   const datasets = (result?.search?.results ?? []).filter(
     (r) => !hero || String(r.recid) !== String(hero.recid),
   );
+  const alts = tieAlternates(hero, result?.search?.results ?? []);
   const used = result?.answer?.sources.filter((s) => s.used) ?? [];
+  const searchError =
+    result?.search === null && live?.error?.includes("CERN")
+      ? live.error
+      : null;
+  const searchPending =
+    Boolean(live?.live) &&
+    (live?.events.some((e) => e.type === "status" && e.step === "search") ?? false) &&
+    !hero &&
+    !result?.search;
+  const searchEmpty =
+    !live?.live && result?.search && (result.search.results?.length ?? 0) === 0;
 
   if (idle) {
     return (
-      <div className="stage idle-stage event-stage">
-        <CollisionView />
-        <div className="event-copy">
-          <p className="microlabel">Event display — opendata.cern.ch</p>
-          <h2 className="stage-title">
-            This is a collision.
-            <br />
-            <em>ChatGPT cannot search it.</em>
-          </h2>
-          <div className="punch">
-            <button type="button" className="punch-btn" onClick={() => onStarter(STARTERS[0].query)}>
-              Fire 13 TeV muons
-            </button>
-            <button type="button" className="punch-ghost" onClick={() => onStarter(STARTERS[1].query)}>
-              Show the GPU lying
-            </button>
-          </div>
-        </div>
+      <div className="stage idle-stage control-stage">
+        <ControlRoom
+          health={health}
+          busy={false}
+          onSubmit={onStarter}
+          onOpenTrust={onOpenTrust}
+          presenterOn={presenterOn}
+        />
       </div>
     );
   }
 
+  const answerGrounded = result?.answer ? result.answer.grounded : null;
+
   return (
-    <div className="stage live-stage">
+    <div className={`stage live-stage ${presenterOn ? "presenter-focus" : ""}`}>
       {live?.live && !hero && !result?.answer && (
         <div className="live-collision">
-          <CollisionView hot />
+          <CollisionView hot telemetry />
         </div>
       )}
-      <div className="pipe" aria-label="Agent pipeline">
-        {NODES.map((n, i) => {
-          const order = ["planning", "search", "ask", "fetch_record"];
-          const nowId = node === "done" ? null : node;
-          const ni = order.indexOf(n.id);
-          const ai = nowId ? order.indexOf(nowId) : -1;
-          const used = result?.tools_used || [];
-          const finished =
-            n.id === "planning"
-              ? Boolean(result) || Boolean(live?.text)
-              : n.id === "fetch_record"
-                ? used.includes("fetch_record")
-                : used.includes(n.id);
-          const on = live?.live ? ni <= Math.max(ai, 0) : finished;
-          const now = Boolean(live?.live && n.id === nowId);
-          return (
-            <div key={n.id} className="pipe-wrap">
-              {i > 0 && <div className={`pipe-line ${on ? "hot" : ""}`} />}
-              <div className={`pipe-node ${on ? "on" : ""} ${now ? "now" : ""}`}>
-                <span>{n.label}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+
+      {(live?.live || (live?.events.length ?? 0) > 0) && (
+        <AgentTimeline
+          events={live?.events ?? []}
+          live={Boolean(live?.live)}
+          error={live?.error ?? null}
+          answerGrounded={answerGrounded}
+        />
+      )}
 
       {live?.text && (
         <h2 className="stage-goal">
@@ -149,34 +126,49 @@ export default function Workbench({ idle, live, onStarter, onOpenRecord }: Props
       )}
 
       {live?.error && <div className="error-banner">{live.error}</div>}
+      {searchError && <div className="error-banner">{searchError}</div>}
 
-      {live?.live && (
-        <ol className="stage-log">
-          {live.steps.map((s, i) => (
-            <li key={i} className={i === live.steps.length - 1 ? "now" : ""}>
-              {s}
-            </li>
-          ))}
-        </ol>
+      {searchPending && (
+        <div className="stage-block passport-block">
+          <PassportSkeleton />
+        </div>
+      )}
+
+      {searchEmpty && (
+        <div className="stage-empty" role="status">
+          No datasets matched this query in the live catalog. Try broadening collision type or energy
+          terms.
+        </div>
       )}
 
       {hero && (
-        <div className="stage-block">
-          <BoardingPass record={hero} onOpen={() => onOpenRecord(hero.recid)} />
+        <div className="stage-block passport-block">
+          <ResearchPassport
+            record={hero}
+            search={result?.search ?? null}
+            health={health}
+            alternates={alts}
+            onOpen={() => onOpenRecord(hero.recid)}
+          />
         </div>
       )}
 
       {result?.answer && (
-        <div className="stage-block">
-          <div className="stage-label">{result.answer.grounded ? "Grounded answer" : "The rail"}</div>
-          <AnswerCard result={result.answer} />
+        <div className="stage-block evidence-block">
+          <div className="stage-label">Scientific evidence brief</div>
+          <AnswerCard
+            result={result.answer}
+            query={query || result.query}
+            onTryGrounded={onStarter}
+            generatedAt={live?.generatedAt}
+          />
         </div>
       )}
 
       {datasets.length > 0 && (
         <div className="stage-block">
           <div className="stage-label">
-            Datasets
+            Related catalog records
             <span>
               {datasets.length} of {result?.search?.total_matches?.toLocaleString()}
             </span>

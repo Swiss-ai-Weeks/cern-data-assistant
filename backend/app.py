@@ -521,8 +521,16 @@ def _followups(plan: dict, search, answer) -> list[str]:
     return uniq[:4]
 
 
+def _sse(ev: dict, t0: float) -> dict:
+    """Attach elapsed_ms for the UI timeline (additive; clients may ignore)."""
+    out = dict(ev)
+    out["elapsed_ms"] = int((time.time() - t0) * 1000)
+    return out
+
+
 def _agent_events(user_query: str, body: dict, history=None):
     """Yield SSE-shaped dicts, last one type=result with the full payload."""
+    t0 = time.time()
     blocked = guardrails.screen_query(user_query)
     if blocked:
         refusal, _ = _refusal(user_query, blocked["message"], f"input:{blocked['category']}")
@@ -536,17 +544,28 @@ def _agent_events(user_query: str, body: dict, history=None):
             "picked": None,
             "followups": _followups({}, None, refusal),
         }
-        yield {"type": "result", "payload": payload}
+        yield _sse({"type": "result", "payload": payload}, t0)
         return
 
-    yield {"type": "status", "step": "planning", "label": "Planning which tools to run"}
+    yield _sse(
+        {
+            "type": "status",
+            "step": "planning",
+            "timeline_stage": "interpret_intent",
+            "label": "Interpret scientific intent",
+        },
+        t0,
+    )
     plan = ollama_client.plan_tasks(user_query, history=history)
-    yield {
-        "type": "plan",
-        "goal": plan.get("goal"),
-        "search_query": plan.get("search_query"),
-        "ask_query": plan.get("ask_query"),
-    }
+    yield _sse(
+        {
+            "type": "plan",
+            "goal": plan.get("goal"),
+            "search_query": plan.get("search_query"),
+            "ask_query": plan.get("ask_query"),
+        },
+        t0,
+    )
 
     tools_used: list[str] = []
     search_payload = None
@@ -554,7 +573,15 @@ def _agent_events(user_query: str, body: dict, history=None):
     retried_with = None
 
     if plan.get("search_query"):
-        yield {"type": "status", "step": "search", "label": f"Searching CERN Open Data for “{plan['search_query']}”"}
+        yield _sse(
+            {
+                "type": "status",
+                "step": "search",
+                "timeline_stage": "search_catalog",
+                "label": f"Search CERN Open Data catalog — “{plan['search_query']}”",
+            },
+            t0,
+        )
         sp, sstatus = _run_search(plan["search_query"], body.get("size"))
         if sstatus == 200:
             search_payload = sp
@@ -562,30 +589,102 @@ def _agent_events(user_query: str, body: dict, history=None):
             if not (sp.get("results") or []):
                 alt = cern_client.fallback_search_query(plan["search_query"])
                 if alt:
-                    yield {"type": "status", "step": "search", "label": f"No hits — retrying as “{alt}”"}
+                    yield _sse(
+                        {
+                            "type": "status",
+                            "step": "search",
+                            "timeline_stage": "search_catalog",
+                            "label": f"No exact match — broadening search to “{alt}”",
+                        },
+                        t0,
+                    )
                     sp2, s2 = _run_search(alt, body.get("size"))
                     if s2 == 200 and (sp2.get("results") or []):
                         search_payload = sp2
                         retried_with = alt
         n = (search_payload or {}).get("returned") or 0
-        yield {"type": "tool_done", "tool": "search", "hits": n, "search": search_payload}
+        if search_payload and search_payload.get("llm_ranked"):
+            yield _sse(
+                {
+                    "type": "status",
+                    "step": "search",
+                    "timeline_stage": "rank_records",
+                    "label": "Rank matching records for your question",
+                },
+                t0,
+            )
+        yield _sse(
+            {
+                "type": "tool_done",
+                "tool": "search",
+                "timeline_stage": "rank_records",
+                "hits": n,
+                "search": search_payload,
+                "meta": {
+                    "total_matches": (search_payload or {}).get("total_matches"),
+                    "returned": n,
+                    "broadened": (search_payload or {}).get("broadened"),
+                    "llm_ranked": (search_payload or {}).get("llm_ranked"),
+                },
+            },
+            t0,
+        )
 
     if plan.get("ask_query"):
-        yield {"type": "status", "step": "ask", "label": "Retrieving CERN sources and writing a grounded answer"}
+        yield _sse(
+            {
+                "type": "status",
+                "step": "ask",
+                "timeline_stage": "retrieve_docs",
+                "label": "Retrieve supporting CERN documentation",
+            },
+            t0,
+        )
         ap, astatus = _run_ask(plan["ask_query"], body.get("k"))
         if astatus == 200:
             answer_payload = ap
             tools_used.append("ask")
-        yield {
-            "type": "tool_done",
-            "tool": "ask",
-            "grounded": bool((answer_payload or {}).get("grounded")),
-            "answer": answer_payload,
-        }
+        gd = (answer_payload or {}).get("guardrail_detail") or {}
+        cited_n = len([s for s in (answer_payload or {}).get("sources") or [] if s.get("used")])
+        yield _sse(
+            {
+                "type": "status",
+                "step": "ask",
+                "timeline_stage": "verify_grounding",
+                "label": "Verify grounding and citations",
+            },
+            t0,
+        )
+        yield _sse(
+            {
+                "type": "tool_done",
+                "tool": "ask",
+                "timeline_stage": "verify_grounding",
+                "grounded": bool((answer_payload or {}).get("grounded")),
+                "answer": answer_payload,
+                "meta": {
+                    "top_score": gd.get("top_score"),
+                    "threshold": gd.get("threshold"),
+                    "sources_retrieved": len((answer_payload or {}).get("sources") or []),
+                    "sources_cited": cited_n,
+                    "guardrail": (answer_payload or {}).get("guardrail"),
+                    "verify_ms": ((answer_payload or {}).get("timing_ms") or {}).get("verify"),
+                },
+            },
+            t0,
+        )
 
     picked = None
     if search_payload and (search_payload.get("results") or []):
-        yield {"type": "status", "step": "fetch_record", "label": "Opening the top dataset record"}
+        yield _sse(
+            {
+                "type": "status",
+                "step": "fetch_record",
+                "timeline_stage": "prepare_handoff",
+                "label": "Prepare research handoff",
+            },
+            t0,
+        )
         picked = _fetch_top_record(search_payload)
         if picked:
             tools_used.append("fetch_record")
@@ -595,13 +694,18 @@ def _agent_events(user_query: str, body: dict, history=None):
                     r["license"] = picked.get("license")
                     r["picked"] = True
                     break
-        yield {
-            "type": "tool_done",
-            "tool": "fetch_record",
-            "recid": (picked or {}).get("recid"),
-            "picked": picked,
-            "search": search_payload,
-        }
+        yield _sse(
+            {
+                "type": "tool_done",
+                "tool": "fetch_record",
+                "timeline_stage": "prepare_handoff",
+                "recid": (picked or {}).get("recid"),
+                "picked": picked,
+                "search": search_payload,
+                "meta": {"file_count": (picked or {}).get("file_count")},
+            },
+            t0,
+        )
 
     payload = {
         "query": user_query,
@@ -617,7 +721,7 @@ def _agent_events(user_query: str, body: dict, history=None):
         "picked": picked,
         "followups": _followups(plan, search_payload, answer_payload),
     }
-    yield {"type": "result", "payload": payload}
+    yield _sse({"type": "result", "payload": payload}, t0)
 
 
 @app.post("/api/agent")

@@ -78,21 +78,57 @@ export async function runAgent(
   return asJson<AgentResponse>(res);
 }
 
+export type TimelineStageId =
+  | "interpret_intent"
+  | "search_catalog"
+  | "rank_records"
+  | "retrieve_docs"
+  | "verify_grounding"
+  | "prepare_handoff";
+
+export type ToolDoneMeta = {
+  total_matches?: number;
+  returned?: number;
+  broadened?: boolean;
+  llm_ranked?: boolean;
+  top_score?: number;
+  threshold?: number;
+  sources_retrieved?: number;
+  sources_cited?: number;
+  guardrail?: string;
+  verify_ms?: number;
+  file_count?: number;
+};
+
+type StreamTiming = { elapsed_ms?: number };
+
 export type AgentStreamEvent =
-  | { type: "status"; step: string; label: string }
-  | { type: "plan"; goal?: string; search_query?: string | null; ask_query?: string | null }
-  | {
+  | ({
+      type: "status";
+      step: string;
+      label: string;
+      timeline_stage?: TimelineStageId;
+    } & StreamTiming)
+  | ({
+      type: "plan";
+      goal?: string;
+      search_query?: string | null;
+      ask_query?: string | null;
+    } & StreamTiming)
+  | ({
       type: "tool_done";
       tool: string;
+      timeline_stage?: TimelineStageId;
       hits?: number;
       grounded?: boolean;
       recid?: string | number;
       search?: AgentResponse["search"];
       answer?: AgentResponse["answer"];
       picked?: AgentResponse["picked"];
-    }
-  | { type: "result"; payload: AgentResponse }
-  | { type: "error"; error: string };
+      meta?: ToolDoneMeta;
+    } & StreamTiming)
+  | ({ type: "result"; payload: AgentResponse } & StreamTiming)
+  | ({ type: "error"; error: string } & StreamTiming);
 
 export async function* streamAgent(
   query: string,

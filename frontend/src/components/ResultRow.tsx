@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { catalogPlainText } from "../lib/catalogText";
 import type { RecordSummary } from "../types";
 
 interface Props {
@@ -83,7 +84,9 @@ export default function ResultRow({ record, showRelevance, onOpen }: Props) {
           </div>
         )}
 
-        {record.abstract && <p className="record-abstract">{record.abstract}</p>}
+        {record.abstract && (
+          <p className="record-abstract">{catalogPlainText(record.abstract, 240)}</p>
+        )}
 
         {record.suggestion && (
           <p className="record-suggestion">

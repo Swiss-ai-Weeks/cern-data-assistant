@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { checkHealth } from "./api";
 import type { HealthResponse } from "./types";
-import StatusBar from "./components/StatusBar";
 import Chat from "./components/Chat";
-import LogoMark from "./components/LogoMark";
+import TrustFlow from "./components/TrustFlow";
+import { usePresenterMode } from "./hooks/usePresenterMode";
 
 export default function App() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
+  const { presenterOn, trustOpen, setTrustOpen } = usePresenterMode();
 
   useEffect(() => {
     let alive = true;
@@ -27,21 +28,18 @@ export default function App() {
   }, []);
 
   return (
-    <div className="app">
-      <div className="grain" aria-hidden />
-      <aside className="rail">
-        <LogoMark />
-        <span className="rail-dot" title="live" />
-      </aside>
-      <div className="shell">
-        <header className="topbar">
-          <div className="brand">
-            <span className="brand-name">beamline</span>
-          </div>
-          <StatusBar health={health} />
-        </header>
-        <Chat />
-      </div>
+    <div className={presenterOn ? "presenter-mode" : ""}>
+      <Chat
+        health={health}
+        presenterOn={presenterOn}
+        onOpenTrust={() => setTrustOpen(true)}
+      />
+      {presenterOn && (
+        <div className="presenter-shortcuts" aria-hidden>
+          <kbd>1</kbd> discovery · <kbd>2</kbd> grounded · <kbd>3</kbd> integrity · <kbd>?</kbd> trust
+        </div>
+      )}
+      <TrustFlow open={trustOpen} onClose={() => setTrustOpen(false)} />
     </div>
   );
 }

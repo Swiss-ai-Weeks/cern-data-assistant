@@ -1,7 +1,12 @@
-import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { BeamlinePromptInputHandle } from "./ui/beamline-prompt-input";
 import { streamAgent, type AgentStreamEvent } from "../api";
-import type { AgentResponse } from "../types";
-import Workbench from "./Workbench";
+import type { AgentResponse, HealthResponse } from "../types";
+import { DEMO_SCENES, type DemoScene } from "../lib/demoQueries";
+import DashboardShell, { type DashTab } from "../layouts/DashboardShell";
+import CommandPalette from "./CommandPalette";
+import HistoryDrawer from "./HistoryDrawer";
+import InvestigateDashboard from "./dashboard/InvestigateDashboard";
 import RecordDrawer from "./RecordDrawer";
 
 type Turn = {
@@ -9,9 +14,11 @@ type Turn = {
   role: "user" | "assistant";
   text: string;
   steps: string[];
+  events: AgentStreamEvent[];
   result: AgentResponse | null;
   error: string | null;
   live: boolean;
+  generatedAt: string | null;
 };
 
 function uid() {
@@ -39,15 +46,25 @@ function blankResult(query: string): AgentResponse {
 }
 
 function applyEvent(t: Turn, ev: AgentStreamEvent, query: string): Turn {
-  if (ev.type === "status") return { ...t, steps: [...t.steps, ev.label] };
-  if (ev.type === "plan" && ev.goal) return { ...t, text: ev.goal };
-  if (ev.type === "error") return { ...t, error: ev.error, live: false };
-  if (ev.type === "result") return { ...t, result: ev.payload, live: false };
+  const events = [...t.events, ev];
+  if (ev.type === "status") return { ...t, events, steps: [...t.steps, ev.label] };
+  if (ev.type === "plan" && ev.goal) return { ...t, events, text: ev.goal };
+  if (ev.type === "error") return { ...t, events, error: ev.error, live: false };
+  if (ev.type === "result") {
+    return {
+      ...t,
+      events,
+      result: ev.payload,
+      live: false,
+      generatedAt: t.generatedAt ?? new Date().toISOString(),
+    };
+  }
   if (ev.type === "tool_done") {
     const prev = t.result ?? blankResult(query);
     const tools = prev.tools_used.includes(ev.tool) ? prev.tools_used : [...prev.tools_used, ev.tool];
     return {
       ...t,
+      events,
       result: {
         ...prev,
         tools_used: tools,
@@ -57,17 +74,26 @@ function applyEvent(t: Turn, ev: AgentStreamEvent, query: string): Turn {
       },
     };
   }
-  return t;
+  return { ...t, events };
 }
 
-export default function Chat() {
+interface ChatProps {
+  health: HealthResponse | null;
+  presenterOn: boolean;
+  onOpenTrust: () => void;
+}
+
+export default function Chat({ health, presenterOn, onOpenTrust }: ChatProps) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [value, setValue] = useState("");
+  const promptRef = useRef<BeamlinePromptInputHandle>(null);
   const [busy, setBusy] = useState(false);
   const [openRecid, setOpenRecid] = useState<number | string | null>(null);
   const [focusId, setFocusId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<DashTab>("investigate");
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
-  const box = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
@@ -91,8 +117,29 @@ export default function Chat() {
     if (!query || busy) return;
     setValue("");
     setBusy(true);
-    const user: Turn = { id: uid(), role: "user", text: query, steps: [], result: null, error: null, live: false };
-    const asst: Turn = { id: uid(), role: "assistant", text: "", steps: [], result: null, error: null, live: true };
+    setHistoryOpen(false);
+    const user: Turn = {
+      id: uid(),
+      role: "user",
+      text: query,
+      steps: [],
+      events: [],
+      result: null,
+      error: null,
+      live: false,
+      generatedAt: null,
+    };
+    const asst: Turn = {
+      id: uid(),
+      role: "assistant",
+      text: "",
+      steps: [],
+      events: [],
+      result: null,
+      error: null,
+      live: true,
+      generatedAt: null,
+    };
     setFocusId(asst.id);
     setTurns((prev) => [...prev, user, asst]);
     const hist = historyForApi([...turns, user]);
@@ -112,126 +159,129 @@ export default function Chat() {
     } finally {
       setBusy(false);
       setTurns((prev) => prev.map((t) => (t.id === asst.id ? { ...t, live: false } : t)));
-      box.current?.focus();
     }
   }
 
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    send(value);
-  }
-
-  function onKey(e: KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      send(value);
-    }
+  function newInvestigation() {
+    setTurns([]);
+    setFocusId(null);
+    setValue("");
+    setActiveTab("investigate");
   }
 
   const followups = stageAsst?.result?.followups ?? [];
+  const stageUser =
+    stageAsst &&
+    turns[Math.max(0, turns.findIndex((t) => t.id === stageAsst.id) - 1)];
+  const stageQuery = stageUser?.role === "user" ? stageUser.text : stageAsst?.result?.query ?? "";
+
+  useEffect(() => {
+    function onKey(e: globalThis.KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
+    if (!presenterOn) return;
+    function onKey(e: globalThis.KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const map: Record<string, DemoScene> = { "1": "discovery", "2": "grounded", "3": "integrity" };
+      const scene = map[e.key];
+      if (!scene) return;
+      e.preventDefault();
+      void send(DEMO_SCENES[scene].queries[0]);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [presenterOn, busy]);
+
+  function submitComposer() {
+    const q = value.trim();
+    if (q) void send(q);
+  }
+
+  function focusComposer() {
+    setActiveTab("investigate");
+    setHistoryOpen(false);
+    requestAnimationFrame(() => promptRef.current?.focus());
+  }
 
   return (
-    <div className={`cockpit-body ${turns.length === 0 ? "stage-first" : ""}`}>
-      <aside className="thread">
-        <div className="thread-scroll" ref={scroller}>
-          {turns.length === 0 && (
-            <p className="thread-empty">
-              Ask anything. Results land <em>on the right.</em>
-            </p>
-          )}
-          {turns.map((t) => {
-            const onStage =
-              t.id === stageAsst?.id ||
-              (t.role === "user" &&
-                turns[turns.findIndex((x) => x.id === t.id) + 1]?.id === stageAsst?.id);
-            return (
-              <button
-                key={t.id}
-                type="button"
-                className={`msg ${t.role} ${onStage ? "on-stage" : ""}`}
-                onClick={() => focusTurn(t)}
-              >
-                <div className="msg-who">{t.role === "user" ? "You" : "Beamline"}</div>
-                {t.role === "user" ? (
-                  <p>{t.text}</p>
-                ) : (
-                  <p className="msg-asst">
-                    {t.live
-                      ? t.steps[t.steps.length - 1] || "Planning…"
-                      : t.result?.answer?.answer
-                        ? t.result.answer.answer.slice(0, 160) + (t.result.answer.answer.length > 160 ? "…" : "")
-                        : t.result?.search
-                          ? `${t.result.search.returned} datasets · ${t.result.search.search_terms}`
-                          : t.error || t.text || "Done."}
-                  </p>
-                )}
-              </button>
-            );
-          })}
-        </div>
+    <>
+      <DashboardShell
+        activeTab={activeTab}
+        onTabChange={(tab) => {
+          setHistoryOpen(false);
+          setActiveTab(tab);
+        }}
+        onNewInvestigation={newInvestigation}
+        onToggleHistory={() => setHistoryOpen((v) => !v)}
+        historyOpen={historyOpen}
+        onFocusComposer={focusComposer}
+      >
+        <InvestigateDashboard
+          promptInputRef={promptRef}
+          activeTab={activeTab}
+          health={health}
+          query={stageQuery}
+          composerValue={value}
+          onComposerChange={setValue}
+          onSubmitComposer={submitComposer}
+          busy={busy}
+          idle={turns.length === 0}
+          live={
+            stageAsst
+              ? {
+                  steps: stageAsst.steps,
+                  text: stageAsst.text,
+                  result: stageAsst.result,
+                  live: stageAsst.live,
+                  error: stageAsst.error,
+                  events: stageAsst.events,
+                  generatedAt: stageAsst.generatedAt,
+                }
+              : null
+          }
+          onStarter={send}
+          onOpenRecord={setOpenRecid}
+          onFocusEvidence={() => setActiveTab("evidence")}
+        />
+      </DashboardShell>
 
-        {followups.length > 0 && !busy && (
-          <div className="followups">
-            {followups.map((q) => (
-              <button key={q} type="button" className="follow-chip" onClick={() => send(q)}>
-                {q}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <form className="composer" onSubmit={onSubmit}>
-          <textarea
-            ref={box}
-            className="composer-input"
-            rows={2}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={onKey}
-            placeholder="ask in plain English"
-            disabled={busy}
-            autoFocus
-          />
-          <div className="composer-bar">
-            {turns.length > 0 && (
-              <button
-                type="button"
-                className="ghost-btn"
-                onClick={() => {
-                  setTurns([]);
-                  setFocusId(null);
-                }}
-                disabled={busy}
-              >
-                Reset
-              </button>
-            )}
-            <span className="composer-hint">{busy ? "working" : "enter ↵"}</span>
-            <button className="send-btn" type="submit" disabled={busy || !value.trim()}>
-              {busy ? "…" : "Ask"}
-            </button>
-          </div>
-        </form>
-      </aside>
-
-      <Workbench
-        idle={turns.length === 0}
-        live={
-          stageAsst
-            ? {
-                steps: stageAsst.steps,
-                text: stageAsst.text,
-                result: stageAsst.result,
-                live: stageAsst.live,
-                error: stageAsst.error,
-              }
-            : null
-        }
-        onStarter={send}
-        onOpenRecord={setOpenRecid}
+      <HistoryDrawer
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        turns={turns}
+        stageAsstId={stageAsst?.id ?? null}
+        onFocusTurn={(id) => {
+          const t = turns.find((x) => x.id === id);
+          if (t) focusTurn(t);
+        }}
+        followups={followups}
+        busy={busy}
+        onFollowup={send}
+        value={value}
+        onValueChange={setValue}
+        onSubmit={submitComposer}
+        scroller={scroller}
       />
 
       <RecordDrawer recid={openRecid} onClose={() => setOpenRecid(null)} />
-    </div>
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        onNewInvestigation={newInvestigation}
+        onOpenTrust={onOpenTrust}
+        onOpenAbout={() => {
+          setHistoryOpen(false);
+          setActiveTab("about");
+        }}
+      />
+    </>
   );
 }

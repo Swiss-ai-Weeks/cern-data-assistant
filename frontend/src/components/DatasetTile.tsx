@@ -7,10 +7,10 @@ interface Props {
 
 export default function DatasetTile({ record, onOpen }: Props) {
   return (
-    <button type="button" className="ds-tile" onClick={onOpen}>
+    <button type="button" className="ds-tile" onClick={onOpen} aria-label={`Open record ${record.recid}`}>
       <div className="ds-tile-top">
         <span className="ds-exp">{record.experiment || "CERN"}</span>
-        {record.picked && <span className="ds-fetched">opened</span>}
+        <span className="ds-recid">{record.recid}</span>
       </div>
       <h3>{record.title}</h3>
       <div className="ds-meta">

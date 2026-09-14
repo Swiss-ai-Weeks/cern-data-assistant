@@ -22,21 +22,19 @@ Laptop demo works today: UI `5173` + Flask `5001` + SSH tunnel `11434` → Ollam
 
 ---
 
-## Phase 6 — Demo-ready (do this next)
+## Phase 6 — Demo-ready (DONE)
 
-One reliable path for the pitch. Highest ROI.
+One reliable path for the pitch.
 
-1. **Run on the H100** with `scripts/start_h100.sh` (tmux). Laptop only tunnels **5001**. Drops the 3-process laptop stack.
-2. **Warm `qwen2.5:32b`** before anyone walks up (script already curls a dummy chat). First real question otherwise waits on GPU load.
-3. **Judge script** (rehearse, 4 queries, say the rail out loud):
-   - *“proton-proton collisions at 13 TeV with muons”* → datasets
-   - *“Why does CMS use a solenoid?”* → grounded + citations
-   - *“find CMS muon datasets and explain why CMS uses a solenoid”* → **both tools**
-   - *“How do black holes evaporate?”* or pasta → **refusal** (the money shot)
-4. **Fix README drift**: diagram still says llama3.2 / laptop-only; align with 32B + optional H100 serve.
-5. **Pre-pull on the GPU box** if a teammate’s clone is empty: `qwen2.5:32b`, `llama3.2`, `nomic-embed-text`.
-
-Skip [Brev CLI](https://github.com/brevdev/brev-cli) unless you leave LaunchPad. You already have the H100.
+- ✅ H100 already serving UI+API via `scripts/start_h100.sh` (tmux `app`, gunicorn `:5001`, `qwen2.5:32b`, 1633 chunks).
+- ✅ Laptop tunnels **5001** only: `ssh -N -L 5001:127.0.0.1:5001 launchpad-cern` → http://127.0.0.1:5001
+- ✅ `scripts/warm_h100.sh` keeps 32B + embed model loaded.
+- ✅ [DEMO.md](DEMO.md) + `scripts/judge_demo.sh` — four queries rehearsed live:
+  - datasets → search (ATLAS 13 TeV muon ntuples)
+  - solenoid → grounded
+  - both tools → search + ask
+  - black holes → `retrieval:no_source` refusal
+- ✅ README diagram: demo (one port) vs laptop-dev (Ollama tunnel).
 
 ---
 
@@ -75,7 +73,7 @@ Guardrails work; a few holes remain.
 ## Suggested order for the rest of the lab
 
 ```
-Phase 6 (H100 demo + 4-query script)   ← do now
+Phase 6 (H100 demo + 4-query script)   ← DONE
      ↓
 Phase 7.1–7.3 (record tool + visible plan)
      ↓
@@ -83,5 +81,3 @@ Phase 8.1–8.2 (recalibrate floor + seed the demo questions)
      ↓
 Phase 9 only if the pitch is already smooth
 ```
-
-Do **not** start Brev, NeMo, or a full AIQ port until Phase 6 is rehearsed once without the tunnel dying.

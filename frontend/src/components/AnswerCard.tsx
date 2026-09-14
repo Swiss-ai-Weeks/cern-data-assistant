@@ -5,19 +5,28 @@ interface Props {
   result: AskResponse;
 }
 
+// Human-readable label for the guardrail that decided this response.
+const RAIL_LABEL: Record<string, string> = {
+  grounded: "grounding verified",
+  "grounded:low_confidence": "grounded — weak match, fact-check passed",
+  "grounded:unverified": "grounded (fact-check offline)",
+  "retrieval:no_source": "blocked: no CERN source (LLM not called)",
+  "model:not_in_sources": "blocked: model found no answer in sources",
+  "citation:none": "blocked: no valid citation",
+  "grounding:unsupported": "blocked: unsupported claim",
+  "input:injection": "blocked: off-scope request",
+  "input:unsafe": "blocked: unsafe request",
+};
+
 function badge(result: AskResponse): { cls: string; label: string } {
-  const status = result.guardrail?.status;
-  if (result.grounded && status === "low_confidence") {
+  if (result.grounded && result.guardrail === "grounded:low_confidence") {
     return { cls: "low", label: "low confidence — weak match in CERN sources" };
   }
   if (result.grounded) {
     const n = result.sources.filter((s) => s.used).length;
     return { cls: "ok", label: `grounded in ${n} CERN source${n === 1 ? "" : "s"}` };
   }
-  if (status === "refused" || status === "refused_by_model") {
-    return { cls: "warn", label: "no answer — not in CERN sources" };
-  }
-  return { cls: "warn", label: "not grounded — no CERN source cited" };
+  return { cls: "warn", label: "not grounded — held back" };
 }
 
 /** Render the answer text with every [n] turned into a link to source n. */
@@ -46,12 +55,24 @@ function renderAnswer(text: string, sources: AskSource[]) {
 
 export default function AnswerCard({ result }: Props) {
   const b = badge(result);
-  const g = result.guardrail;
+  const railLabel = result.guardrail
+    ? RAIL_LABEL[result.guardrail] ?? result.guardrail
+    : null;
+  const d = result.guardrail_detail;
 
   return (
     <div className="answer-card">
-      <div className={`answer-badge ${b.cls}`}>{b.label}</div>
+      <div className="answer-badges">
+        <span className={`answer-badge ${b.cls}`}>{b.label}</span>
+        {railLabel && <span className="rail-badge">{railLabel}</span>}
+      </div>
       <p className="answer-text">{renderAnswer(result.answer, result.sources)}</p>
+
+      {d?.unsupported && d.unsupported.length > 0 && (
+        <div className="answer-unsupported">
+          Fact-check flagged: {d.unsupported.join(" · ")}
+        </div>
+      )}
 
       {result.sources.length > 0 && (
         <div className="answer-sources">
@@ -75,14 +96,16 @@ export default function AnswerCard({ result }: Props) {
 
       <div className="answer-meta">
         {result.model_used && <span>model {result.model_used}</span>}
-        {g && (
+        {d && d.top_score > 0 && (
           <span>
-            best match {g.top_score} / gate {g.threshold}
-            {g.citations_removed > 0 && ` · ${g.citations_removed} invalid citation(s) removed`}
+            best match {d.top_score} / gate {d.threshold}
+            {d.citations_removed > 0 && ` · ${d.citations_removed} invalid citation(s) removed`}
           </span>
         )}
         {result.timing_ms?.llm !== undefined && (
-          <span>{((result.timing_ms.llm ?? 0) / 1000).toFixed(1)} s</span>
+          <span>
+            {(((result.timing_ms.llm ?? 0) + (result.timing_ms.verify ?? 0)) / 1000).toFixed(1)} s
+          </span>
         )}
       </div>
     </div>

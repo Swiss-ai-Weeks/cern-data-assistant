@@ -131,18 +131,22 @@ API pulls are cached in `knowledge/raw_*.jsonl`. Health then shows
 
 ### 4c. Guardrails (how "grounded" is decided)
 
-The model is never trusted to judge its own grounding. `guardrail.py` applies:
+The model is never trusted to judge its own grounding. `guardrails.py` applies:
 
 1. **Retrieval gate** — if the best passage's cosine similarity is below
    `RAG_MIN_SCORE` (0.65, calibrated: on-topic questions score ≥ 0.75, off-topic
    ≤ 0.58) the API refuses *before* calling the LLM. Between 0.65 and 0.70 it
    answers but flags **low confidence**.
 2. **Citation check** — every `[n]` in the answer must point at a passage that was
-   actually shown; invalid ones are stripped, and an answer with no valid citation
-   is returned as `grounded: false`. The model may also reply `NOT_IN_SOURCES`,
-   which becomes the same refusal.
+   actually shown and scored at least `RAG_MIN_CITE_SCORE`; invalid ones are stripped,
+   and an answer with no valid citation is refused. The model may also reply
+   `NOT_IN_SOURCES`, which becomes the same refusal.
+3. **Fact-check pass** — a second LLM call checks every claim in the answer against
+   the cited passages only; unsupported claims block the answer.
+4. **Input rail** — prompt-injection and unsafe requests are refused before any model call.
 
-Every response carries `guardrail: {status, top_score, threshold, citations_removed}`
+Every response carries `guardrail` (the rail that decided, e.g. `grounded`,
+`retrieval:no_source`, `grounding:unsupported`) plus `guardrail_detail: {status, top_score, threshold, citations_removed, unsupported}`
 and `sources[]` with `used: true` on the passages the answer cites. Try
 `"Who won the 2022 World Cup?"` to see the refusal.
 

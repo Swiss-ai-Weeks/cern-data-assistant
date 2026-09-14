@@ -37,6 +37,7 @@ export interface RecordDetail extends RecordSummary {
 export interface SearchResponse {
   query: string;
   search_terms: string;
+  broadened?: boolean;
   total_matches: number;
   returned: number;
   model_used: string | null;
@@ -70,13 +71,16 @@ export type GuardrailStatus =
   | "low_confidence"
   | "refused"
   | "refused_by_model"
-  | "no_citations";
+  | "no_citations"
+  | "unsupported"
+  | "blocked";
 
 export interface Guardrail {
   status: GuardrailStatus;
   top_score: number;
   threshold: number;
   citations_removed: number;
+  unsupported?: string[];
 }
 
 export interface AskResponse {
@@ -84,11 +88,24 @@ export interface AskResponse {
   answer: string;
   grounded: boolean;
   model_used?: string;
+  guardrail?: string;
+  guardrail_detail?: Guardrail;
   sources: AskSource[];
-  guardrail?: Guardrail;
-  timing_ms?: { retrieve?: number; llm?: number };
+  timing_ms?: { retrieve?: number; llm?: number; verify?: number };
 }
 
 export type AssistantResponse =
   | (SearchResponse & { mode: "search"; route_confidence: number })
   | (AskResponse & { mode: "ask"; route_confidence: number });
+
+export interface AgentResponse {
+  query: string;
+  goal: string;
+  plan?: {
+    search_query: string | null;
+    ask_query: string | null;
+  };
+  tools_used: string[];
+  search: SearchResponse | null;
+  answer: AskResponse | null;
+}

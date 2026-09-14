@@ -324,3 +324,99 @@ def answer_with_context(
         context_lines.append(f"[{p['n']}] ({label})\n{p.get('text', '')}")
     user_payload = "Passages:\n" + "\n\n".join(context_lines) + f"\n\nQuestion: {question}"
     return chat_text(ASK_SYSTEM_PROMPT, user_payload, model=model)
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 — agentic planner (decompose a request into tool calls)
+# ---------------------------------------------------------------------------
+
+PLAN_SYSTEM_PROMPT = """You are the planner for the CERN Data Assistant. You \
+turn one user message into a plan over TWO tools, and may use one, the other, \
+or BOTH in a single turn.
+
+Tools:
+- "search_query": a short keyword query for the CERN Open Data portal, used to
+  FIND datasets/files (e.g. "CMS muon proton collisions 13 TeV"). null if the
+  user isn't asking to find data.
+- "ask_query": a self-contained QUESTION about physics / detectors / experiments
+  to be answered from CERN documentation (e.g. "Why does CMS use a solenoid?").
+  null if the user isn't asking to understand something.
+
+Use BOTH when the message has two parts, e.g. "find CMS muon datasets and
+explain why CMS uses a solenoid" -> search_query for the data, ask_query for
+the explanation.
+
+Respond with ONLY a JSON object of this exact shape:
+{"goal": "<one short sentence restating the user's goal>",
+ "search_query": "<keywords>" | null,
+ "ask_query": "<question>" | null}
+
+If both would be null, put the user's message in ask_query."""
+
+
+def plan_tasks(user_message: str, model: Optional[str] = None) -> dict:
+    """Decompose a request into optional search + ask sub-tasks. Falls back to
+    the single-intent router if planning fails."""
+    try:
+        data = _chat_json(PLAN_SYSTEM_PROMPT, user_message, model=model)
+    except OllamaUnavailable:
+        data = {}
+
+    def _clean(v):
+        if isinstance(v, str) and v.strip() and v.strip().lower() != "null":
+            return v.strip()
+        return None
+
+    search_q = _clean(data.get("search_query"))
+    ask_q = _clean(data.get("ask_query"))
+    goal = _clean(data.get("goal"))
+
+    # Fallback: if the planner gave us nothing usable, route with the classifier.
+    if not search_q and not ask_q:
+        intent = classify_intent(user_message, model=model)["intent"]
+        if intent == "search":
+            search_q = user_message
+        else:
+            ask_q = user_message
+
+    return {"goal": goal or user_message, "search_query": search_q, "ask_query": ask_q}
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — grounding verification (LLM fact-check rail)
+# ---------------------------------------------------------------------------
+
+GROUNDCHECK_SYSTEM_PROMPT = """You are a strict fact-checker for the CERN Data \
+Assistant. You are given an ANSWER and the numbered CONTEXT passages it was \
+supposed to be based on.
+
+Decide whether EVERY factual claim in the answer is directly supported by the \
+context. Do not use outside knowledge — if a claim is true in reality but is \
+NOT stated in the context, it is UNSUPPORTED.
+
+Respond with ONLY a JSON object of this exact shape:
+{"supported": <true|false>, "unsupported": ["<short quote or paraphrase of each unsupported claim>"]}
+
+Rules:
+- "supported" is true only if the context backs up all claims.
+- Ignore generic framing sentences with no factual content.
+- Be strict: plausible-sounding physics that isn't in the context is unsupported."""
+
+
+def verify_grounding(
+    answer: str, passages: list[dict], model: Optional[str] = None
+) -> dict:
+    """Second-pass check: does `answer` stay within `passages`? Returns
+    {"supported": bool, "unsupported": [str]}. Fails open (supported=True) only
+    if the checker itself errors, so it never blocks a good answer on an
+    infra hiccup — callers can treat OllamaUnavailable separately."""
+    context_lines = [
+        f"[{p['n']}] {p.get('title','')}\n{p.get('text','')}" for p in passages
+    ]
+    user_payload = f"ANSWER:\n{answer}\n\nCONTEXT:\n" + "\n\n".join(context_lines)
+    data = _chat_json(GROUNDCHECK_SYSTEM_PROMPT, user_payload, model=model)
+    if "supported" not in data:
+        return {"supported": True, "unsupported": []}
+    unsupported = data.get("unsupported")
+    unsupported = unsupported if isinstance(unsupported, list) else []
+    return {"supported": bool(data.get("supported")), "unsupported": unsupported}

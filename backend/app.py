@@ -26,9 +26,9 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 
 import cern_client
-import guardrail
 import ollama_client
 import rag
+import guardrails
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 log = logging.getLogger("app")
@@ -37,6 +37,7 @@ log = logging.getLogger("app")
 # backend serves it, so one port (5001) carries UI + API on the H100.
 DIST_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "dist")
 SERVE_FRONTEND = os.environ.get("SERVE_FRONTEND", "0") == "1" and os.path.isdir(DIST_DIR)
+DEFAULT_K = int(os.environ.get("RAG_TOP_K", "6"))
 
 app = Flask(__name__, static_folder=DIST_DIR if SERVE_FRONTEND else None, static_url_path="")
 CORS(app)  # dev-friendly: allow the Vite dev server to call this API
@@ -71,8 +72,11 @@ def health():
             "embed_model": ollama_client.EMBED_MODEL,
             "knowledge_base": "ready" if kb.ready else "empty",
             "knowledge_chunks": kb.size,
-            "guardrail": {"min_score": guardrail.MIN_SCORE,
-                          "low_conf_margin": guardrail.LOW_CONF_MARGIN},
+            "guardrails": {
+                "min_top_score": guardrails.MIN_TOP_SCORE,
+                "low_conf_margin": guardrails.LOW_CONF_MARGIN,
+                "min_cite_score": guardrails.MIN_CITE_SCORE,
+            },
             "serving_frontend": SERVE_FRONTEND,
         }
     )
@@ -82,6 +86,32 @@ def health():
 # Core logic (reused by the direct routes and by the /api/assistant router).
 # Each helper returns (payload_dict, http_status).
 # ---------------------------------------------------------------------------
+
+def _fetch_with_broadening(terms: str, pool: int):
+    """CERN Open Data search is strict AND-matching, so over-specific keyword
+    queries ("CMS muon proton collisions 13 TeV") collapse to 0 hits. Retry
+    with progressively fewer trailing keywords until we get results — this is
+    the agent's search-resilience step. Returns (raw, used_terms, broadened)."""
+    words = terms.split()
+    attempts = [" ".join(words[:n]) for n in range(len(words), 1, -1)]
+    if words:
+        attempts.append(words[0])
+    seen, ordered = set(), []
+    for a in attempts:
+        if a and a not in seen:
+            seen.add(a)
+            ordered.append(a)
+    if not ordered:
+        ordered = [terms]
+
+    last_raw = None
+    for attempt in ordered:
+        raw = cern_client.search_records(attempt, size=pool)
+        if raw.get("hits", {}).get("total", 0):
+            return raw, attempt, attempt != terms
+        last_raw = raw
+    return last_raw, ordered[-1], True
+
 
 def _run_search(user_query: str, requested_size=None, use_llm_rank: bool = True):
     size = requested_size if isinstance(requested_size, int) else DEFAULT_SIZE
@@ -98,15 +128,17 @@ def _run_search(user_query: str, requested_size=None, use_llm_rank: bool = True)
     except ollama_client.OllamaUnavailable:
         log.warning("Ollama unavailable — falling back to raw query as search terms")
 
-    # 2. Query CERN Open Data (fetch a larger pool so the ranker has choices)
+    # 2. Query CERN Open Data (fetch a larger pool so the ranker has choices),
+    #    broadening the query if the first, most-specific attempt returns 0.
     fetch_pool = min(size * 3, 60) if use_llm_rank and model_used else size
     try:
-        raw = cern_client.search_records(search_terms, size=fetch_pool)
+        raw, used_terms, broadened = _fetch_with_broadening(search_terms, fetch_pool)
     except cern_client.CernApiError as exc:
         return {"error": f"CERN Open Data API unreachable: {exc}"}, 502
 
-    hits = raw.get("hits", {}).get("hits", [])
-    total = raw.get("hits", {}).get("total", 0)
+    search_terms = used_terms
+    hits = raw.get("hits", {}).get("hits", []) if raw else []
+    total = raw.get("hits", {}).get("total", 0) if raw else 0
     summaries = [cern_client.summarize_hit(h) for h in hits]
 
     # 3. Optionally rank/annotate with the local LLM
@@ -133,15 +165,13 @@ def _run_search(user_query: str, requested_size=None, use_llm_rank: bool = True)
     return {
         "query": user_query,
         "search_terms": search_terms,
+        "broadened": broadened,
         "total_matches": total,
         "returned": len(summaries),
         "model_used": model_used,
         "llm_ranked": ranking_used,
         "results": summaries,
     }, 200
-
-
-DEFAULT_K = int(os.environ.get("RAG_TOP_K", "6"))
 
 
 def _sources(hits: list[dict], cited: set[int]) -> list[dict]:
@@ -161,11 +191,34 @@ def _sources(hits: list[dict], cited: set[int]) -> list[dict]:
     ]
 
 
+def _refusal(question: str, message: str, rail: str, sources=None,
+             detail: dict | None = None, timing: dict | None = None):
+    """Uniform ungrounded response shape used by every guardrail refusal."""
+    return {
+        "question": question,
+        "answer": message,
+        "grounded": False,
+        "model_used": ollama_client.get_model(),
+        "guardrail": rail,
+        "guardrail_detail": {"status": "blocked", "top_score": 0.0,
+                             "threshold": guardrails.MIN_TOP_SCORE,
+                             "citations_removed": 0, **(detail or {})},
+        "sources": sources or [],
+        "timing_ms": timing or {},
+    }, 200
+
+
 def _run_ask(question: str, k=None):
-    """RAG with two server-side guardrails (see guardrail.py):
-    a retrieval gate before the LLM and a citation check after it."""
+    """RAG answer wrapped in the guardrails (guardrails.py), in order:
+    input rail -> retrieval gate (before the LLM) -> answer -> citation
+    rewrite -> LLM fact-check. The model never decides its own grounding."""
     k = k if isinstance(k, int) and 1 <= k <= 10 else DEFAULT_K
     timing: dict[str, int] = {}
+
+    # --- INPUT rail: block unsafe / injection before any model call ---------
+    blocked = guardrails.screen_query(question)
+    if blocked:
+        return _refusal(question, blocked["message"], f"input:{blocked['category']}")
 
     kb = rag.get_kb()
     if not kb.ready:
@@ -184,21 +237,16 @@ def _run_ask(question: str, k=None):
     timing["retrieve"] = int((time.time() - t0) * 1000)
 
     top_score = hits[0]["score_raw"] if hits else 0.0
-    gate = guardrail.retrieval_gate(top_score)
-    base = {
-        "question": question,
-        "model_used": ollama_client.get_model(),
-        "guardrail": {"status": gate, "top_score": round(top_score, 3),
-                      "threshold": guardrail.MIN_SCORE, "citations_removed": 0},
-        "timing_ms": timing,
-    }
+    gate = guardrails.retrieval_gate(top_score)
+    detail = {"status": gate, "top_score": round(top_score, 3),
+              "threshold": guardrails.MIN_TOP_SCORE, "citations_removed": 0}
 
-    # 2. retrieval gate: nothing similar enough -> refuse, never call the LLM
+    # --- RETRIEVAL rail: no CERN source above the floor -> refuse, no LLM ----
     if gate == "refused":
-        return {**base, "answer": guardrail.REFUSAL, "grounded": False,
-                "sources": _sources(hits, set())}, 200
+        return _refusal(question, guardrails.NO_SOURCE_MESSAGE, "retrieval:no_source",
+                        sources=_sources(hits, set()), detail=detail, timing=timing)
 
-    # 3. ask the model to answer from the passages only
+    # 2. ask the model to answer from the numbered passages only
     passages = [{"n": i + 1, **h} for i, h in enumerate(hits)]
     t0 = time.time()
     try:
@@ -208,31 +256,54 @@ def _run_ask(question: str, k=None):
     timing["llm"] = int((time.time() - t0) * 1000)
 
     if raw_answer.strip().startswith(ollama_client.NOT_IN_SOURCES):
-        base["guardrail"]["status"] = "refused_by_model"
-        return {**base, "answer": guardrail.REFUSAL, "grounded": False,
-                "sources": _sources(hits, set())}, 200
+        detail["status"] = "refused_by_model"
+        return _refusal(question, guardrails.NO_SOURCE_MESSAGE, "model:not_in_sources",
+                        sources=_sources(hits, set()), detail=detail, timing=timing)
 
-    # 4. citation check: every [n] must point at a passage we actually showed
-    check = guardrail.check_citations(raw_answer, len(passages))
+    # --- CITATION rail: every [n] must point at a shown, relevant passage ----
+    check = guardrails.check_citations(raw_answer, passages)
     if check["status"] == "no_citations":
-        # one retry — small models sometimes forget the format
-        try:
+        try:  # one retry — smaller models sometimes forget the format
             retry = ollama_client.answer_with_context(
                 question + "\n\n(Your previous answer had no [n] citations. "
                 "Cite the passage numbers you use.)", passages)
-            check = guardrail.check_citations(retry, len(passages))
+            check = guardrails.check_citations(retry, passages)
         except ollama_client.OllamaUnavailable:
             pass
-
+    detail["citations_removed"] = check["removed"]
     cited = set(check["cited"])
-    grounded = bool(cited)
-    base["guardrail"]["citations_removed"] = check["removed"]
-    if not grounded:
-        base["guardrail"]["status"] = "no_citations"
-    answer = check["answer"] if grounded else "(Unverified — no sources cited) " + check["answer"]
+    if not cited:
+        detail["status"] = "no_citations"
+        return _refusal(question, guardrails.NO_SOURCE_MESSAGE, "citation:none",
+                        sources=_sources(hits, set()), detail=detail, timing=timing)
+    answer = check["answer"]
 
-    return {**base, "answer": answer, "grounded": grounded,
-            "sources": _sources(hits, cited)}, 200
+    # --- GROUNDING rail: fact-check the answer against the cited passages ---
+    rail = "grounded" if gate == "ok" else "grounded:low_confidence"
+    cited_passages = [p for p in passages if p["n"] in cited]
+    t0 = time.time()
+    try:
+        verdict = ollama_client.verify_grounding(answer, cited_passages)
+        timing["verify"] = int((time.time() - t0) * 1000)
+        if not verdict.get("supported", True):
+            log.info("grounding rail rejected answer; unsupported=%s", verdict.get("unsupported"))
+            detail["status"] = "unsupported"
+            detail["unsupported"] = verdict.get("unsupported", [])
+            return _refusal(question, guardrails.UNSUPPORTED_MESSAGE, "grounding:unsupported",
+                            sources=_sources(hits, cited), detail=detail, timing=timing)
+    except ollama_client.OllamaUnavailable:
+        rail = "grounded:unverified"  # fact-check unreachable; keep the cited answer
+
+    return {
+        "question": question,
+        "answer": answer,
+        "grounded": True,
+        "model_used": ollama_client.get_model(),
+        "guardrail": rail,
+        "guardrail_detail": detail,
+        "sources": _sources(hits, cited),
+        "timing_ms": timing,
+    }, 200
 
 
 @app.post("/api/search")
@@ -269,6 +340,12 @@ def assistant():
     if not user_query:
         return jsonify({"error": "Field 'query' is required."}), 400
 
+    # INPUT rail applies to both routes.
+    blocked = guardrails.screen_query(user_query)
+    if blocked:
+        payload, _ = _refusal(user_query, blocked["message"], f"input:{blocked['category']}")
+        return jsonify({"mode": "ask", "route_confidence": 100, **payload}), 200
+
     route = ollama_client.classify_intent(user_query)
     intent = route["intent"]
 
@@ -280,6 +357,60 @@ def assistant():
     if status == 200:
         payload = {"mode": intent, "route_confidence": route["confidence"], **payload}
     return jsonify(payload), status
+
+
+@app.post("/api/agent")
+def agent():
+    """Agentic entry point (Phase 4): plan a request over the available tools
+    (dataset search + grounded Q&A), run the needed ones in a single turn, and
+    return a combined result. Handles multi-part queries like
+    "find CMS muon datasets and explain why CMS uses a solenoid"."""
+    body = request.get_json(silent=True) or {}
+    user_query = (body.get("query") or "").strip()
+    if not user_query:
+        return jsonify({"error": "Field 'query' is required."}), 400
+
+    # INPUT rail first — one refusal covers every downstream tool.
+    blocked = guardrails.screen_query(user_query)
+    if blocked:
+        refusal, _ = _refusal(user_query, blocked["message"], f"input:{blocked['category']}")
+        return jsonify({
+            "query": user_query,
+            "goal": user_query,
+            "tools_used": [],
+            "search": None,
+            "answer": refusal,
+        }), 200
+
+    plan = ollama_client.plan_tasks(user_query)
+
+    tools_used: list[str] = []
+    search_payload = None
+    answer_payload = None
+
+    if plan.get("search_query"):
+        sp, sstatus = _run_search(plan["search_query"], body.get("size"))
+        if sstatus == 200:
+            search_payload = sp
+            tools_used.append("search")
+
+    if plan.get("ask_query"):
+        ap, astatus = _run_ask(plan["ask_query"], body.get("k"))
+        if astatus == 200:
+            answer_payload = ap
+            tools_used.append("ask")
+
+    return jsonify({
+        "query": user_query,
+        "goal": plan.get("goal", user_query),
+        "plan": {
+            "search_query": plan.get("search_query"),
+            "ask_query": plan.get("ask_query"),
+        },
+        "tools_used": tools_used,
+        "search": search_payload,
+        "answer": answer_payload,
+    }), 200
 
 
 @app.get("/api/record/<recid>")

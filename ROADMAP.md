@@ -30,13 +30,20 @@ One box that auto-decides search vs ask — the first step toward the agent.
 - ✅ `POST /api/assistant` classifies then dispatches to the shared search / ask logic; returns `mode` + `route_confidence`.
 - ✅ UI: default **"Assistant (auto)"** tab — single console that renders dataset cards or a grounded answer based on the route (manual tabs kept).
 
-## Phase 3 — Guardrails (grounding is judged)
-- NeMo Guardrails / validation layer: no physics claim without a retrieved CERN source.
-- Graceful "no CERN source for that" instead of hallucinating.
-- Every answer shows citations.
+## Phase 3 — Guardrails (grounding is judged) (DONE)
+Three deterministic rails wrap the RAG flow (`guardrails.py`) plus an LLM fact-check pass:
+- ✅ **Input rail** — block prompt-injection / unsafe / off-scope before any model call.
+- ✅ **Retrieval rail** — "no CERN source → no answer": refuse if the best passage is below a similarity floor (`RAG_MIN_SCORE`), calibrated on the seed corpus (on-topic ~0.6-0.75 vs off-topic ~0.40).
+- ✅ **Citation rail** — keep only citations that map to a retrieved passage relevant enough to cite (`RAG_MIN_CITE_SCORE`).
+- ✅ **Grounding rail** — second-pass `verify_grounding` fact-check rejects answers with claims not supported by the cited passages (caught e.g. a hallucinated Hawking-radiation answer).
+- ✅ Graceful refusals instead of hallucinating; every kept answer shows citations. Rail decision surfaced in the UI + `/api/health`.
 
-## Phase 4 — Agentic (AIQ)
-- Wrap router + tools (search, record fetch, RAG retrieve) as an agent that chains: interpret → search → fetch metadata → explain → cite.
+## Phase 4 — Agentic (AIQ) (DONE)
+A plan-and-execute agent that can use multiple tools in one turn.
+- ✅ **Planner** (`ollama_client.plan_tasks`) decomposes a message into optional `search_query` + `ask_query`, so multi-part requests like *"find CMS muon datasets and explain why CMS uses a solenoid"* run both tools; falls back to the router when planning is empty.
+- ✅ **`POST /api/agent`** orchestrates: input rail → plan → run dataset search and/or grounded Q&A (all Phase-3 guardrails applied) → combined `{goal, tools_used, search, answer}`.
+- ✅ **Search resilience**: `_fetch_with_broadening` retries with progressively fewer keywords when CERN's strict AND-matching returns 0 hits (e.g. "CMS muon proton collisions 13 TeV" → "CMS muon proton collisions"); response flags `broadened`.
+- ✅ UI: the default **Assistant (agent)** tab shows the interpreted goal + tools used, and renders a grounded answer and/or dataset cards together.
 
 ## Phase 5 — Polish
 - Cache CERN calls, stream answers, facet filters (experiment/energy/format), dataset preview/download.
@@ -45,4 +52,4 @@ One box that auto-decides search vs ask — the first step toward the agent.
 
 ## Build order (hackathon)
 Judges reward grounding + the RAG/AIQ/Guardrails trio:
-**Phase 1 → Phase 2 → Phase 3 → Phase 4**, Phase 5 if time remains.
+**Phase 1 → Phase 2 → Phase 2.5 → Phase 3 → Phase 4** — all DONE. Phase 5 (polish) if time remains.

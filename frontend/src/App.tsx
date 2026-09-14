@@ -54,7 +54,7 @@ export default function App() {
           className={`mode-tab ${mode === "assistant" ? "active" : ""}`}
           onClick={() => setMode("assistant")}
         >
-          Assistant (auto)
+          Assistant (agent)
         </button>
         <button
           type="button"

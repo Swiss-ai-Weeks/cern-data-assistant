@@ -209,6 +209,21 @@ a {
   font-weight: 500;
 }
 
+.agent-tools {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.tool-chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--accent-2);
+  background: var(--accent-2-soft);
+}
+
 /* ---------------------------------------------------------------- chips */
 
 .examples {
@@ -481,6 +496,12 @@ a {
   border-radius: 12px;
   padding: 20px;
 }
+.answer-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
 .answer-badge {
   display: inline-block;
   font-family: var(--font-mono);
@@ -489,7 +510,18 @@ a {
   text-transform: uppercase;
   padding: 3px 10px;
   border-radius: 999px;
-  margin-bottom: 12px;
+}
+.rail-badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 .answer-badge.ok {
   color: var(--accent-2);
@@ -656,4 +688,13 @@ a {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-faint);
+}
+.answer-unsupported {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--danger);
+  background: rgba(229, 103, 108, 0.1);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 0 0 14px;
 }

@@ -1,208 +1,176 @@
-# Beamline — natural-language search over CERN Open Data
+# CERN Data Assistant (Beamline)
 
-A small full-stack app:
+HPE & NVIDIA Agentic AI Hackathon — [Swiss-ai-Weeks/cern-data-assistant](https://github.com/Swiss-ai-Weeks/cern-data-assistant).
 
-- **Frontend**: React + Vite + TypeScript
-- **Backend**: Flask (Python)
-- **LLM**: local [Ollama](https://ollama.com) model — no API keys, no cloud calls
-- **Data source**: the public [CERN Open Data](https://opendata.cern.ch/) REST API
+Natural-language search over [CERN Open Data](https://opendata.cern.ch/). You type something like *“I need proton-proton collisions at 13 TeV with muons”*. A model on the LaunchPad H100 turns that into search terms, the backend queries CERN, and the same model ranks the hits.
 
-You type something like *"fetch me the best dataset on proton"*, the local
-model turns that into good search keywords, the backend queries CERN Open
-Data, and (if Ollama is running) the same model ranks and explains the
-results before they're shown.
+**Do not run the LLM on your laptop.** The GPUs are on NVIDIA LaunchPad. Your machine only runs the UI + Flask, and tunnels to Ollama on the H100.
 
-This is an MVP meant to be optimized later — see **Notes & next steps** at
-the bottom.
+```
+Laptop                         LaunchPad H100
+------                         --------------
+http://127.0.0.1:5173  UI
+http://127.0.0.1:5001  Flask  --SSH tunnel 11434-->  Ollama (llama3.2, 2× H100)
+                                 CERN API is public (opendata.cern.ch)
+```
 
----
-
-## 1. Prerequisites (M1 Mac)
-
-- **Python 3.10+** — check with `python3 --version`
-- **Node.js 18+** — check with `node --version`
-- **Ollama** for Apple Silicon:
-
-  ```bash
-  brew install ollama
-  ```
-
-  Then pull a small local model (any of these run comfortably on an M1):
-
-  ```bash
-  ollama pull llama3.2      # ~2GB, good default
-  # or
-  ollama pull qwen2.5:7b    # a bit larger, often better at following JSON format
-  ```
-
-  Start the Ollama server (leave this running in its own terminal tab):
-
-  ```bash
-  ollama serve
-  ```
-
-  Ollama listens on `http://localhost:11434` by default.
+If Ollama is down, search still works; ranking is off.
 
 ---
 
-## 2. Backend setup
+## What you need
+
+- Python 3.10+
+- Node.js 18+
+- SSH access to the team LaunchPad GPU (invite + **your public SSH key** in the LaunchPad UI)
+- This repo
+
+LaunchPad SSH (current lab):
+
+```bash
+ssh -p 15406 nvidia@global.prd.ga.launchpad.nvidia.com
+```
+
+Optional `~/.ssh/config`:
+
+```
+Host launchpad-cern
+  HostName global.prd.ga.launchpad.nvidia.com
+  User nvidia
+  Port 15406
+  IdentityFile ~/.ssh/id_rsa
+  IdentitiesOnly yes
+  ServerAliveInterval 30
+```
+
+Then: `ssh launchpad-cern`.
+
+---
+
+## 1. Clone
+
+```bash
+git clone https://github.com/Swiss-ai-Weeks/cern-data-assistant.git
+cd cern-data-assistant
+git pull
+```
+
+---
+
+## 2. Ollama on the H100 (once per lab)
+
+SSH to LaunchPad. Binary is already at `/usr/local/bin/ollama`. There is no systemd unit — start it in the background:
+
+```bash
+ssh launchpad-cern
+# on the GPU node:
+nohup ollama serve >/tmp/ollama.log 2>&1 &
+ollama pull llama3.2
+ollama list
+```
+
+Confirm it sees the GPUs in `/tmp/ollama.log` (`NVIDIA H100 NVL`). Ollama listens on **127.0.0.1:11434** on the GPU box only.
+
+---
+
+## 3. Tunnel (every time you work from a laptop)
+
+On **your** machine, leave this running:
+
+```bash
+ssh -N -L 11434:127.0.0.1:11434 launchpad-cern
+```
+
+`localhost:11434` is now the H100. If this dies, the UI shows **ollama offline**.
+
+---
+
+## 4. Backend (laptop)
 
 ```bash
 cd backend
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-
-cp .env.example .env
-# edit .env if you pulled a different model than llama3.2
-
+cp .env.example .env        # OLLAMA_HOST=http://localhost:11434  MODEL=llama3.2  PORT=5001
 python app.py
 ```
 
-The API now runs at `http://localhost:5001`.
-
-> **Why port 5001, not 5000?** On macOS, port 5000 is used by the AirPlay
-> Receiver service by default, which silently breaks Flask's usual default
-> port. 5001 avoids that entirely.
-
-Sanity check:
+API: http://127.0.0.1:5001
 
 ```bash
-curl http://localhost:5001/api/health
+curl http://127.0.0.1:5001/api/health
 ```
 
-You should see `"cern_api": "ok"` and, once Ollama is running, `"ollama": "ok"`.
+You want `"cern_api": "ok"` and `"ollama": "ok"`. Port **5001** (not 5000) so macOS AirPlay does not steal it.
 
 ---
 
-## 3. Frontend setup
-
-In a second terminal tab:
+## 5. Frontend (laptop)
 
 ```bash
 cd frontend
-npm install
-cp .env.example .env   # points VITE_API_BASE at the backend
-npm run dev
+cp .env.example .env        # VITE_API_BASE=http://localhost:5001
+npm install --legacy-peer-deps
+npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
-Open the URL Vite prints (typically `http://localhost:5173`).
+`--legacy-peer-deps` is required: Vite 8 vs `@vitejs/plugin-react` 4. Open http://127.0.0.1:5173/
+
+Do **not** commit `node_modules`. If you cloned a copy that still has them, delete them and `npm install --legacy-peer-deps` on your OS.
 
 ---
 
-## 4. Using it
+## Using it
 
-Type a request like:
+Try:
 
-- "fetch me the best dataset on proton"
-- "ATLAS data about the Higgs boson"
-- "muon detector data from CMS, 8 TeV"
+- `I need proton-proton collisions at 13 TeV with muons`
+- `ATLAS data about the Higgs boson`
+- `muon detector data from CMS, 8 TeV`
 
-The backend will:
+Flow:
 
-1. Ask the local model to turn your sentence into CERN-style search
-   keywords (e.g. "proton").
-2. Query `https://opendata.cern.ch/api/records/` with those keywords.
-3. Pull a pool of candidate records and ask the local model to rank them
-   against your original request, with a one-line reason for each.
-4. Return the top matches with metadata: experiment, type, collision
-   energy, publish date, file count, and an abstract snippet.
-
-If Ollama isn't running, the app still works — it just searches CERN Open
-Data directly with your raw text and skips the ranking step (you'll see
-`ranking: off` under the search box).
+1. Ollama extracts CERN search keywords
+2. Backend queries `https://opendata.cern.ch/api/records/`
+3. Ollama ranks hits and writes a one-line *why*
+4. UI shows experiment, type, energy, date, file count, abstract
 
 ---
 
-## 5. Project layout
+## Layout
 
 ```
-cern-ai-search/
+cern-data-assistant/
 ├── backend/
-│   ├── app.py             # Flask routes: /api/search, /api/record/<id>, /api/health
-│   ├── cern_client.py     # CERN Open Data REST API wrapper + response shaping
-│   ├── ollama_client.py   # Local Ollama chat calls: query extraction + ranking
-│   ├── requirements.txt
-│   └── .env.example
-└── frontend/
-    ├── src/
-    │   ├── App.tsx
-    │   ├── api.ts             # fetch() wrappers around the Flask API
-    │   ├── types.ts
-    │   └── components/
-    │       ├── SearchConsole.tsx
-    │       ├── ResultsFeed.tsx
-    │       ├── ResultRow.tsx
-    │       └── StatusBar.tsx
-    ├── index.html
-    └── .env.example
+│   ├── app.py              # GET /api/health  POST /api/search  GET /api/record/<id>
+│   ├── cern_client.py      # CERN Open Data REST
+│   ├── ollama_client.py    # query extract + ranking
+│   └── requirements.txt
+├── frontend/
+│   └── src/                # React + Vite UI (Beamline)
+└── dataset/                # optional local CERN JSON dumps (gitignored)
 ```
+
+H100 scratch (not in git): `~/nvidia_hack/dataset/` (`fetch_cern.py`, `proton_full.json`, `tf` venv).
 
 ---
 
-## 6. API reference
+## API
 
-### `POST /api/search`
-
-```json
-{ "query": "fetch me the best dataset on proton", "size": 8 }
-```
-
-`size` is optional (default 8). Response:
+**POST `/api/search`**
 
 ```json
-{
-  "query": "fetch me the best dataset on proton",
-  "search_terms": "proton",
-  "total_matches": 1234,
-  "returned": 8,
-  "model_used": "llama3.2",
-  "llm_ranked": true,
-  "results": [
-    {
-      "recid": 80000,
-      "title": "...",
-      "experiment": "CMS",
-      "type": "Dataset",
-      "collision_energy": "7TeV",
-      "date_published": "2014-01-15",
-      "file_count": 42,
-      "abstract": "...",
-      "url": "https://opendata.cern.ch/record/80000",
-      "relevance": 92,
-      "why": "Directly matches proton-proton collision data from CMS."
-    }
-  ]
-}
+{ "query": "proton-proton collisions at 13 TeV with muons", "size": 8 }
 ```
 
-### `GET /api/record/<recid>`
-
-Full metadata for one record, including a `files` list with download URIs.
-
-### `GET /api/health`
-
-Reports whether CERN Open Data and the local Ollama server are reachable,
-and which models are installed.
+**GET `/api/record/<recid>`** — full metadata + files  
+**GET `/api/health`** — CERN + Ollama status
 
 ---
 
-## 7. Notes & next steps
+## Team notes
 
-This is deliberately an MVP to optimize later. Ideas, roughly in order of
-value:
-
-- **Caching**: cache CERN search responses (e.g. in SQLite or Redis) —
-  identical queries currently hit the live API every time.
-- **Streaming ranking**: stream the LLM's ranking output so results appear
-  progressively instead of all at once.
-- **Filters**: expose CERN's own facets (experiment, collision type, file
-  format) as UI filters instead of relying entirely on free-text + LLM
-  interpretation.
-- **File-level search**: use `cernopendata-client` (or the `files` field
-  already returned by `/api/record/<id>`) to let users preview or download
-  specific files, not just whole records.
-- **Better ranking model**: try `qwen2.5:7b` or `mistral` locally and
-  compare relevance quality against `llama3.2`.
-- **Tests**: none exist yet — `cern_client.py` and `ollama_client.py` are
-  both small and pure enough to unit-test with mocked HTTP responses.
+- Challenge next: dataset cards (size, format, how to use, citations), RAG over detector docs, NeMo Guardrails / AIQ.
+- Current model is **llama3.2** (3B) on H100 so ranking is fast. Bigger models can wait.
+- Keep `backend/.env` and `frontend/.env` local (gitignored).

@@ -11,7 +11,7 @@ Phases 0–5 are **done**. This file is only the remaining work, ordered for a h
 | Piece | What judges can see |
 |---|---|
 | **Search** | NL → keywords → CERN Open Data → ranked dataset cards (size, format, DOI, citation, `cernopendata-client`, copy) |
-| **RAG** | 1,185 chunks: seed + 45 CERN docs + 1,006 glossary terms; `nomic-embed-text` on the H100 |
+| **RAG** | 1,636 chunks: 18 seed facts + 78 CERN docs (612 chunks) + 1,006 glossary terms; `nomic-embed-text` on the H100 |
 | **Guardrails** | Input / retrieval floor / citations / LLM fact-check. No CERN source → no answer. Badge in the UI |
 | **Agent** | `POST /api/agent` plans search and/or ask in one turn (the solenoid + datasets example) |
 | **Polish** | Facets, CERN HTTP cache, unit tests, `qwen2.5:32b` with `llama3.2` fallback |
@@ -49,16 +49,16 @@ Three tools, visible plan, retry if CERN returns nothing.
 
 ---
 
-## Phase 8 — Grounding that survives a hostile question
+## Phase 8 — Grounding that survives a hostile question (DONE)
 
-Guardrails work; a few holes remain.
-
-1. **Calibrate `RAG_MIN_SCORE` on the new 1,185-chunk index** (floor is 0.65 from the old 60-chunk corpus). Re-run on-topic vs off-topic; tune so solenoid still answers and pasta still refuses.
-2. **Expand `seed.json`** for the exact demo questions (CMS solenoid, MiniAOD vs NanoAOD, 13 TeV, ATLAS magnet) so retrieval isn’t glossary-only.
-3. **Cite-or-refuse in the UI** even when `grounded:low_confidence` — judges should never see a naked physics claim.
-4. **Skip NeMo Guardrails** unless you have spare time; Colang + NIM is a day, and you already fact-check.
-
----
+- ✅ **Floor recalibrated on the 1,636-chunk index**: 15 on-topic questions score ≥ 0.756, 10 off-topic
+  ("black holes", "speed of light", "cook pasta", "World Cup"…) ≤ 0.660 → `RAG_MIN_SCORE=0.70`,
+  low-confidence band 0.70–0.75. Battery: `backend/tests` + the calibration in README 4c.
+- ✅ **`seed.json` covers the demo questions**: MiniAOD vs NanoAOD, LHC Run 2 / 13 TeV pp, what a dataset
+  record contains (plus the existing CMS solenoid, ATLAS magnet, pile-up via glossary).
+- ✅ **Cite-or-refuse in the low-confidence band**: `guardrails.strip_uncited_sentences` drops every sentence
+  without a `[n]`; nothing left → `citation:none` refusal. UI shows "n uncited sentence(s) dropped".
+- Skipped NeMo Guardrails (own rails + LLM fact-check already cover it).
 
 ## Phase 9 — Only if there is time
 
@@ -77,7 +77,7 @@ Phase 6 (H100 demo + 4-query script)   ← DONE
      ↓
 Phase 7.1–7.3 (record tool + visible plan)  ← DONE
      ↓
-Phase 8.1–8.2 (recalibrate floor + seed the demo questions)
+Phase 8 (recalibrate floor + seed + cite-or-drop)  ← DONE
      ↓
 Phase 9 only if the pitch is already smooth
 ```

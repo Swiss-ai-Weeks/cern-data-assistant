@@ -158,9 +158,12 @@ API pulls are cached in `knowledge/raw_*.jsonl`. Health then shows
 The model is never trusted to judge its own grounding. `guardrails.py` applies:
 
 1. **Retrieval gate** — if the best passage's cosine similarity is below
-   `RAG_MIN_SCORE` (0.65, calibrated: on-topic questions score ≥ 0.75, off-topic
-   ≤ 0.58) the API refuses *before* calling the LLM. Between 0.65 and 0.70 it
-   answers but flags **low confidence**.
+   `RAG_MIN_SCORE` (0.70, calibrated on the 1,636-chunk index: 15 on-topic demo
+   questions score ≥ 0.756, 10 off-topic ones ≤ 0.660) the API refuses *before*
+   calling the LLM. Between 0.70 and 0.75 it answers but flags **low confidence**,
+   and in that band every sentence must carry a citation: uncited sentences are
+   dropped server-side (`sentences_removed` in `guardrail_detail`), and if nothing
+   cited survives the answer is refused.
 2. **Citation check** — every `[n]` in the answer must point at a passage that was
    actually shown and scored at least `RAG_MIN_CITE_SCORE`; invalid ones are stripped,
    and an answer with no valid citation is refused. The model may also reply

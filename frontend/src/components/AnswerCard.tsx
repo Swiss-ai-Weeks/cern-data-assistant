@@ -100,6 +100,8 @@ export default function AnswerCard({ result }: Props) {
           <span>
             best match {d.top_score} / gate {d.threshold}
             {d.citations_removed > 0 && ` · ${d.citations_removed} invalid citation(s) removed`}
+            {(d.sentences_removed ?? 0) > 0 &&
+              ` · ${d.sentences_removed} uncited sentence(s) dropped`}
           </span>
         )}
         {result.timing_ms?.llm !== undefined && (

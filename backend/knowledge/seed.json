@@ -73,5 +73,23 @@
     "title": "Downloading open data with cernopendata-client",
     "text": "Files attached to a CERN Open Data record can be downloaded with the cernopendata-client command-line tool, for example 'cernopendata-client download-files --recid <RECID>'. You can also list file locations for a record. This is the recommended way to fetch dataset files programmatically for analysis.",
     "source": "https://opendata.cern.ch/docs/cernopendata-client"
+  },
+  {
+    "title": "MiniAOD vs NanoAOD: which CMS format to use",
+    "experiment": "CMS",
+    "text": "CMS open data is released in three reconstructed formats. AOD (Analysis Object Data) is the full format used for the Run 1 (2010-2012) releases. MiniAOD, introduced for Run 2 (2015 onwards), is a slimmed version of AOD about ten times smaller; it keeps the reconstructed physics objects (electrons, muons, photons, jets, missing transverse energy) and needs the CMS software CMSSW to read. NanoAOD is a further reduced flat ROOT ntuple of roughly one to two kilobytes per event that stores only high-level object information; it can be analysed with plain ROOT or Python tools such as uproot, without CMSSW. Use NanoAOD for most analyses; use MiniAOD when the analysis needs more detailed information, such as particle-flow candidates or re-deriving object identification.",
+    "source": "https://opendata.cern.ch/docs/cms-getting-started-nanoaod"
+  },
+  {
+    "title": "LHC Run 2: proton-proton collisions at 13 TeV",
+    "experiment": "",
+    "text": "During Run 2 (2015-2018) the Large Hadron Collider collided protons at a centre-of-mass energy of 13 TeV, with each beam accelerated to 6.5 TeV, the highest collision energy reached at that time. Run 1 (2010-2012) took data at 7 TeV and 8 TeV. The CMS and ATLAS open data taken in 2015 and 2016 are 13 TeV proton-proton (pp) collision data. Dataset records on the CERN Open Data Portal carry the collision energy (for example 13TeV) and the collision type (for example pp or PbPb) as searchable metadata, so datasets can be filtered by energy and by the particles in the final state, such as muons.",
+    "source": "https://opendata.cern.ch/docs/cms-getting-started-2015"
+  },
+  {
+    "title": "What a CERN Open Data dataset record contains",
+    "experiment": "",
+    "text": "Every dataset on the CERN Open Data Portal is a record with a numeric identifier and a persistent DOI. The record lists the experiment (CMS, ATLAS, ALICE, LHCb and others), the data type (collision data, simulated data or derived data), the collision energy and collision type, the year and run period, the file format (for example ROOT, AOD, MiniAOD, NanoAOD or DAOD_PHYSLITE), the number and total size of files, the licence (data are released under the Creative Commons CC0 waiver) and a recommended citation. Files can be downloaded directly, with the cernopendata-client command-line tool, or streamed with XRootD.",
+    "source": "https://opendata.cern.ch/docs/about"
   }
 ]

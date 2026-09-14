@@ -273,6 +273,18 @@ def _run_ask(question: str, k=None):
                         sources=_sources(hits, set()), detail=detail, timing=timing)
     answer = check["answer"]
 
+    # --- CITE-OR-DROP: weak retrieval -> every surviving sentence is cited ---
+    detail["sentences_removed"] = 0
+    if gate == "low_confidence":
+        trimmed = guardrails.strip_uncited_sentences(answer)
+        detail["sentences_removed"] = trimmed["removed"]
+        if not trimmed["answer"]:
+            detail["status"] = "no_citations"
+            return _refusal(question, guardrails.NO_SOURCE_MESSAGE, "citation:none",
+                            sources=_sources(hits, set()), detail=detail, timing=timing)
+        answer = trimmed["answer"]
+        cited = {n for n in cited if f"[{n}]" in answer} or cited
+
     # --- GROUNDING rail: fact-check the answer against the cited passages ---
     rail = "grounded" if gate == "ok" else "grounded:low_confidence"
     cited_passages = [p for p in passages if p["n"] in cited]

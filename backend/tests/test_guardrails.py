@@ -87,5 +87,23 @@ class CitationRewriteTests(unittest.TestCase):
         self.assertEqual(out["cited"], [])
 
 
+class UncitedSentenceTests(unittest.TestCase):
+    def test_drops_only_uncited_sentences(self):
+        out = guardrails.strip_uncited_sentences(
+            "CMS uses a solenoid [1]. It is very cold. The field is 3.8 T [1][2]. Trust me!")
+        self.assertEqual(out["answer"], "CMS uses a solenoid [1]. The field is 3.8 T [1][2].")
+        self.assertEqual(out["removed"], 2)
+
+    def test_citation_after_period_is_not_a_boundary(self):
+        out = guardrails.strip_uncited_sentences("Solenoid bends tracks. [1] Momentum follows [2].")
+        self.assertEqual(out["removed"], 0)
+        self.assertIn("[1]", out["answer"])
+
+    def test_nothing_cited_leaves_empty_answer(self):
+        out = guardrails.strip_uncited_sentences("No sources here. None at all.")
+        self.assertEqual(out["answer"], "")
+        self.assertEqual(out["removed"], 2)
+
+
 if __name__ == "__main__":
     unittest.main()

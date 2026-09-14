@@ -88,6 +88,7 @@ export interface Guardrail {
   top_score: number;
   threshold: number;
   citations_removed: number;
+  sentences_removed?: number;
   unsupported?: string[];
 }
 

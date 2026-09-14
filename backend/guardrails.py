@@ -26,7 +26,7 @@ import re
 # Similarity floors (raw cosine, nomic-embed-text with search_* prefixes).
 # Calibrated on the full corpus (CERN docs + glossary + seed): on-topic top
 # hits score >= 0.75, off-topic questions <= 0.58. Tunable via env.
-MIN_TOP_SCORE = float(os.environ.get("RAG_MIN_SCORE", "0.65"))
+MIN_TOP_SCORE = float(os.environ.get("RAG_MIN_SCORE", "0.70"))
 # Above MIN_TOP_SCORE but below MIN_TOP_SCORE + margin -> answer, but flag it.
 LOW_CONF_MARGIN = float(os.environ.get("RAG_LOW_CONF_MARGIN", "0.05"))
 # A passage must score at least this to be citable at all.
@@ -133,6 +133,21 @@ def check_citations(answer: str, passages: list[dict]) -> dict:
     cited = sorted({int(n) for n in _CITATION_RE.findall(cleaned)})
     return {"answer": cleaned, "cited": cited, "removed": removed,
             "status": "ok" if cited else "no_citations"}
+
+
+# Sentence boundary: punctuation, whitespace, then a capital letter. A bracket
+# is deliberately NOT a boundary so "text. [1] More" stays one cited unit.
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'(])")
+
+
+def strip_uncited_sentences(answer: str) -> dict:
+    """Cite-or-drop rail for the low-confidence band: keep only the sentences
+    that carry at least one [n] citation, so a weakly supported answer never
+    shows a bare physics claim. Returns {answer, removed (int)}; the caller
+    refuses if nothing survives."""
+    sentences = [x.strip() for x in _SENTENCE_SPLIT.split(answer.strip()) if x.strip()]
+    kept = [x for x in sentences if _CITATION_RE.search(x)]
+    return {"answer": " ".join(kept), "removed": len(sentences) - len(kept)}
 
 
 def valid_citations(answer: str, used: list, passages: list[dict]) -> list[int]:

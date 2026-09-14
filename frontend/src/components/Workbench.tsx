@@ -132,7 +132,7 @@ export default function Workbench({ idle, live, onStarter, onOpenRecord }: Props
 
       {live?.error && <div className="error-banner">{live.error}</div>}
 
-      {live?.live && !result && (
+      {live?.live && (
         <ol className="stage-log">
           {live.steps.map((s, i) => (
             <li key={i} className={i === live.steps.length - 1 ? "now" : ""}>

@@ -81,7 +81,16 @@ export async function runAgent(
 export type AgentStreamEvent =
   | { type: "status"; step: string; label: string }
   | { type: "plan"; goal?: string; search_query?: string | null; ask_query?: string | null }
-  | { type: "tool_done"; tool: string; hits?: number; grounded?: boolean; recid?: string | number }
+  | {
+      type: "tool_done";
+      tool: string;
+      hits?: number;
+      grounded?: boolean;
+      recid?: string | number;
+      search?: AgentResponse["search"];
+      answer?: AgentResponse["answer"];
+      picked?: AgentResponse["picked"];
+    }
   | { type: "result"; payload: AgentResponse }
   | { type: "error"; error: string };
 

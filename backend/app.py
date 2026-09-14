@@ -488,7 +488,7 @@ def _agent_events(user_query: str, body: dict, history=None):
                         search_payload = sp2
                         retried_with = alt
         n = (search_payload or {}).get("returned") or 0
-        yield {"type": "tool_done", "tool": "search", "hits": n}
+        yield {"type": "tool_done", "tool": "search", "hits": n, "search": search_payload}
 
     if plan.get("ask_query"):
         yield {"type": "status", "step": "ask", "label": "Retrieving CERN sources and writing a grounded answer"}
@@ -500,6 +500,7 @@ def _agent_events(user_query: str, body: dict, history=None):
             "type": "tool_done",
             "tool": "ask",
             "grounded": bool((answer_payload or {}).get("grounded")),
+            "answer": answer_payload,
         }
 
     picked = None
@@ -514,7 +515,13 @@ def _agent_events(user_query: str, body: dict, history=None):
                     r["license"] = picked.get("license")
                     r["picked"] = True
                     break
-        yield {"type": "tool_done", "tool": "fetch_record", "recid": (picked or {}).get("recid")}
+        yield {
+            "type": "tool_done",
+            "tool": "fetch_record",
+            "recid": (picked or {}).get("recid"),
+            "picked": picked,
+            "search": search_payload,
+        }
 
     payload = {
         "query": user_query,

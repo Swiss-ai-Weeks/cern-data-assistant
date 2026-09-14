@@ -1,5 +1,5 @@
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
-import { streamAgent } from "../api";
+import { streamAgent, type AgentStreamEvent } from "../api";
 import type { AgentResponse } from "../types";
 import Workbench from "./Workbench";
 import RecordDrawer from "./RecordDrawer";
@@ -34,11 +34,38 @@ function historyForApi(turns: Turn[]): { role: string; content: string }[] {
   return out.slice(-6);
 }
 
+function blankResult(query: string): AgentResponse {
+  return { query, goal: query, tools_used: [], search: null, answer: null, picked: null };
+}
+
+function applyEvent(t: Turn, ev: AgentStreamEvent, query: string): Turn {
+  if (ev.type === "status") return { ...t, steps: [...t.steps, ev.label] };
+  if (ev.type === "plan" && ev.goal) return { ...t, text: ev.goal };
+  if (ev.type === "error") return { ...t, error: ev.error, live: false };
+  if (ev.type === "result") return { ...t, result: ev.payload, live: false };
+  if (ev.type === "tool_done") {
+    const prev = t.result ?? blankResult(query);
+    const tools = prev.tools_used.includes(ev.tool) ? prev.tools_used : [...prev.tools_used, ev.tool];
+    return {
+      ...t,
+      result: {
+        ...prev,
+        tools_used: tools,
+        search: ev.search !== undefined ? ev.search : prev.search,
+        answer: ev.answer !== undefined ? ev.answer : prev.answer,
+        picked: ev.picked !== undefined ? ev.picked : prev.picked,
+      },
+    };
+  }
+  return t;
+}
+
 export default function Chat() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [openRecid, setOpenRecid] = useState<number | string | null>(null);
+  const [focusId, setFocusId] = useState<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
 
@@ -46,7 +73,18 @@ export default function Chat() {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
   }, [turns]);
 
-  const liveAsst = [...turns].reverse().find((t) => t.role === "assistant") ?? null;
+  const lastAsst = [...turns].reverse().find((t) => t.role === "assistant") ?? null;
+  const stageAsst = turns.find((t) => t.id === focusId && t.role === "assistant") ?? lastAsst;
+
+  function focusTurn(t: Turn) {
+    if (t.role === "assistant") {
+      setFocusId(t.id);
+      return;
+    }
+    const i = turns.findIndex((x) => x.id === t.id);
+    const next = turns.slice(i + 1).find((x) => x.role === "assistant");
+    if (next) setFocusId(next.id);
+  }
 
   async function send(raw: string) {
     const query = raw.trim();
@@ -55,21 +93,13 @@ export default function Chat() {
     setBusy(true);
     const user: Turn = { id: uid(), role: "user", text: query, steps: [], result: null, error: null, live: false };
     const asst: Turn = { id: uid(), role: "assistant", text: "", steps: [], result: null, error: null, live: true };
+    setFocusId(asst.id);
     setTurns((prev) => [...prev, user, asst]);
     const hist = historyForApi([...turns, user]);
 
     try {
       for await (const ev of streamAgent(query, hist)) {
-        setTurns((prev) =>
-          prev.map((t) => {
-            if (t.id !== asst.id) return t;
-            if (ev.type === "status") return { ...t, steps: [...t.steps, ev.label] };
-            if (ev.type === "plan" && ev.goal) return { ...t, text: ev.goal };
-            if (ev.type === "result") return { ...t, result: ev.payload, live: false };
-            if (ev.type === "error") return { ...t, error: ev.error, live: false };
-            return t;
-          }),
-        );
+        setTurns((prev) => prev.map((t) => (t.id === asst.id ? applyEvent(t, ev, query) : t)));
       }
     } catch (err) {
       setTurns((prev) =>
@@ -98,7 +128,7 @@ export default function Chat() {
     }
   }
 
-  const followups = liveAsst?.result?.followups ?? [];
+  const followups = stageAsst?.result?.followups ?? [];
 
   return (
     <div className="cockpit-body">
@@ -107,24 +137,35 @@ export default function Chat() {
           {turns.length === 0 && (
             <p className="thread-empty">The thread stays here. The work happens on the stage →</p>
           )}
-          {turns.map((t) => (
-            <div key={t.id} className={`msg ${t.role}`}>
-              <div className="msg-who">{t.role === "user" ? "You" : "Beamline"}</div>
-              {t.role === "user" ? (
-                <p>{t.text}</p>
-              ) : (
-                <p className="msg-asst">
-                  {t.live
-                    ? t.steps[t.steps.length - 1] || "Planning…"
-                    : t.result?.answer?.answer
-                      ? t.result.answer.answer.slice(0, 160) + (t.result.answer.answer.length > 160 ? "…" : "")
-                      : t.result?.search
-                        ? `${t.result.search.returned} datasets · ${t.result.search.search_terms}`
-                        : t.error || t.text || "Done."}
-                </p>
-              )}
-            </div>
-          ))}
+          {turns.map((t) => {
+            const onStage =
+              t.id === stageAsst?.id ||
+              (t.role === "user" &&
+                turns[turns.findIndex((x) => x.id === t.id) + 1]?.id === stageAsst?.id);
+            return (
+              <button
+                key={t.id}
+                type="button"
+                className={`msg ${t.role} ${onStage ? "on-stage" : ""}`}
+                onClick={() => focusTurn(t)}
+              >
+                <div className="msg-who">{t.role === "user" ? "You" : "Beamline"}</div>
+                {t.role === "user" ? (
+                  <p>{t.text}</p>
+                ) : (
+                  <p className="msg-asst">
+                    {t.live
+                      ? t.steps[t.steps.length - 1] || "Planning…"
+                      : t.result?.answer?.answer
+                        ? t.result.answer.answer.slice(0, 160) + (t.result.answer.answer.length > 160 ? "…" : "")
+                        : t.result?.search
+                          ? `${t.result.search.returned} datasets · ${t.result.search.search_terms}`
+                          : t.error || t.text || "Done."}
+                  </p>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {followups.length > 0 && !busy && (
@@ -151,7 +192,15 @@ export default function Chat() {
           />
           <div className="composer-bar">
             {turns.length > 0 && (
-              <button type="button" className="ghost-btn" onClick={() => setTurns([])} disabled={busy}>
+              <button
+                type="button"
+                className="ghost-btn"
+                onClick={() => {
+                  setTurns([]);
+                  setFocusId(null);
+                }}
+                disabled={busy}
+              >
                 Reset
               </button>
             )}
@@ -166,13 +215,13 @@ export default function Chat() {
       <Workbench
         idle={turns.length === 0}
         live={
-          liveAsst
+          stageAsst
             ? {
-                steps: liveAsst.steps,
-                text: liveAsst.text,
-                result: liveAsst.result,
-                live: liveAsst.live,
-                error: liveAsst.error,
+                steps: stageAsst.steps,
+                text: stageAsst.text,
+                result: stageAsst.result,
+                live: stageAsst.live,
+                error: stageAsst.error,
               }
             : null
         }

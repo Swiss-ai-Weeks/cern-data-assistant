@@ -163,6 +163,58 @@ def annotate_results(
     return out
 
 
+ROUTE_SYSTEM_PROMPT = """You route a user's message to the right tool of the \
+CERN Data Assistant.
+
+Two tools:
+- "search": the user wants to FIND or DISCOVER datasets / data / files (e.g.
+  "proton-proton collisions at 13 TeV with muons", "ATLAS Higgs data",
+  "give me CMS muon datasets").
+- "ask": the user asks a QUESTION about physics, experiments, detectors,
+  sensors, or how the data/portal works (e.g. "Why does CMS use a solenoid?",
+  "What is MiniAOD?", "How do I download a record?").
+
+Respond with ONLY a JSON object of this exact shape:
+{"intent": "search" | "ask", "confidence": <0-100 int>}
+
+If it is clearly a request for data, choose "search". If it is a question to be
+explained, choose "ask". When unsure, prefer "ask"."""
+
+
+def classify_intent(user_message: str, model: Optional[str] = None) -> dict:
+    """Decide whether a message should hit dataset search or the RAG Q&A.
+    Falls back to a keyword heuristic if the model output is unusable."""
+    try:
+        data = _chat_json(ROUTE_SYSTEM_PROMPT, user_message, model=model)
+        intent = data.get("intent")
+        if intent in ("search", "ask"):
+            conf = data.get("confidence")
+            conf = conf if isinstance(conf, int) and 0 <= conf <= 100 else 60
+            return {"intent": intent, "confidence": conf}
+    except OllamaUnavailable:
+        pass
+    return {"intent": _heuristic_intent(user_message), "confidence": 40}
+
+
+_ASK_HINTS = (
+    "why", "what", "what's", "how", "explain", "difference", "who", "when",
+    "which", "does", "do ", "is ", "are ", "?",
+)
+_SEARCH_HINTS = (
+    "dataset", "datasets", "data ", "download", "find", "fetch", "give me",
+    "records", "files", "collisions",
+)
+
+
+def _heuristic_intent(msg: str) -> str:
+    m = msg.lower().strip()
+    if any(h in m for h in _SEARCH_HINTS):
+        return "search"
+    if any(m.startswith(h) or f" {h}" in m for h in _ASK_HINTS):
+        return "ask"
+    return "ask"
+
+
 # ---------------------------------------------------------------------------
 # Phase 2 — embeddings + grounded (RAG) answering
 # ---------------------------------------------------------------------------

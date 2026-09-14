@@ -23,7 +23,12 @@ Answers questions like *"Why does CMS use a solenoid?"*.
 - ✅ Embeddings via `nomic-embed-text` on the H100; NumPy cosine vector store (`rag.py`, `build_index.py`).
 - ✅ `POST /api/ask` → retrieve → **grounded answer with inline [n] citations + sources**.
 - ✅ UI: "Ask about CERN" mode with grounded/not-grounded badge and source list.
-- Next within RAG: a query router so one box auto-picks search vs ask.
+
+## Phase 2.5 — Query router (DONE)
+One box that auto-decides search vs ask — the first step toward the agent.
+- ✅ `ollama_client.classify_intent()` → `{intent: search|ask, confidence}` with a keyword fallback if the model is down.
+- ✅ `POST /api/assistant` classifies then dispatches to the shared search / ask logic; returns `mode` + `route_confidence`.
+- ✅ UI: default **"Assistant (auto)"** tab — single console that renders dataset cards or a grounded answer based on the route (manual tabs kept).
 
 ## Phase 3 — Guardrails (grounding is judged)
 - NeMo Guardrails / validation layer: no physics claim without a retrieved CERN source.

@@ -68,3 +68,7 @@ export interface AskResponse {
   model_used?: string;
   sources: AskSource[];
 }
+
+export type AssistantResponse =
+  | (SearchResponse & { mode: "search"; route_confidence: number })
+  | (AskResponse & { mode: "ask"; route_confidence: number });

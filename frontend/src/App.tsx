@@ -5,12 +5,13 @@ import StatusBar from "./components/StatusBar";
 import SearchConsole from "./components/SearchConsole";
 import ResultsFeed from "./components/ResultsFeed";
 import AskPanel from "./components/AskPanel";
+import AssistantPanel from "./components/AssistantPanel";
 
-type Mode = "search" | "ask";
+type Mode = "assistant" | "search" | "ask";
 
 export default function App() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [mode, setMode] = useState<Mode>("search");
+  const [mode, setMode] = useState<Mode>("assistant");
   const [result, setResult] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +51,13 @@ export default function App() {
       <div className="mode-tabs">
         <button
           type="button"
+          className={`mode-tab ${mode === "assistant" ? "active" : ""}`}
+          onClick={() => setMode("assistant")}
+        >
+          Assistant (auto)
+        </button>
+        <button
+          type="button"
           className={`mode-tab ${mode === "search" ? "active" : ""}`}
           onClick={() => setMode("search")}
         >
@@ -64,7 +72,9 @@ export default function App() {
         </button>
       </div>
 
-      {mode === "search" ? (
+      {mode === "assistant" && <AssistantPanel />}
+
+      {mode === "search" && (
         <>
           <SearchConsole onSubmit={handleSearch} loading={loading} lastResult={result} />
 
@@ -87,9 +97,9 @@ export default function App() {
 
           {!loading && result && <ResultsFeed result={result} />}
         </>
-      ) : (
-        <AskPanel />
       )}
+
+      {mode === "ask" && <AskPanel />}
     </div>
   );
 }

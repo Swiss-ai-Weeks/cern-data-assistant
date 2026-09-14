@@ -1,5 +1,6 @@
 import type {
   AskResponse,
+  AssistantResponse,
   HealthResponse,
   RecordDetail,
   SearchResponse,
@@ -50,4 +51,13 @@ export async function askAssistant(query: string): Promise<AskResponse> {
     body: JSON.stringify({ query }),
   });
   return asJson<AskResponse>(res);
+}
+
+export async function runAssistant(query: string): Promise<AssistantResponse> {
+  const res = await fetch(`${API_BASE}/api/assistant`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query }),
+  });
+  return asJson<AssistantResponse>(res);
 }

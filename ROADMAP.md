@@ -38,14 +38,14 @@ One reliable path for the pitch.
 
 ---
 
-## Phase 7 — Agent that looks more like AIQ
+## Phase 7 — Agent that looks more like AIQ (DONE)
 
-The planner is one-shot. A judge who knows agentic stacks will ask “what are the tools?”
+Three tools, visible plan, retry if CERN returns nothing.
 
-1. **`fetch_record` tool** — after search, pull `GET /api/record/<recid>` and use files/size in the answer (“here’s how to download this one”).
-2. **Retry loop** — if search returns 0 after broadening, re-plan with fewer constraints instead of an empty feed.
-3. **Show the plan** more clearly in the UI (already have `goal` + `tools_used`; add the actual `search_query` / `ask_query` chips).
-4. **Optional, only if a mentor insists on the NVIDIA name:** wrap the same three tools in NVIDIA AIQ. Do **not** rewrite the app for this unless required.
+- ✅ **`fetch_record`** — after search, `GET` the top dataset; stitch example files + license onto that card (`picked` badge).
+- ✅ **Retry** — if search is empty after broadening, drop `N TeV` (or fall back to CMS/ATLAS/ALICE/LHCb) and search again; UI marks `(retried)`.
+- ✅ **Plan chips** — console shows `search: …` and `ask: …` plus tools `dataset search` / `grounded answer` / `fetch record`.
+- Skipped NVIDIA AIQ package (same tools, our orchestrator).
 
 ---
 
@@ -75,7 +75,7 @@ Guardrails work; a few holes remain.
 ```
 Phase 6 (H100 demo + 4-query script)   ← DONE
      ↓
-Phase 7.1–7.3 (record tool + visible plan)
+Phase 7.1–7.3 (record tool + visible plan)  ← DONE
      ↓
 Phase 8.1–8.2 (recalibrate floor + seed the demo questions)
      ↓

@@ -354,18 +354,42 @@ def assistant():
     return jsonify(payload), status
 
 
+def _fetch_top_record(search_payload: dict) -> dict | None:
+    """Agent tool: pull the full CERN record for the top dataset so the UI
+    can show real files / license, not just the search snippet."""
+    results = search_payload.get("results") or []
+    pick = next((r for r in results if r.get("is_dataset")), results[0] if results else None)
+    if not pick:
+        return None
+    try:
+        raw = cern_client.get_record(pick["recid"])
+        detail = cern_client.summarize_full_record(raw)
+    except cern_client.CernApiError as exc:
+        log.warning("fetch_record failed for %s: %s", pick.get("recid"), exc)
+        return None
+    files = (detail.get("files") or [])[:6]
+    return {
+        "recid": detail.get("recid"),
+        "title": detail.get("title"),
+        "size": detail.get("size"),
+        "file_count": detail.get("file_count"),
+        "formats": detail.get("formats") or [],
+        "usage": detail.get("usage"),
+        "url": detail.get("url"),
+        "license": detail.get("license"),
+        "files": files,
+    }
+
+
 @app.post("/api/agent")
 def agent():
-    """Agentic entry point (Phase 4): plan a request over the available tools
-    (dataset search + grounded Q&A), run the needed ones in a single turn, and
-    return a combined result. Handles multi-part queries like
-    "find CMS muon datasets and explain why CMS uses a solenoid"."""
+    """Agentic entry point: plan over search + grounded Q&A, retry empty
+    searches, then fetch the top record's files."""
     body = request.get_json(silent=True) or {}
     user_query = (body.get("query") or "").strip()
     if not user_query:
         return jsonify({"error": "Field 'query' is required."}), 400
 
-    # INPUT rail first — one refusal covers every downstream tool.
     blocked = guardrails.screen_query(user_query)
     if blocked:
         refusal, _ = _refusal(user_query, blocked["message"], f"input:{blocked['category']}")
@@ -373,8 +397,10 @@ def agent():
             "query": user_query,
             "goal": user_query,
             "tools_used": [],
+            "plan": {"search_query": None, "ask_query": None},
             "search": None,
             "answer": refusal,
+            "picked": None,
         }), 200
 
     plan = ollama_client.plan_tasks(user_query)
@@ -382,12 +408,22 @@ def agent():
     tools_used: list[str] = []
     search_payload = None
     answer_payload = None
+    retried_with = None
 
     if plan.get("search_query"):
         sp, sstatus = _run_search(plan["search_query"], body.get("size"))
         if sstatus == 200:
             search_payload = sp
             tools_used.append("search")
+            if not (sp.get("results") or []):
+                alt = cern_client.fallback_search_query(plan["search_query"])
+                if alt:
+                    sp2, s2 = _run_search(alt, body.get("size"))
+                    if s2 == 200 and (sp2.get("results") or []):
+                        search_payload = sp2
+                        retried_with = alt
+                        log.info("agent retry search %r -> %r (%s hits)",
+                                 plan["search_query"], alt, sp2.get("returned"))
 
     if plan.get("ask_query"):
         ap, astatus = _run_ask(plan["ask_query"], body.get("k"))
@@ -395,16 +431,30 @@ def agent():
             answer_payload = ap
             tools_used.append("ask")
 
+    picked = None
+    if search_payload and (search_payload.get("results") or []):
+        picked = _fetch_top_record(search_payload)
+        if picked:
+            tools_used.append("fetch_record")
+            for r in search_payload["results"]:
+                if str(r.get("recid")) == str(picked["recid"]):
+                    r["files"] = picked["files"]
+                    r["license"] = picked.get("license")
+                    r["picked"] = True
+                    break
+
     return jsonify({
         "query": user_query,
         "goal": plan.get("goal", user_query),
         "plan": {
-            "search_query": plan.get("search_query"),
+            "search_query": retried_with or plan.get("search_query"),
             "ask_query": plan.get("ask_query"),
+            "retried": retried_with,
         },
         "tools_used": tools_used,
         "search": search_payload,
         "answer": answer_payload,
+        "picked": picked,
     }), 200
 
 

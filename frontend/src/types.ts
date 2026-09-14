@@ -21,6 +21,9 @@ export interface RecordSummary {
   url: string;
   relevance?: number;
   why?: string;
+  files?: RecordFile[];
+  license?: string | null;
+  picked?: boolean;
 }
 
 export interface RecordFile {
@@ -109,8 +112,20 @@ export interface AgentResponse {
   plan?: {
     search_query: string | null;
     ask_query: string | null;
+    retried?: string | null;
   };
   tools_used: string[];
   search: SearchResponse | null;
   answer: AskResponse | null;
+  picked?: {
+    recid: number | string;
+    title: string;
+    size?: string;
+    file_count?: number;
+    formats?: string[];
+    usage?: string;
+    url?: string;
+    license?: string | null;
+    files?: RecordFile[];
+  } | null;
 }

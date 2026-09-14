@@ -12,6 +12,7 @@ app.py can turn failures into clean JSON error responses.
 from __future__ import annotations
 
 import os
+import re
 import json
 import copy
 import urllib.request
@@ -71,6 +72,20 @@ def get_record(recid: int | str) -> dict:
 
 def cache_stats() -> dict:
     return {"search": SEARCH_CACHE.stats(), "record": RECORD_CACHE.stats()}
+
+
+def fallback_search_query(original: str) -> str | None:
+    """If a specific keyword query still returns 0 hits after broadening,
+    drop collision energies (13 TeV) or fall back to the experiment name."""
+    stripped = re.sub(r"\b\d+(\.\d+)?\s*TeV\b", "", original or "", flags=re.I)
+    stripped = re.sub(r"\s+", " ", stripped).strip()
+    if stripped and stripped.lower() != (original or "").strip().lower():
+        return stripped
+    for exp in ("CMS", "ATLAS", "ALICE", "LHCb"):
+        if re.search(rf"\b{exp}\b", original or "", re.I):
+            if exp.lower() != (original or "").strip().lower():
+                return exp
+    return None
 
 
 def broadening_attempts(terms: str) -> list[str]:

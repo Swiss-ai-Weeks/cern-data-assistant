@@ -60,13 +60,30 @@ export default function AssistantPanel() {
               {result.tools_used.length > 0 ? (
                 result.tools_used.map((t) => (
                   <span key={t} className="tool-chip">
-                    {t === "search" ? "dataset search" : "grounded answer"}
+                    {t === "search"
+                      ? "dataset search"
+                      : t === "ask"
+                        ? "grounded answer"
+                        : t === "fetch_record"
+                          ? "fetch record"
+                          : t}
                   </span>
                 ))
               ) : (
                 <span className="tool-chip">no tools run</span>
               )}
             </span>
+            {result.plan?.search_query && (
+              <span>
+                search <strong>{result.plan.search_query}</strong>
+                {result.plan.retried ? " (retried)" : ""}
+              </span>
+            )}
+            {result.plan?.ask_query && (
+              <span>
+                ask <strong>{result.plan.ask_query}</strong>
+              </span>
+            )}
           </div>
         )}
       </form>

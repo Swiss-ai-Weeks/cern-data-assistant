@@ -22,6 +22,7 @@ export default function ResultRow({ record, showRelevance }: Props) {
           <span className={`kind-badge ${record.is_dataset ? "kind-dataset" : "kind-doc"}`}>
             {record.kind}
           </span>
+          {record.picked && <span className="picked-badge">fetched</span>}
         </h3>
 
         <div className="record-stats">
@@ -80,6 +81,28 @@ export default function ResultRow({ record, showRelevance }: Props) {
               />
             </div>
             <span className="relevance-why">{record.why}</span>
+          </div>
+        )}
+
+        {record.files && record.files.length > 0 && (
+          <div className="file-list">
+            <span className="label">Example files</span>
+            <ul>
+              {record.files.slice(0, 5).map((f) => (
+                <li key={f.filename}>
+                  {f.uri ? (
+                    <a href={f.uri} target="_blank" rel="noreferrer">
+                      {f.filename}
+                    </a>
+                  ) : (
+                    f.filename
+                  )}
+                  {typeof f.size === "number" && f.size > 0 && (
+                    <span className="file-size"> · {f.size.toLocaleString()} B</span>
+                  )}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 

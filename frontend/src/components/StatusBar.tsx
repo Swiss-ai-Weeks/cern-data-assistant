@@ -10,16 +10,14 @@ export default function StatusBar({ health }: Props) {
   const kbOk = health?.knowledge_base === "ready";
 
   return (
-    <div className="status-pills">
-      <span className={`pill ${health ? (cernOk ? "ok" : "down") : ""}`}>
-        CERN Open Data
+    <nav className="status-pills" aria-label="System">
+      <span className={`pill ${cernOk ? "on" : health ? "down" : ""}`}>CERN</span>
+      <span className={`pill ${ollamaOk ? "on" : health ? "down" : ""}`}>
+        {ollamaOk ? health?.ollama_model : "GPU"}
       </span>
-      <span className={`pill ${health ? (ollamaOk ? "ok" : "down") : ""}`}>
-        {ollamaOk ? health?.ollama_model : "GPU offline"}
+      <span className={`pill ${kbOk ? "on" : ""}`}>
+        {kbOk ? `${health?.knowledge_chunks} sources` : "index"}
       </span>
-      <span className={`pill ${kbOk ? "ok" : ""}`}>
-        {kbOk ? `${health?.knowledge_chunks} sources` : "no index"}
-      </span>
-    </div>
+    </nav>
   );
 }

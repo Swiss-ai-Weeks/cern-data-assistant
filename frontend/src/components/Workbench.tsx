@@ -67,27 +67,23 @@ export default function Workbench({ idle, live, onStarter, onOpenRecord }: Props
   if (idle) {
     return (
       <div className="stage idle-stage">
-        <div className="ring" aria-hidden>
-          <div className="ring-orbit" />
-          <div className="ring-core" />
-          <div className="ring-beam" />
+        <div className="hero-word" aria-hidden>
+          beamline
         </div>
-        <p className="stage-kicker">Mission control</p>
+        <p className="microlabel">CERN Open Data — Swiss AI Weeks 2026</p>
         <h2 className="stage-title">
-          One place for
-          <br />
-          data, detectors, and doubt.
+          Ask CERN, <em>in English.</em>
         </h2>
         <p className="stage-lead">
-          Ask in English. Watch the agent plan, search CERN Open Data, and
-          answer only with a source. If it cannot cite CERN, it will not guess.
+          Plain English in — datasets and detectors out. If it cannot cite CERN,
+          it will not guess.
         </p>
         <div className="launch-grid">
           {STARTERS.map((s) => (
             <button key={s.k} type="button" className="launch-tile" onClick={() => onStarter(s.query)}>
               <span className="launch-k">{s.k}</span>
               <strong>{s.title}</strong>
-              <em>{s.query}</em>
+              <span className="launch-q">{s.query}</span>
             </button>
           ))}
         </div>
@@ -124,10 +120,10 @@ export default function Workbench({ idle, live, onStarter, onOpenRecord }: Props
       </div>
 
       {live?.text && (
-        <p className="stage-goal">
-          {live.live ? "Working: " : "Goal: "}
-          {live.text}
-        </p>
+        <h2 className="stage-goal">
+          {live.live ? "Working on " : ""}
+          <em>{live.text}</em>
+        </h2>
       )}
 
       {live?.error && <div className="error-banner">{live.error}</div>}

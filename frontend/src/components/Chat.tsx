@@ -135,7 +135,9 @@ export default function Chat() {
       <aside className="thread">
         <div className="thread-scroll" ref={scroller}>
           {turns.length === 0 && (
-            <p className="thread-empty">The thread stays here. The work happens on the stage →</p>
+            <p className="thread-empty">
+              Ask anything. Results land <em>on the right.</em>
+            </p>
           )}
           {turns.map((t) => {
             const onStage =
@@ -186,7 +188,7 @@ export default function Chat() {
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={onKey}
-            placeholder="Ask in English — datasets, detectors, or both"
+            placeholder="ask in plain English"
             disabled={busy}
             autoFocus
           />
@@ -204,9 +206,9 @@ export default function Chat() {
                 Reset
               </button>
             )}
-            <span className="composer-hint">{busy ? "beam in flight" : "Enter to send"}</span>
+            <span className="composer-hint">{busy ? "working" : "enter ↵"}</span>
             <button className="send-btn" type="submit" disabled={busy || !value.trim()}>
-              {busy ? "…" : "Send"}
+              {busy ? "…" : "Ask"}
             </button>
           </div>
         </form>

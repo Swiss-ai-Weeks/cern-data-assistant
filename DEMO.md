@@ -1,6 +1,6 @@
 # Judge demo — 4 queries (rehearse once)
 
-Pitch in ~3 minutes. Open **http://127.0.0.1:5001** (H100 via SSH tunnel). Full-screen cockpit: thread on the left, live stage on the right. Click a launch tile (or type). Watch Plan → Search → Ground → Fetch light up; datasets land on the stage as soon as search returns, then the grounded answer. Click a dataset tile to inspect files. Click a thread message to put that turn back on the stage.
+Pitch in ~3 minutes. Open **http://127.0.0.1:5001** (H100 via SSH tunnel). Paper UI: thread on the left, stage on the right. Click a launch tile. Watch Plan → Search → Ground → Fetch. Datasets land as soon as search returns. Click a tile to inspect files. Click a thread message to put that turn back on the stage.
 
 If the first answer hangs: the 32B model is still loading. Wait, or run `scripts/warm_h100.sh` on the GPU box first.
 

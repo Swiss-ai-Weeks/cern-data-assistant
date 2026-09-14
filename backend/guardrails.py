@@ -155,6 +155,40 @@ def strip_uncited_sentences(answer: str) -> dict:
     return {"answer": " ".join(kept), "removed": len(sentences) - len(kept)}
 
 
+_WORD_RE = re.compile(r"[a-z0-9][a-z0-9_\-]{2,}")
+_STOPWORDS = frozenset("""
+the and for with that this from are was were which such can its into than then
+also only more most very when where while what how why does use used using
+""".split())
+# Share of a flagged claim's content words that must appear in the cited
+# passages for the claim to count as lexically supported.
+LEXICAL_SUPPORT_RATIO = float(os.environ.get("RAG_LEXICAL_SUPPORT", "0.8"))
+
+
+def _content_words(text: str) -> set[str]:
+    return {w for w in _WORD_RE.findall((text or "").lower()) if w not in _STOPWORDS}
+
+
+def claim_supported_lexically(claim: str, passages: list[dict]) -> bool:
+    """True when nearly every content word of `claim` occurs in the cited
+    passages — i.e. the claim is a paraphrase of the sources, not new physics.
+    Used to veto false positives from the LLM fact-checker (temperature > 0
+    models occasionally flag sentences copied from the passage)."""
+    words = _content_words(claim)
+    if not words:
+        return True
+    corpus = _content_words(" ".join(f"{p.get('title', '')} {p.get('text', '')}" for p in passages))
+    return len(words & corpus) / len(words) >= LEXICAL_SUPPORT_RATIO
+
+
+def filter_verifier_flags(unsupported: list, passages: list[dict]) -> dict:
+    """Keep only the fact-checker flags that are NOT lexically covered by the
+    cited passages. Returns {unsupported: [...], overridden: int}."""
+    flags = [str(u) for u in (unsupported or []) if str(u).strip()]
+    real = [u for u in flags if not claim_supported_lexically(u, passages)]
+    return {"unsupported": real, "overridden": len(flags) - len(real)}
+
+
 def valid_citations(answer: str, used: list, passages: list[dict]) -> list[int]:
     """Compatibility helper (older call sites / tests): the set of citation
     numbers that appear inline as [n] or in the model's `used` list, map to a

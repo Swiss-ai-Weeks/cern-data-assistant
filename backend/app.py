@@ -304,6 +304,14 @@ def _run_ask(question: str, k=None):
         verdict = ollama_client.verify_grounding(answer, cited_passages)
         timing["verify"] = int((time.time() - t0) * 1000)
         if not verdict.get("supported", True):
+            # Arbiter: a flagged claim whose words all come from the cited
+            # passages is a verifier false positive, not new physics.
+            arb = guardrails.filter_verifier_flags(verdict.get("unsupported", []), cited_passages)
+            detail["verifier_overridden"] = arb["overridden"]
+            if arb["overridden"]:
+                log.info("verifier flags overridden lexically: %d", arb["overridden"])
+            verdict = {"supported": not arb["unsupported"], "unsupported": arb["unsupported"]}
+        if not verdict.get("supported", True):
             log.info("grounding rail rejected answer; unsupported=%s", verdict.get("unsupported"))
             detail["status"] = "unsupported"
             detail["unsupported"] = verdict.get("unsupported", [])

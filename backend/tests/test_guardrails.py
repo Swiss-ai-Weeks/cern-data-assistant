@@ -105,5 +105,30 @@ class UncitedSentenceTests(unittest.TestCase):
         self.assertEqual(out["removed"], 2)
 
 
+class VerifierArbiterTests(unittest.TestCase):
+    PASSAGES = [{"n": 1, "title": "MiniAOD vs NanoAOD",
+                 "text": "MiniAOD keeps the reconstructed physics objects (electrons, muons, "
+                         "photons, jets, missing transverse energy). NanoAOD is a flat ROOT "
+                         "ntuple readable with uproot without CMSSW."}]
+
+    def test_paraphrase_of_passage_is_supported(self):
+        self.assertTrue(guardrails.claim_supported_lexically(
+            "MiniAOD retains reconstructed physics objects such as electrons, muons, photons and jets",
+            self.PASSAGES))
+
+    def test_new_physics_is_not_supported(self):
+        self.assertFalse(guardrails.claim_supported_lexically(
+            "Black holes evaporate through Hawking radiation near the event horizon",
+            self.PASSAGES))
+
+    def test_filter_keeps_only_real_flags(self):
+        out = guardrails.filter_verifier_flags(
+            ["NanoAOD is readable with uproot without CMSSW",
+             "The solenoid field is 3.8 tesla and bends muon tracks"], self.PASSAGES)
+        self.assertEqual(out["overridden"], 1)
+        self.assertEqual(len(out["unsupported"]), 1)
+        self.assertIn("solenoid", out["unsupported"][0])
+
+
 if __name__ == "__main__":
     unittest.main()

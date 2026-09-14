@@ -89,6 +89,7 @@ export interface Guardrail {
   threshold: number;
   citations_removed: number;
   sentences_removed?: number;
+  verifier_overridden?: number;
   unsupported?: string[];
 }
 

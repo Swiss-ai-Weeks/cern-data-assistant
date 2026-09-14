@@ -59,6 +59,8 @@ Three tools, visible plan, retry if CERN returns nothing.
 - ✅ **Cite-or-refuse in the low-confidence band**, two rails: `guardrails.strip_uncited_sentences` drops every
   sentence without a `[n]` (UI shows "n uncited sentence(s) dropped"; nothing left → `citation:none`), and at
   least one cited passage must itself clear the floor or we refuse (`grounding:low_confidence`).
+- ✅ **Fact-check made reproducible**: verifier runs at temperature 0 and a lexical arbiter vetoes flags on
+  sentences that are paraphrases of the cited passage (it refused "MiniAOD vs NanoAOD" 1 run in 3 before).
 - Skipped NeMo Guardrails (own rails + LLM fact-check already cover it).
 
 ---

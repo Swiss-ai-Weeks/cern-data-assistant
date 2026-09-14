@@ -168,8 +168,12 @@ The model is never trusted to judge its own grounding. `guardrails.py` applies:
    actually shown and scored at least `RAG_MIN_CITE_SCORE`; invalid ones are stripped,
    and an answer with no valid citation is refused. The model may also reply
    `NOT_IN_SOURCES`, which becomes the same refusal.
-3. **Fact-check pass** — a second LLM call checks every claim in the answer against
-   the cited passages only; unsupported claims block the answer.
+3. **Fact-check pass** — a second LLM call (temperature 0, so the verdict is
+   reproducible) checks every claim in the answer against the cited passages only;
+   unsupported claims block the answer. A lexical arbiter vetoes verifier false
+   positives: a flagged claim whose content words all occur in the cited passages
+   (`RAG_LEXICAL_SUPPORT`, default 0.8) is a paraphrase, not new physics, and is
+   kept (`verifier_overridden` in `guardrail_detail`).
 4. **Input rail** — prompt-injection and unsafe requests are refused before any model call.
 
 Every response carries `guardrail` (the rail that decided, e.g. `grounded`,

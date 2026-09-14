@@ -107,10 +107,11 @@ def _chat(system: str, user: str, model: Optional[str], *, json_mode: bool,
     return resp.json().get("message", {}).get("content", "")
 
 
-def _chat_json(system: str, user: str, model: Optional[str] = None) -> dict:
+def _chat_json(system: str, user: str, model: Optional[str] = None,
+               temperature: float = 0.2) -> dict:
     """Call Ollama's chat endpoint in JSON mode and parse the result."""
     content = _chat(system, user, model, json_mode=True,
-                    timeout=REQUEST_TIMEOUT, temperature=0.2) or "{}"
+                    timeout=REQUEST_TIMEOUT, temperature=temperature) or "{}"
     try:
         return json.loads(content)
     except json.JSONDecodeError:
@@ -400,6 +401,8 @@ Respond with ONLY a JSON object of this exact shape:
 Rules:
 - "supported" is true only if the context backs up all claims.
 - Ignore generic framing sentences with no factual content.
+- A claim that restates or paraphrases a sentence of the context IS supported, \
+even if the wording differs slightly (e.g. "about" vs "roughly").
 - Be strict: plausible-sounding physics that isn't in the context is unsupported."""
 
 
@@ -414,7 +417,8 @@ def verify_grounding(
         f"[{p['n']}] {p.get('title','')}\n{p.get('text','')}" for p in passages
     ]
     user_payload = f"ANSWER:\n{answer}\n\nCONTEXT:\n" + "\n\n".join(context_lines)
-    data = _chat_json(GROUNDCHECK_SYSTEM_PROMPT, user_payload, model=model)
+    # temperature 0: the verdict must be reproducible, not a coin flip
+    data = _chat_json(GROUNDCHECK_SYSTEM_PROMPT, user_payload, model=model, temperature=0.0)
     if "supported" not in data:
         return {"supported": True, "unsupported": []}
     unsupported = data.get("unsupported")

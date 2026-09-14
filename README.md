@@ -107,20 +107,44 @@ You want `"cern_api": "ok"` and `"ollama": "ok"`. Port **5001** (not 5000) so ma
 ### 4b. Build the RAG knowledge base (for "Ask about CERN")
 
 The **Ask** mode answers detector/experiment questions grounded in CERN sources.
-Pull the embedding model on the H100 once, then build the index locally
-(with the tunnel up):
+The corpus is real CERN Open Data content, cached locally on first build:
+
+- `knowledge/seed.json` — a few curated facts with source URLs
+- **78 CERN Open Data "Documentation" records** with page text (About CMS, detector and
+  data-format guides, trigger, pile-up, ALICE/ATLAS/LHCb/OPERA/DELPHI/JADE docs).
+  The ~9,000 auto-generated LHCb "Stripping" pages are skipped.
+- **all 1,006 CERN Open Data glossary terms**
 
 ```bash
-# on the H100:
+# on the H100 (once):
 ollama pull nomic-embed-text
 
 # on the laptop, in backend/ with the venv active + tunnel running:
-python build_index.py --with-cern
+python build_index.py            # ~2 min: downloads + embeds ≈1,600 chunks
+python build_index.py --force    # re-download the CERN records
+python build_index.py --seed-only
 ```
 
-This writes `knowledge/index.npy` + `knowledge/chunks.json` (gitignored).
-Health should then show `"knowledge_base": "ready"`. Curated facts live in
-`knowledge/seed.json` — add more there and rebuild.
+This writes `knowledge/index.npy` + `knowledge/chunks.json` (gitignored); raw
+API pulls are cached in `knowledge/raw_*.jsonl`. Health then shows
+`"knowledge_base": "ready"` and the chunk count.
+
+### 4c. Guardrails (how "grounded" is decided)
+
+The model is never trusted to judge its own grounding. `guardrail.py` applies:
+
+1. **Retrieval gate** — if the best passage's cosine similarity is below
+   `RAG_MIN_SCORE` (0.65, calibrated: on-topic questions score ≥ 0.75, off-topic
+   ≤ 0.58) the API refuses *before* calling the LLM. Between 0.65 and 0.70 it
+   answers but flags **low confidence**.
+2. **Citation check** — every `[n]` in the answer must point at a passage that was
+   actually shown; invalid ones are stripped, and an answer with no valid citation
+   is returned as `grounded: false`. The model may also reply `NOT_IN_SOURCES`,
+   which becomes the same refusal.
+
+Every response carries `guardrail: {status, top_score, threshold, citations_removed}`
+and `sources[]` with `used: true` on the passages the answer cites. Try
+`"Who won the 2022 World Cup?"` to see the refusal.
 
 ---
 
@@ -156,6 +180,35 @@ Flow:
 
 ---
 
+## Run the full stack on the H100 (demo setup)
+
+One process on the GPU box serves the built UI **and** the API on port 5001;
+teammates only need one SSH tunnel and no local Python/Node.
+
+```bash
+ssh launchpad-cern
+git clone https://github.com/Swiss-ai-Weeks/cern-data-assistant.git ~/cern-data-assistant   # once
+cd ~/cern-data-assistant && git pull
+tmux new -s app            # survives SSH drops; reattach with: tmux attach -t app
+scripts/start_h100.sh      # starts Ollama if needed, pulls models, builds index + UI, warms the LLM, serves :5001
+```
+
+`start_h100.sh --rebuild` also rebuilds the RAG index and the UI bundle after a `git pull`.
+The script writes `backend/.env` with `OLLAMA_MODEL=qwen2.5:32b`, `SERVE_FRONTEND=1`, `FLASK_DEBUG=0`.
+
+From your laptop:
+
+```bash
+ssh -N -L 5001:127.0.0.1:5001 launchpad-cern
+open http://localhost:5001
+curl -s localhost:5001/api/health | jq .
+curl -s localhost:5001/api/ask -H 'content-type: application/json' -d '{"query":"Why does CMS use a solenoid?"}' | jq .
+```
+
+If Ollama dies: `pkill ollama; nohup env OLLAMA_KEEP_ALIVE=-1 ollama serve > ~/ollama.log 2>&1 &` then rerun the script.
+
+---
+
 ## Layout
 
 ```
@@ -164,8 +217,9 @@ cern-data-assistant/
 │   ├── app.py              # /api/health  /api/search  /api/ask  /api/record/<id>
 │   ├── cern_client.py      # CERN Open Data REST + rich card fields
 │   ├── ollama_client.py    # query extract, ranking, embeddings, grounded answer
-│   ├── rag.py              # tiny local vector store (NumPy cosine)
-│   ├── build_index.py      # build the RAG index from seed + CERN docs
+│   ├── rag.py              # tiny local vector store (NumPy cosine + boosts)
+│   ├── guardrail.py        # retrieval gate + citation verification
+│   ├── build_index.py      # build the RAG index: seed + CERN docs + glossary
 │   ├── knowledge/
 │   │   ├── seed.json       # curated authoritative CERN facts (+ sources)
 │   │   ├── index.npy       # built embeddings (gitignored)
@@ -205,5 +259,5 @@ source supports the question.
 ## Team notes
 
 - Challenge next: dataset cards (size, format, how to use, citations), RAG over detector docs, NeMo Guardrails / AIQ.
-- Current model is **llama3.2** (3B) on H100 so ranking is fast. Bigger models can wait.
+- Model on the H100 is **qwen2.5:32b** (set via `OLLAMA_MODEL`); it falls back to **llama3.2** automatically if the bigger model is not pulled.
 - Keep `backend/.env` and `frontend/.env` local (gitignored).

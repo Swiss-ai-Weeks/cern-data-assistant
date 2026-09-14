@@ -632,3 +632,28 @@ a {
   color: var(--text-muted);
   line-height: 1.5;
 }
+
+/* ------------------------------------------------ Phase 3 guardrail states */
+.answer-badge.low {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.answer-text a.cite {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent-2);
+  text-decoration: none;
+  margin: 0 1px;
+}
+.answer-text a.cite:hover {
+  text-decoration: underline;
+}
+.answer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-faint);
+}

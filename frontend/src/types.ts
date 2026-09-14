@@ -56,9 +56,27 @@ export interface HealthResponse {
 export interface AskSource {
   n: number;
   title: string;
+  section?: string;
+  experiment?: string;
+  kind?: "doc" | "glossary" | "seed";
   source: string;
   score: number;
   used: boolean;
+  snippet?: string;
+}
+
+export type GuardrailStatus =
+  | "ok"
+  | "low_confidence"
+  | "refused"
+  | "refused_by_model"
+  | "no_citations";
+
+export interface Guardrail {
+  status: GuardrailStatus;
+  top_score: number;
+  threshold: number;
+  citations_removed: number;
 }
 
 export interface AskResponse {
@@ -67,6 +85,8 @@ export interface AskResponse {
   grounded: boolean;
   model_used?: string;
   sources: AskSource[];
+  guardrail?: Guardrail;
+  timing_ms?: { retrieve?: number; llm?: number };
 }
 
 export type AssistantResponse =

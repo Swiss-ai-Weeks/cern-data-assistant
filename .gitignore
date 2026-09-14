@@ -11,3 +11,12 @@ dataset/*.json
 # Built RAG index (regenerate with backend/build_index.py); keep seed.json
 backend/knowledge/index.npy
 backend/knowledge/chunks.json
+
+# Local environments and build outputs
+frontend/node_modules/
+frontend/dist/
+backend/.venv/
+backend/knowledge/raw_*.jsonl
+backend/knowledge/index_meta.json
+frontend/.tsbuild/
+frontend/tsconfig.tsbuildinfo

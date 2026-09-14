@@ -6,7 +6,10 @@ import type {
   SearchResponse,
 } from "./types";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5001";
+// Dev: Vite on 5173 talks to Flask on 5001. Production build: Flask serves the
+// bundle itself, so use same-origin (works through any SSH tunnel port).
+const API_BASE =
+  import.meta.env.VITE_API_BASE ?? (import.meta.env.DEV ? "http://localhost:5001" : "");
 
 async function asJson<T>(res: Response): Promise<T> {
   if (!res.ok) {

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import json
+import time
 import logging
 from typing import Any, Optional
 
@@ -23,10 +24,21 @@ import requests
 log = logging.getLogger("ollama_client")
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gpt-oss:120b-cloud")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2")
+# Used automatically when OLLAMA_MODEL is not pulled on the Ollama host, so a
+# demo never blocks on a 20 GB download.
+OLLAMA_FALLBACK_MODEL = os.environ.get("OLLAMA_FALLBACK_MODEL", "llama3.2")
 EMBED_MODEL = os.environ.get("OLLAMA_EMBED_MODEL", "nomic-embed-text")
 REQUEST_TIMEOUT = 60
+ANSWER_TIMEOUT = 180  # 32B model, long context: allow a slow first answer
 EMBED_TIMEOUT = 120  # first call cold-loads the model on the GPU
+# keep_alive=-1: never unload the model between requests (demo latency).
+CHAT_OPTIONS = {"temperature": 0.2, "num_ctx": 8192}
+
+# nomic-embed-text is trained with task prefixes; using them measurably
+# improves retrieval. The index and the query MUST use matching prefixes.
+EMBED_DOC_PREFIX = "search_document: "
+EMBED_QUERY_PREFIX = "search_query: "
 
 
 class OllamaUnavailable(RuntimeError):
@@ -50,32 +62,67 @@ def list_models() -> list[str]:
         raise OllamaUnavailable(str(exc)) from exc
 
 
-def _chat_json(system: str, user: str, model: Optional[str] = None) -> dict:
-    """Call Ollama's chat endpoint in JSON mode and parse the result."""
+_model_cache: dict[str, Any] = {"name": None, "at": 0.0}
+
+
+def get_model() -> str:
+    """OLLAMA_MODEL if the Ollama host has it, else OLLAMA_FALLBACK_MODEL.
+    Cached for 60 s so we don't hit /api/tags on every request."""
+    now = time.time()
+    if _model_cache["name"] and now - _model_cache["at"] < 60:
+        return _model_cache["name"]
+    chosen = OLLAMA_MODEL
+    try:
+        installed = list_models()
+        names = set(installed) | {n.split(":")[0] for n in installed}
+        if OLLAMA_MODEL not in names and OLLAMA_MODEL.split(":")[0] not in names:
+            log.warning("model %s not installed; falling back to %s",
+                        OLLAMA_MODEL, OLLAMA_FALLBACK_MODEL)
+            chosen = OLLAMA_FALLBACK_MODEL
+    except OllamaUnavailable:
+        pass
+    _model_cache.update(name=chosen, at=now)
+    return chosen
+
+
+def _chat(system: str, user: str, model: Optional[str], *, json_mode: bool,
+          timeout: int, temperature: float) -> str:
     payload = {
-        "model": model or OLLAMA_MODEL,
+        "model": model or get_model(),
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
-        "format": "json",
         "stream": False,
-        "options": {"temperature": 0.2},
+        "keep_alive": -1,
+        "options": {**CHAT_OPTIONS, "temperature": temperature},
     }
+    if json_mode:
+        payload["format"] = "json"
     try:
-        resp = requests.post(
-            f"{OLLAMA_HOST}/api/chat", json=payload, timeout=REQUEST_TIMEOUT
-        )
+        resp = requests.post(f"{OLLAMA_HOST}/api/chat", json=payload, timeout=timeout)
         resp.raise_for_status()
     except requests.RequestException as exc:
         raise OllamaUnavailable(str(exc)) from exc
+    return resp.json().get("message", {}).get("content", "")
 
-    content = resp.json().get("message", {}).get("content", "{}")
+
+def _chat_json(system: str, user: str, model: Optional[str] = None) -> dict:
+    """Call Ollama's chat endpoint in JSON mode and parse the result."""
+    content = _chat(system, user, model, json_mode=True,
+                    timeout=REQUEST_TIMEOUT, temperature=0.2) or "{}"
     try:
         return json.loads(content)
     except json.JSONDecodeError:
         log.warning("Ollama returned non-JSON content: %r", content)
         return {}
+
+
+def chat_text(system: str, user: str, model: Optional[str] = None,
+              timeout: int = ANSWER_TIMEOUT, temperature: float = 0.1) -> str:
+    """Plain-text chat call (no JSON mode) for prose answers."""
+    return _chat(system, user, model, json_mode=False,
+                 timeout=timeout, temperature=temperature).strip()
 
 
 EXTRACT_SYSTEM_PROMPT = """You turn a scientist's plain-language request into a \
@@ -219,60 +266,61 @@ def _heuristic_intent(msg: str) -> str:
 # Phase 2 — embeddings + grounded (RAG) answering
 # ---------------------------------------------------------------------------
 
-def embed(text: str, model: Optional[str] = None) -> list[float]:
-    """Return an embedding vector for one piece of text."""
-    payload = {"model": model or EMBED_MODEL, "prompt": text}
+def _embed_request(inputs: list[str], model: Optional[str] = None) -> list[list[float]]:
+    """POST /api/embed (batched endpoint, Ollama >= 0.3)."""
+    payload = {"model": model or EMBED_MODEL, "input": inputs, "keep_alive": -1}
     try:
-        resp = requests.post(
-            f"{OLLAMA_HOST}/api/embeddings", json=payload, timeout=EMBED_TIMEOUT
-        )
+        resp = requests.post(f"{OLLAMA_HOST}/api/embed", json=payload, timeout=EMBED_TIMEOUT)
         resp.raise_for_status()
     except requests.RequestException as exc:
         raise OllamaUnavailable(str(exc)) from exc
-    vec = resp.json().get("embedding")
-    if not isinstance(vec, list) or not vec:
-        raise OllamaUnavailable("empty embedding returned")
-    return vec
+    vecs = resp.json().get("embeddings")
+    if not isinstance(vecs, list) or len(vecs) != len(inputs):
+        raise OllamaUnavailable("embedding response malformed")
+    return vecs
 
 
-def embed_batch(texts: list[str], model: Optional[str] = None) -> list[list[float]]:
-    """Embed a list of texts (sequentially; the GPU makes this fast enough
-    for a hackathon-sized corpus)."""
-    return [embed(t, model=model) for t in texts]
+def embed(text: str, model: Optional[str] = None) -> list[float]:
+    """Embed one QUERY string (uses the nomic query prefix)."""
+    return _embed_request([EMBED_QUERY_PREFIX + text], model=model)[0]
 
 
-ASK_SYSTEM_PROMPT = """You are the CERN Data Assistant. Answer questions about \
-CERN experiments, detectors, sensors, and open data using ONLY the numbered \
-CONTEXT passages provided.
+def embed_batch(texts: list[str], model: Optional[str] = None,
+                batch_size: int = 64) -> list[list[float]]:
+    """Embed DOCUMENT chunks for the index, in batches (nomic document prefix)."""
+    out: list[list[float]] = []
+    for i in range(0, len(texts), batch_size):
+        batch = [EMBED_DOC_PREFIX + t for t in texts[i:i + batch_size]]
+        out.extend(_embed_request(batch, model=model))
+    return out
+
+
+ASK_SYSTEM_PROMPT = """You are the CERN Open Data assistant. Answer the question \
+using ONLY the numbered passages provided.
 
 Rules:
-- Ground every claim in the context. Cite sources inline as [1], [2], matching
-  the passage numbers you used.
-- If the context does not contain the answer, say you don't have a CERN source
-  for that and suggest what to look for. Do NOT invent physics.
-- Be concise and precise. Prefer 2-5 sentences.
-
-Respond with ONLY a JSON object of this exact shape:
-{"answer": "<text with inline [n] citations>", "used": [<passage numbers you cited>], "grounded": <true|false>}
+- Every sentence that states a fact must end with a citation like [1] or [2][3], \
+using only passage numbers that exist.
+- Do not use outside knowledge. Do not invent numbers, dates or mechanisms that \
+are not in the passages.
+- If the passages do not contain enough information to answer, reply with \
+exactly: NOT_IN_SOURCES
+- Be concise: 3-6 sentences of plain text. No headings, no bullet lists, no JSON.
 """
+
+NOT_IN_SOURCES = "NOT_IN_SOURCES"
 
 
 def answer_with_context(
     question: str, passages: list[dict], model: Optional[str] = None
-) -> dict:
-    """Given retrieved passages (each {n, title, text, source}), produce a
-    grounded answer with inline citations. `grounded` is False when the model
-    could not support the answer from the context."""
+) -> str:
+    """Given retrieved passages (each {n, title, text, ...}), return the model's
+    plain-text answer with inline [n] citations, or NOT_IN_SOURCES.
+    Citation verification is done server-side in guardrail.py, never trusted
+    from the model."""
     context_lines = []
     for p in passages:
-        context_lines.append(
-            f"[{p['n']}] {p.get('title','')}\n{p.get('text','')}\nSOURCE: {p.get('source','')}"
-        )
-    user_payload = (
-        f"QUESTION:\n{question}\n\nCONTEXT:\n" + "\n\n".join(context_lines)
-    )
-    data = _chat_json(ASK_SYSTEM_PROMPT, user_payload, model=model)
-    answer = (data.get("answer") or "").strip()
-    used = data.get("used") if isinstance(data.get("used"), list) else []
-    grounded = bool(data.get("grounded", bool(answer and used)))
-    return {"answer": answer, "used": used, "grounded": grounded}
+        label = " / ".join(x for x in (p.get("experiment"), p.get("title"), p.get("section")) if x)
+        context_lines.append(f"[{p['n']}] ({label})\n{p.get('text', '')}")
+    user_payload = "Passages:\n" + "\n\n".join(context_lines) + f"\n\nQuestion: {question}"
+    return chat_text(ASK_SYSTEM_PROMPT, user_payload, model=model)

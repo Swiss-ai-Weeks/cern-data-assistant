@@ -49,4 +49,22 @@ export interface HealthResponse {
   ollama: "ok" | "unreachable";
   ollama_model: string;
   ollama_models_installed: string[];
+  knowledge_base?: "ready" | "empty";
+  knowledge_chunks?: number;
+}
+
+export interface AskSource {
+  n: number;
+  title: string;
+  source: string;
+  score: number;
+  used: boolean;
+}
+
+export interface AskResponse {
+  question: string;
+  answer: string;
+  grounded: boolean;
+  model_used?: string;
+  sources: AskSource[];
 }

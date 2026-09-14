@@ -8,7 +8,7 @@ Goal: turn Beamline (natural-language dataset search) into the full **CERN Data 
 - Flask API (`5001`) + React UI (`5173`) on the laptop; Ollama on the H100 via SSH tunnel (`11434`).
 - Only does shallow dataset discovery.
 
-## Phase 1 — Rich dataset cards (NEXT)
+## Phase 1 — Rich dataset cards (DONE)
 Deliver, per result:
 - description, **size**, **format + example file**, **date of formation**
 - **sources & citations** (CERN record URL + files)
@@ -17,11 +17,13 @@ Deliver, per result:
 - Fix: separate real **datasets** from glossary/docs so "atom" no longer returns a 0-file glossary record.
 - Uses the existing `GET /api/record/<id>` (already returns files/URIs).
 
-## Phase 2 — RAG over CERN docs (core differentiator)
+## Phase 2 — RAG over CERN docs (DONE)
 Answers questions like *"Why does CMS use a solenoid?"*.
-- Ingest CERN Open Data + detector/experiment docs → chunk → embed on H100 → vector store (Chroma/FAISS).
-- `POST /api/ask` → retrieve → answer **with inline CERN citations**.
-- Query router: "find datasets" → search path; "explain/why/how" → RAG path.
+- ✅ Corpus: curated `seed.json` + Documentation records fetched from CERN Open Data.
+- ✅ Embeddings via `nomic-embed-text` on the H100; NumPy cosine vector store (`rag.py`, `build_index.py`).
+- ✅ `POST /api/ask` → retrieve → **grounded answer with inline [n] citations + sources**.
+- ✅ UI: "Ask about CERN" mode with grounded/not-grounded badge and source list.
+- Next within RAG: a query router so one box auto-picks search vs ask.
 
 ## Phase 3 — Guardrails (grounding is judged)
 - NeMo Guardrails / validation layer: no physics claim without a retrieved CERN source.

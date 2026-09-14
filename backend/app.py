@@ -24,6 +24,7 @@ from flask_cors import CORS
 
 import cern_client
 import ollama_client
+import rag
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 log = logging.getLogger("app")
@@ -51,12 +52,15 @@ def health():
     except cern_client.CernApiError:
         cern_ok = False
 
+    kb = rag.get_kb()
     return jsonify(
         {
             "cern_api": "ok" if cern_ok else "unreachable",
             "ollama": "ok" if ollama_ok else "unreachable",
             "ollama_model": ollama_client.OLLAMA_MODEL,
             "ollama_models_installed": models,
+            "knowledge_base": "ready" if kb.ready else "empty",
+            "knowledge_chunks": kb.size,
         }
     )
 
@@ -133,6 +137,72 @@ def search():
             "results": summaries,
         }
     )
+
+
+@app.post("/api/ask")
+def ask():
+    """RAG endpoint: answer a knowledge question about CERN experiments,
+    detectors and open data, grounded in the local knowledge base with
+    inline citations."""
+    body = request.get_json(silent=True) or {}
+    question = (body.get("query") or body.get("question") or "").strip()
+    k = body.get("k")
+    k = k if isinstance(k, int) and 1 <= k <= 10 else 4
+
+    if not question:
+        return jsonify({"error": "Field 'query' is required."}), 400
+
+    kb = rag.get_kb()
+    if not kb.ready:
+        return jsonify({
+            "error": "Knowledge base is empty. Build it first: "
+                     "`python build_index.py` (with the H100 tunnel up).",
+        }), 503
+
+    # 1. embed the question and retrieve supporting passages
+    try:
+        qvec = ollama_client.embed(question)
+    except ollama_client.OllamaUnavailable as exc:
+        return jsonify({"error": f"Embedding model unavailable: {exc}"}), 502
+
+    hits = kb.search(qvec, k=k)
+    if not hits:
+        return jsonify({
+            "question": question,
+            "answer": "I don't have a CERN source that covers that yet.",
+            "grounded": False,
+            "sources": [],
+        })
+
+    # 2. build numbered passages and ask the model to answer from them only
+    passages = [
+        {"n": i + 1, "title": h["title"], "text": h["text"], "source": h["source"]}
+        for i, h in enumerate(hits)
+    ]
+    try:
+        result = ollama_client.answer_with_context(question, passages)
+    except ollama_client.OllamaUnavailable as exc:
+        return jsonify({"error": f"Ollama unavailable: {exc}"}), 502
+
+    used = set(result.get("used") or [])
+    sources = [
+        {
+            "n": p["n"],
+            "title": p["title"],
+            "source": p["source"],
+            "score": round(hits[p["n"] - 1].get("score", 0.0), 3),
+            "used": p["n"] in used,
+        }
+        for p in passages
+    ]
+
+    return jsonify({
+        "question": question,
+        "answer": result.get("answer", ""),
+        "grounded": result.get("grounded", False),
+        "model_used": ollama_client.OLLAMA_MODEL,
+        "sources": sources,
+    })
 
 
 @app.get("/api/record/<recid>")

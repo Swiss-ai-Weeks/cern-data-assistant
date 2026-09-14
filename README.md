@@ -104,6 +104,24 @@ curl http://127.0.0.1:5001/api/health
 
 You want `"cern_api": "ok"` and `"ollama": "ok"`. Port **5001** (not 5000) so macOS AirPlay does not steal it.
 
+### 4b. Build the RAG knowledge base (for "Ask about CERN")
+
+The **Ask** mode answers detector/experiment questions grounded in CERN sources.
+Pull the embedding model on the H100 once, then build the index locally
+(with the tunnel up):
+
+```bash
+# on the H100:
+ollama pull nomic-embed-text
+
+# on the laptop, in backend/ with the venv active + tunnel running:
+python build_index.py --with-cern
+```
+
+This writes `knowledge/index.npy` + `knowledge/chunks.json` (gitignored).
+Health should then show `"knowledge_base": "ready"`. Curated facts live in
+`knowledge/seed.json` — add more there and rebuild.
+
 ---
 
 ## 5. Frontend (laptop)
@@ -143,12 +161,18 @@ Flow:
 ```
 cern-data-assistant/
 ├── backend/
-│   ├── app.py              # GET /api/health  POST /api/search  GET /api/record/<id>
-│   ├── cern_client.py      # CERN Open Data REST
-│   ├── ollama_client.py    # query extract + ranking
+│   ├── app.py              # /api/health  /api/search  /api/ask  /api/record/<id>
+│   ├── cern_client.py      # CERN Open Data REST + rich card fields
+│   ├── ollama_client.py    # query extract, ranking, embeddings, grounded answer
+│   ├── rag.py              # tiny local vector store (NumPy cosine)
+│   ├── build_index.py      # build the RAG index from seed + CERN docs
+│   ├── knowledge/
+│   │   ├── seed.json       # curated authoritative CERN facts (+ sources)
+│   │   ├── index.npy       # built embeddings (gitignored)
+│   │   └── chunks.json     # built chunk texts (gitignored)
 │   └── requirements.txt
 ├── frontend/
-│   └── src/                # React + Vite UI (Beamline)
+│   └── src/                # React + Vite UI (Beamline): Find datasets + Ask
 └── dataset/                # optional local CERN JSON dumps (gitignored)
 ```
 
@@ -158,14 +182,23 @@ H100 scratch (not in git): `~/nvidia_hack/dataset/` (`fetch_cern.py`, `proton_fu
 
 ## API
 
-**POST `/api/search`**
+**POST `/api/search`** — dataset discovery
 
 ```json
 { "query": "proton-proton collisions at 13 TeV with muons", "size": 8 }
 ```
 
+**POST `/api/ask`** — grounded Q&A (RAG) with citations
+
+```json
+{ "query": "Why does CMS use a solenoid?" }
+```
+
+Returns `{ answer, grounded, sources[] }`; `grounded` is `false` when no CERN
+source supports the question.
+
 **GET `/api/record/<recid>`** — full metadata + files  
-**GET `/api/health`** — CERN + Ollama status
+**GET `/api/health`** — CERN + Ollama + knowledge-base status
 
 ---
 

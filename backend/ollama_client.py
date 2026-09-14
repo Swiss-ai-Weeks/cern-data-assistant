@@ -24,7 +24,9 @@ log = logging.getLogger("ollama_client")
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gpt-oss:120b-cloud")
+EMBED_MODEL = os.environ.get("OLLAMA_EMBED_MODEL", "nomic-embed-text")
 REQUEST_TIMEOUT = 60
+EMBED_TIMEOUT = 120  # first call cold-loads the model on the GPU
 
 
 class OllamaUnavailable(RuntimeError):
@@ -159,3 +161,66 @@ def annotate_results(
             "why": item.get("why", ""),
         }
     return out
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — embeddings + grounded (RAG) answering
+# ---------------------------------------------------------------------------
+
+def embed(text: str, model: Optional[str] = None) -> list[float]:
+    """Return an embedding vector for one piece of text."""
+    payload = {"model": model or EMBED_MODEL, "prompt": text}
+    try:
+        resp = requests.post(
+            f"{OLLAMA_HOST}/api/embeddings", json=payload, timeout=EMBED_TIMEOUT
+        )
+        resp.raise_for_status()
+    except requests.RequestException as exc:
+        raise OllamaUnavailable(str(exc)) from exc
+    vec = resp.json().get("embedding")
+    if not isinstance(vec, list) or not vec:
+        raise OllamaUnavailable("empty embedding returned")
+    return vec
+
+
+def embed_batch(texts: list[str], model: Optional[str] = None) -> list[list[float]]:
+    """Embed a list of texts (sequentially; the GPU makes this fast enough
+    for a hackathon-sized corpus)."""
+    return [embed(t, model=model) for t in texts]
+
+
+ASK_SYSTEM_PROMPT = """You are the CERN Data Assistant. Answer questions about \
+CERN experiments, detectors, sensors, and open data using ONLY the numbered \
+CONTEXT passages provided.
+
+Rules:
+- Ground every claim in the context. Cite sources inline as [1], [2], matching
+  the passage numbers you used.
+- If the context does not contain the answer, say you don't have a CERN source
+  for that and suggest what to look for. Do NOT invent physics.
+- Be concise and precise. Prefer 2-5 sentences.
+
+Respond with ONLY a JSON object of this exact shape:
+{"answer": "<text with inline [n] citations>", "used": [<passage numbers you cited>], "grounded": <true|false>}
+"""
+
+
+def answer_with_context(
+    question: str, passages: list[dict], model: Optional[str] = None
+) -> dict:
+    """Given retrieved passages (each {n, title, text, source}), produce a
+    grounded answer with inline citations. `grounded` is False when the model
+    could not support the answer from the context."""
+    context_lines = []
+    for p in passages:
+        context_lines.append(
+            f"[{p['n']}] {p.get('title','')}\n{p.get('text','')}\nSOURCE: {p.get('source','')}"
+        )
+    user_payload = (
+        f"QUESTION:\n{question}\n\nCONTEXT:\n" + "\n\n".join(context_lines)
+    )
+    data = _chat_json(ASK_SYSTEM_PROMPT, user_payload, model=model)
+    answer = (data.get("answer") or "").strip()
+    used = data.get("used") if isinstance(data.get("used"), list) else []
+    grounded = bool(data.get("grounded", bool(answer and used)))
+    return {"answer": answer, "used": used, "grounded": grounded}

@@ -1,0 +1,77 @@
+[
+  {
+    "title": "CMS solenoid magnet",
+    "text": "The central feature of the CMS (Compact Muon Solenoid) detector is a large superconducting solenoid magnet that generates a 3.8 tesla magnetic field. A strong, uniform solenoidal field bends the paths of charged particles produced in collisions; measuring how much a track curves reveals the particle's momentum and the sign of its charge. CMS chose a solenoid because it gives a compact detector a very strong, uniform field along the beam axis, enabling precise momentum measurement of muons and other charged particles. The magnet's return field is large enough to saturate the iron yoke that also houses the muon detectors.",
+    "source": "https://home.cern/science/experiments/cms"
+  },
+  {
+    "title": "ATLAS magnet system",
+    "text": "ATLAS (A Toroidal LHC ApparatuS) uses a hybrid magnet system: a central solenoid around the inner tracking detector plus very large air-core toroidal magnets for the muon spectrometer. The toroids give ATLAS its characteristic large size and allow standalone muon momentum measurement over a huge volume, while the inner solenoid bends tracks close to the collision point. This differs from CMS, which relies on a single strong solenoid.",
+    "source": "https://home.cern/science/experiments/atlas"
+  },
+  {
+    "title": "Why particle detectors use magnetic fields",
+    "text": "Charged particles moving through a magnetic field follow curved trajectories. The radius of curvature is proportional to the particle's momentum, so measuring the curvature of reconstructed tracks lets experiments determine momentum and charge. This is why collider detectors like CMS and ATLAS are built around powerful magnets, and why tracking detectors sit inside the magnetic field.",
+    "source": "https://home.cern/science/experiments/how-detector-works"
+  },
+  {
+    "title": "The Large Hadron Collider (LHC)",
+    "text": "The Large Hadron Collider is the world's largest and most powerful particle accelerator, a 27-kilometre ring of superconducting magnets at CERN. It mainly collides protons, and its design collision energy for proton-proton collisions is 13-14 TeV in the centre of mass. During Run 2 (2015-2018) the LHC operated at 13 TeV. It also collides heavy ions such as lead nuclei.",
+    "source": "https://home.cern/science/accelerators/large-hadron-collider"
+  },
+  {
+    "title": "Proton-proton collisions and centre-of-mass energy",
+    "text": "At the LHC, two counter-rotating beams of protons are brought into collision. The centre-of-mass energy (for example 7, 8, or 13 TeV) sets the maximum energy available to create new particles. Higher energy allows the production of heavier particles and rarer processes. Run 1 collected data mostly at 7 and 8 TeV; Run 2 at 13 TeV.",
+    "source": "https://home.cern/science/accelerators/large-hadron-collider"
+  },
+  {
+    "title": "Discovery of the Higgs boson",
+    "text": "In July 2012 the ATLAS and CMS experiments at the LHC announced the discovery of a new particle consistent with the Higgs boson, using proton-proton collision data at 7 and 8 TeV. The Higgs boson is associated with the mechanism that gives elementary particles their mass. Its discovery led to the 2013 Nobel Prize in Physics for Englert and Higgs.",
+    "source": "https://home.cern/science/physics/higgs-boson"
+  },
+  {
+    "title": "How a layered detector works",
+    "text": "Collider detectors are built in concentric layers, each with a job. Innermost is the tracking detector, which records the paths of charged particles inside the magnetic field. Next are calorimeters: the electromagnetic calorimeter measures electrons and photons, and the hadronic calorimeter measures hadrons like protons and pions by absorbing them. Muon detectors form the outermost layer because muons pass through the inner layers with little interaction. Neutrinos escape undetected and are inferred as missing transverse energy.",
+    "source": "https://home.cern/science/experiments/how-detector-works"
+  },
+  {
+    "title": "Muon detection",
+    "text": "Muons are heavy, penetrating charged particles that traverse the inner detector layers and calorimeters with little energy loss, so they are identified in dedicated muon chambers at the outside of experiments like CMS and ATLAS. Because the magnetic field bends their tracks, the muon systems also measure their momentum. Many physics analyses (for example Higgs, Z boson, and top-quark studies) select events containing one or more muons.",
+    "source": "https://home.cern/science/experiments/cms"
+  },
+  {
+    "title": "Calorimeters",
+    "text": "A calorimeter measures the energy a particle loses as it is absorbed. Electromagnetic calorimeters (ECAL) measure electrons and photons; hadronic calorimeters (HCAL) measure hadrons. Calorimeters are essential for measuring particle energies and for reconstructing jets and missing transverse energy in collision events.",
+    "source": "https://home.cern/science/experiments/how-detector-works"
+  },
+  {
+    "title": "Trigger and data acquisition",
+    "text": "The LHC produces collisions far faster than any system could record in full, so experiments use a trigger: a fast, multi-level selection system that keeps only the small fraction of events likely to be physically interesting. CMS and ATLAS use a hardware Level-1 trigger followed by a software High-Level Trigger. This is why open datasets represent triggered, selected events rather than every collision.",
+    "source": "https://home.cern/science/experiments/how-detector-works"
+  },
+  {
+    "title": "CERN Open Data Portal",
+    "text": "The CERN Open Data Portal (opendata.cern.ch) provides open access to real and simulated datasets from LHC experiments, along with software, documentation, and analysis examples. Datasets are identified by a record ID (recid) and can carry a DOI for citation. The portal is intended for research, education, and reuse of LHC data.",
+    "source": "https://opendata.cern.ch/docs/about"
+  },
+  {
+    "title": "CMS open data formats: AOD, MiniAOD, NanoAOD",
+    "text": "CMS releases reconstructed collision data in tiered formats. AOD (Analysis Object Data) is the most complete and largest. MiniAOD is a slimmed format with the objects most analyses need. NanoAOD is a compact flat ROOT ntuple readable with common tools like uproot, suitable for many analyses without the full CMS software stack. Choosing the right format trades completeness against size and ease of use.",
+    "source": "https://opendata.cern.ch/docs/cms-guide-for-research"
+  },
+  {
+    "title": "ATLAS open data format: DAOD_PHYSLITE",
+    "text": "ATLAS provides open data in the DAOD_PHYSLITE format, a lightweight derived analysis format containing calibrated physics objects ready for analysis. It is stored as ROOT files and is designed to be small and quick to analyse, making it a good starting point for ATLAS open-data studies.",
+    "source": "https://opendata.cern.ch/docs/atlas-physlite-getting-started"
+  },
+  {
+    "title": "ROOT and analysis tools",
+    "text": "ROOT is the standard data-analysis framework in high-energy physics, and most CERN open datasets are distributed as ROOT files. Data can be analysed with ROOT itself or with Python tools such as uproot and awkward-array, which read ROOT files without the full experiment software. These tools are commonly used for histogramming, event selection, and building machine-learning inputs.",
+    "source": "https://opendata.cern.ch/docs/cms-guide-for-research"
+  },
+  {
+    "title": "Downloading open data with cernopendata-client",
+    "text": "Files attached to a CERN Open Data record can be downloaded with the cernopendata-client command-line tool, for example 'cernopendata-client download-files --recid <RECID>'. You can also list file locations for a record. This is the recommended way to fetch dataset files programmatically for analysis.",
+    "source": "https://opendata.cern.ch/docs/cernopendata-client"
+  }
+]

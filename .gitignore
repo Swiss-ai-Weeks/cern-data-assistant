@@ -7,3 +7,7 @@ dataset/*.json
 .DS_Store
 .vscode/
 *.egg-info/
+
+# Built RAG index (regenerate with backend/build_index.py); keep seed.json
+backend/knowledge/index.npy
+backend/knowledge/chunks.json

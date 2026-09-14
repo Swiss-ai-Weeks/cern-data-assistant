@@ -1,4 +1,9 @@
-import type { HealthResponse, RecordDetail, SearchResponse } from "./types";
+import type {
+  AskResponse,
+  HealthResponse,
+  RecordDetail,
+  SearchResponse,
+} from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5001";
 
@@ -36,4 +41,13 @@ export async function searchDatasets(
 export async function getRecord(recid: number | string): Promise<RecordDetail> {
   const res = await fetch(`${API_BASE}/api/record/${recid}`);
   return asJson<RecordDetail>(res);
+}
+
+export async function askAssistant(query: string): Promise<AskResponse> {
+  const res = await fetch(`${API_BASE}/api/ask`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query }),
+  });
+  return asJson<AskResponse>(res);
 }

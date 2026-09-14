@@ -4,9 +4,13 @@ import type { HealthResponse, SearchResponse } from "./types";
 import StatusBar from "./components/StatusBar";
 import SearchConsole from "./components/SearchConsole";
 import ResultsFeed from "./components/ResultsFeed";
+import AskPanel from "./components/AskPanel";
+
+type Mode = "search" | "ask";
 
 export default function App() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
+  const [mode, setMode] = useState<Mode>("search");
   const [result, setResult] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,26 +47,49 @@ export default function App() {
         <StatusBar health={health} />
       </header>
 
-      <SearchConsole onSubmit={handleSearch} loading={loading} lastResult={result} />
+      <div className="mode-tabs">
+        <button
+          type="button"
+          className={`mode-tab ${mode === "search" ? "active" : ""}`}
+          onClick={() => setMode("search")}
+        >
+          Find datasets
+        </button>
+        <button
+          type="button"
+          className={`mode-tab ${mode === "ask" ? "active" : ""}`}
+          onClick={() => setMode("ask")}
+        >
+          Ask about CERN
+        </button>
+      </div>
 
-      {error && <div className="error-banner">{error}</div>}
+      {mode === "search" ? (
+        <>
+          <SearchConsole onSubmit={handleSearch} loading={loading} lastResult={result} />
 
-      {loading && (
-        <div className="loading-state">
-          <div className="loading-bar" />
-          querying opendata.cern.ch{health?.ollama === "ok" ? " and ranking with " + health.ollama_model : ""}
-        </div>
+          {error && <div className="error-banner">{error}</div>}
+
+          {loading && (
+            <div className="loading-state">
+              <div className="loading-bar" />
+              querying opendata.cern.ch{health?.ollama === "ok" ? " and ranking with " + health.ollama_model : ""}
+            </div>
+          )}
+
+          {!loading && !error && !result && (
+            <div className="empty-state">
+              Nothing searched yet. Try one of the examples above, or describe a
+              dataset — an experiment, a particle, a collision energy, a data
+              format — and Beamline will do the rest.
+            </div>
+          )}
+
+          {!loading && result && <ResultsFeed result={result} />}
+        </>
+      ) : (
+        <AskPanel />
       )}
-
-      {!loading && !error && !result && (
-        <div className="empty-state">
-          Nothing searched yet. Try one of the examples above, or describe a
-          dataset — an experiment, a particle, a collision energy, a data
-          format — and Beamline will do the rest.
-        </div>
-      )}
-
-      {!loading && result && <ResultsFeed result={result} />}
     </div>
   );
 }

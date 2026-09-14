@@ -25,6 +25,14 @@ export default function StatusBar({ health }: Props) {
         <span className={`status-dot ${health ? (ollamaOk ? "ok" : "down") : ""}`} />
         {ollamaOk ? health?.ollama_model : "ollama offline"}
       </div>
+      {health?.knowledge_base && (
+        <div className="status-line" title="RAG knowledge base">
+          <span className={`status-dot ${health.knowledge_base === "ready" ? "ok" : "down"}`} />
+          {health.knowledge_base === "ready"
+            ? `${health.knowledge_chunks ?? 0} sources`
+            : "index empty"}
+        </div>
+      )}
     </div>
   );
 }

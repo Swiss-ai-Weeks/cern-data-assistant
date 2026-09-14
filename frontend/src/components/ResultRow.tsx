@@ -4,11 +4,31 @@ import type { RecordSummary } from "../types";
 interface Props {
   record: RecordSummary;
   showRelevance: boolean;
+  onOpen?: () => void;
 }
 
-export default function ResultRow({ record, showRelevance }: Props) {
+export default function ResultRow({ record, showRelevance, onOpen }: Props) {
   return (
-    <div className="record-row">
+    <div
+      className={`record-row ${onOpen ? "clickable" : ""}`}
+      onClick={(e) => {
+        if (!onOpen) return;
+        if ((e.target as HTMLElement).closest("a, button, details, input")) return;
+        onOpen();
+      }}
+      onKeyDown={
+        onOpen
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onOpen();
+              }
+            }
+          : undefined
+      }
+      role={onOpen ? "button" : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+    >
       <div className="record-recid">
         <span className="label">recid</span>
         {record.recid}

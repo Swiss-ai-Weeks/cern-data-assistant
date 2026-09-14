@@ -16,7 +16,13 @@ Phases 0–5 are **done**. This file is only the remaining work, ordered for a h
 | **Agent** | `POST /api/agent` plans search and/or ask in one turn (the solenoid + datasets example) |
 | **Polish** | Facets, CERN HTTP cache, unit tests, `qwen2.5:32b` with `llama3.2` fallback |
 
-Laptop demo works today: UI `5173` + Flask `5001` + SSH tunnel `11434` → Ollama on LaunchPad.
+## Product surface (DONE)
+
+Chat-first app, not a three-tab prototype:
+- Live **tool timeline** over `POST /api/agent/stream` (plan → search → grounded answer → fetch record).
+- **Follow-up conversation** (planner sees prior turns; suggested next questions).
+- **Dataset inspector** — click a card to open the full CERN record + file list.
+- Health poll, knowledge-base size in the header.
 
 **Not using** the NVIDIA **AIQ** or **NeMo Guardrails** packages — same *ideas*, our own code. Fine unless judges ask for the branded stack.
 

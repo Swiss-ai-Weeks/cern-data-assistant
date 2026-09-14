@@ -4,6 +4,7 @@ import ResultRow from "./ResultRow";
 
 interface Props {
   result: SearchResponse;
+  onOpenRecord?: (recid: number | string) => void;
 }
 
 type FacetKey = "experiment" | "energy" | "format" | "kind";
@@ -33,7 +34,7 @@ function applyFacets(
   });
 }
 
-export default function ResultsFeed({ result }: Props) {
+export default function ResultsFeed({ result, onOpenRecord }: Props) {
   const [selected, setSelected] = useState<Record<FacetKey, string | null>>({
     experiment: null,
     energy: null,
@@ -134,7 +135,12 @@ export default function ResultsFeed({ result }: Props) {
       ) : (
         <div className="feed">
           {visible.map((r) => (
-            <ResultRow key={r.recid} record={r} showRelevance={result.llm_ranked} />
+            <ResultRow
+              key={r.recid}
+              record={r}
+              showRelevance={result.llm_ranked}
+              onOpen={onOpenRecord ? () => onOpenRecord(r.recid) : undefined}
+            />
           ))}
         </div>
       )}

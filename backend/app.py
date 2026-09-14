@@ -6,7 +6,8 @@ Endpoints:
   POST /api/search            -> { query, size?, use_llm_rank? } -> ranked results
   POST /api/ask               -> { query } -> grounded answer + citations (RAG)
   POST /api/assistant         -> { query } -> auto-routes to search or ask
-  POST /api/agent             -> { query } -> plan + run search and/or ask
+  POST /api/agent             -> { query, history? } -> plan + tools
+  POST /api/agent/stream      -> SSE of the same run (live tool steps)
   GET  /api/record/<recid>    -> full metadata + file list for one record
 
 Run with:
@@ -17,13 +18,14 @@ Run with:
 from __future__ import annotations
 
 import os
+import json
 import time
 import logging
 
 from dotenv import load_dotenv
 load_dotenv()
 
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, Response, stream_with_context
 from flask_cors import CORS
 
 import cern_client
@@ -412,19 +414,39 @@ def _fetch_top_record(search_payload: dict) -> dict | None:
     }
 
 
-@app.post("/api/agent")
-def agent():
-    """Agentic entry point: plan over search + grounded Q&A, retry empty
-    searches, then fetch the top record's files."""
-    body = request.get_json(silent=True) or {}
-    user_query = (body.get("query") or "").strip()
-    if not user_query:
-        return jsonify({"error": "Field 'query' is required."}), 400
+def _followups(plan: dict, search, answer) -> list[str]:
+    """Deterministic next questions a researcher would actually type."""
+    out: list[str] = []
+    if search and (search.get("results") or []):
+        top = search["results"][0]
+        exp = (top.get("experiment") or "").split(",")[0].strip()
+        if exp and exp != "—":
+            out.append(f"Why does {exp} use its magnet system?")
+        out.append("How do I download the top dataset?")
+        if top.get("formats"):
+            fmt = top["formats"][0]
+            out.append(f"What is a {fmt} file and how do I open it?")
+    if answer and answer.get("grounded"):
+        out.append("Find open datasets related to this")
+        out.append("Compare CMS and ATLAS detectors")
+    if answer and not answer.get("grounded"):
+        out.append("Why does CMS use a solenoid?")
+        out.append("proton-proton collisions at 13 TeV with muons")
+    # de-dupe, cap
+    seen, uniq = set(), []
+    for q in out:
+        if q not in seen:
+            seen.add(q)
+            uniq.append(q)
+    return uniq[:4]
 
+
+def _agent_events(user_query: str, body: dict, history=None):
+    """Yield SSE-shaped dicts, last one type=result with the full payload."""
     blocked = guardrails.screen_query(user_query)
     if blocked:
         refusal, _ = _refusal(user_query, blocked["message"], f"input:{blocked['category']}")
-        return jsonify({
+        payload = {
             "query": user_query,
             "goal": user_query,
             "tools_used": [],
@@ -432,9 +454,19 @@ def agent():
             "search": None,
             "answer": refusal,
             "picked": None,
-        }), 200
+            "followups": _followups({}, None, refusal),
+        }
+        yield {"type": "result", "payload": payload}
+        return
 
-    plan = ollama_client.plan_tasks(user_query)
+    yield {"type": "status", "step": "planning", "label": "Planning which tools to run"}
+    plan = ollama_client.plan_tasks(user_query, history=history)
+    yield {
+        "type": "plan",
+        "goal": plan.get("goal"),
+        "search_query": plan.get("search_query"),
+        "ask_query": plan.get("ask_query"),
+    }
 
     tools_used: list[str] = []
     search_payload = None
@@ -442,6 +474,7 @@ def agent():
     retried_with = None
 
     if plan.get("search_query"):
+        yield {"type": "status", "step": "search", "label": f"Searching CERN Open Data for “{plan['search_query']}”"}
         sp, sstatus = _run_search(plan["search_query"], body.get("size"))
         if sstatus == 200:
             search_payload = sp
@@ -449,21 +482,29 @@ def agent():
             if not (sp.get("results") or []):
                 alt = cern_client.fallback_search_query(plan["search_query"])
                 if alt:
+                    yield {"type": "status", "step": "search", "label": f"No hits — retrying as “{alt}”"}
                     sp2, s2 = _run_search(alt, body.get("size"))
                     if s2 == 200 and (sp2.get("results") or []):
                         search_payload = sp2
                         retried_with = alt
-                        log.info("agent retry search %r -> %r (%s hits)",
-                                 plan["search_query"], alt, sp2.get("returned"))
+        n = (search_payload or {}).get("returned") or 0
+        yield {"type": "tool_done", "tool": "search", "hits": n}
 
     if plan.get("ask_query"):
+        yield {"type": "status", "step": "ask", "label": "Retrieving CERN sources and writing a grounded answer"}
         ap, astatus = _run_ask(plan["ask_query"], body.get("k"))
         if astatus == 200:
             answer_payload = ap
             tools_used.append("ask")
+        yield {
+            "type": "tool_done",
+            "tool": "ask",
+            "grounded": bool((answer_payload or {}).get("grounded")),
+        }
 
     picked = None
     if search_payload and (search_payload.get("results") or []):
+        yield {"type": "status", "step": "fetch_record", "label": "Opening the top dataset record"}
         picked = _fetch_top_record(search_payload)
         if picked:
             tools_used.append("fetch_record")
@@ -473,8 +514,9 @@ def agent():
                     r["license"] = picked.get("license")
                     r["picked"] = True
                     break
+        yield {"type": "tool_done", "tool": "fetch_record", "recid": (picked or {}).get("recid")}
 
-    return jsonify({
+    payload = {
         "query": user_query,
         "goal": plan.get("goal", user_query),
         "plan": {
@@ -486,7 +528,53 @@ def agent():
         "search": search_payload,
         "answer": answer_payload,
         "picked": picked,
-    }), 200
+        "followups": _followups(plan, search_payload, answer_payload),
+    }
+    yield {"type": "result", "payload": payload}
+
+
+@app.post("/api/agent")
+def agent():
+    """Agentic entry point: plan over search + grounded Q&A, retry empty
+    searches, then fetch the top record's files."""
+    body = request.get_json(silent=True) or {}
+    user_query = (body.get("query") or "").strip()
+    if not user_query:
+        return jsonify({"error": "Field 'query' is required."}), 400
+    history = body.get("history") if isinstance(body.get("history"), list) else None
+    payload = None
+    for ev in _agent_events(user_query, body, history):
+        if ev.get("type") == "result":
+            payload = ev["payload"]
+    return jsonify(payload), 200
+
+
+@app.post("/api/agent/stream")
+def agent_stream():
+    """Same as /api/agent but Server-Sent Events so the UI can show live steps."""
+    body = request.get_json(silent=True) or {}
+    user_query = (body.get("query") or "").strip()
+    if not user_query:
+        return jsonify({"error": "Field 'query' is required."}), 400
+    history = body.get("history") if isinstance(body.get("history"), list) else None
+
+    def gen():
+        try:
+            for ev in _agent_events(user_query, body, history):
+                yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
+        except Exception as exc:  # noqa: BLE001
+            log.exception("agent stream failed")
+            yield f"data: {json.dumps({'type': 'error', 'error': str(exc)})}\n\n"
+
+    return Response(
+        stream_with_context(gen()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @app.get("/api/record/<recid>")

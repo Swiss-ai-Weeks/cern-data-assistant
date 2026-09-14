@@ -1,105 +1,44 @@
 import { useEffect, useState } from "react";
-import { checkHealth, searchDatasets } from "./api";
-import type { HealthResponse, SearchResponse } from "./types";
+import { checkHealth } from "./api";
+import type { HealthResponse } from "./types";
 import StatusBar from "./components/StatusBar";
-import SearchConsole from "./components/SearchConsole";
-import ResultsFeed from "./components/ResultsFeed";
-import AskPanel from "./components/AskPanel";
-import AssistantPanel from "./components/AssistantPanel";
-
-type Mode = "assistant" | "search" | "ask";
+import Chat from "./components/Chat";
 
 export default function App() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [mode, setMode] = useState<Mode>("assistant");
-  const [result, setResult] = useState<SearchResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    checkHealth()
-      .then(setHealth)
-      .catch(() => setHealth(null));
+    let alive = true;
+    async function ping() {
+      try {
+        const h = await checkHealth();
+        if (alive) setHealth(h);
+      } catch {
+        if (alive) setHealth(null);
+      }
+    }
+    ping();
+    const id = window.setInterval(ping, 20000);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+    };
   }, []);
 
-  async function handleSearch(query: string) {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await searchDatasets(query);
-      setResult(res);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
-    <div className="app-shell">
+    <div className="app-shell product">
       <header className="app-header">
         <div>
+          <p className="brand-kicker">NVIDIA LaunchPad · CERN Open Data</p>
           <h1 className="app-title">Beamline</h1>
           <p className="app-subtitle">
-            Ask in plain language. A local model turns it into a search of the
-            CERN Open Data portal and ranks what comes back.
+            The research assistant for LHC open data — search datasets, inspect
+            files, and ask about detectors. Ungrounded physics is refused.
           </p>
         </div>
         <StatusBar health={health} />
       </header>
-
-      <div className="mode-tabs">
-        <button
-          type="button"
-          className={`mode-tab ${mode === "assistant" ? "active" : ""}`}
-          onClick={() => setMode("assistant")}
-        >
-          Assistant (agent)
-        </button>
-        <button
-          type="button"
-          className={`mode-tab ${mode === "search" ? "active" : ""}`}
-          onClick={() => setMode("search")}
-        >
-          Find datasets
-        </button>
-        <button
-          type="button"
-          className={`mode-tab ${mode === "ask" ? "active" : ""}`}
-          onClick={() => setMode("ask")}
-        >
-          Ask about CERN
-        </button>
-      </div>
-
-      {mode === "assistant" && <AssistantPanel />}
-
-      {mode === "search" && (
-        <>
-          <SearchConsole onSubmit={handleSearch} loading={loading} lastResult={result} />
-
-          {error && <div className="error-banner">{error}</div>}
-
-          {loading && (
-            <div className="loading-state">
-              <div className="loading-bar" />
-              querying opendata.cern.ch{health?.ollama === "ok" ? " and ranking with " + health.ollama_model : ""}
-            </div>
-          )}
-
-          {!loading && !error && !result && (
-            <div className="empty-state">
-              Nothing searched yet. Try one of the examples above, or describe a
-              dataset — an experiment, a particle, a collision energy, a data
-              format — and Beamline will do the rest.
-            </div>
-          )}
-
-          {!loading && result && <ResultsFeed result={result} />}
-        </>
-      )}
-
-      {mode === "ask" && <AskPanel />}
+      <Chat />
     </div>
   );
 }

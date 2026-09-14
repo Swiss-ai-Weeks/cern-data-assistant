@@ -130,4 +130,5 @@ export interface AgentResponse {
     license?: string | null;
     files?: RecordFile[];
   } | null;
+  followups?: string[];
 }

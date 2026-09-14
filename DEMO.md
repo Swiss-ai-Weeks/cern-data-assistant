@@ -1,8 +1,8 @@
 # Judge demo — two beats
 
-Pitch in ~3 minutes. Open **http://127.0.0.1:5001** (H100 via SSH tunnel). Hard-refresh.
+Pitch in ~3 minutes. Hard-refresh **http://127.0.0.1:5001**. You should see a live collision, not a chat form.
 
-**Do not say** RAG, guardrails, or agent. Say the two objects: a real CERN record, and a lecture the GPU wanted to give.
+**Say nothing about RAG.** Two buttons: **Fire 13 TeV muons** and **Show the GPU lying**.
 
 If the first query hangs: the 32B model is still loading. Wait, or run `scripts/warm_h100.sh` on the GPU box.
 
@@ -10,7 +10,7 @@ If the first query hangs: the 32B model is still loading. Wait, or run `scripts/
 
 ## 1. Boarding pass (~50s)
 
-Click **01** or type:
+Click **Fire 13 TeV muons**.
 
 > proton-proton collisions at 13 TeV with muons
 
@@ -24,7 +24,7 @@ Click **01** or type:
 
 ## 2. The rail (~40s)
 
-Click **02** or type:
+Click **Show the GPU lying**.
 
 > How do black holes evaporate?
 

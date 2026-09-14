@@ -1215,13 +1215,114 @@ a {
   background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
 
-.cockpit-body {
+.cockpit-body.stage-first {
+  grid-template-columns: 0fr 1fr;
+  gap: 0;
+  padding: 0 16px 16px 8px;
+}
+.cockpit-body.stage-first .thread {
+  width: 0;
+  min-width: 0;
+  opacity: 0;
+  pointer-events: none;
+  border: none;
+  overflow: hidden;
+}
+
+.event-stage {
+  justify-content: flex-end;
+  padding: 0 8px 28px;
+}
+.collision {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.event-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 22ch;
+}
+.event-copy .stage-title {
+  max-width: 14ch;
+  font-size: clamp(40px, 5.5vw, 68px);
+}
+.punch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+.punch-btn,
+.punch-ghost {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 14px 22px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.punch-btn {
+  border: none;
+  background: var(--ink);
+  color: var(--paper);
+}
+.punch-ghost {
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+}
+.live-collision {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+.pass.ticket {
+  display: flex;
+  padding: 0;
+  overflow: hidden;
+  min-height: 280px;
+}
+.ticket-stub {
+  width: 108px;
+  flex-shrink: 0;
+  background: var(--ink);
+  color: var(--paper);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  border-right: 1px dashed color-mix(in srgb, var(--paper) 35%, transparent);
+}
+.ticket-stub strong {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 22px;
+  letter-spacing: 0.08em;
+}
+.ticket-barcode {
+  width: 18px;
+  height: 88px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--paper) 0 2px,
+    transparent 2px 5px
+  );
+  opacity: 0.85;
+}
+.ticket-body {
   flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(280px, 360px) 1fr;
-  gap: 16px;
-  padding: 8px 20px 20px;
+  min-width: 0;
+  padding: 22px 24px 20px;
 }
 
 .thread {
@@ -1329,6 +1430,9 @@ a {
   justify-content: center;
   min-height: 100%;
   overflow: hidden;
+}
+.live-stage {
+  min-height: 100%;
 }
 .hero-word {
   position: absolute;
@@ -1738,8 +1842,13 @@ a {
 @media (max-width: 960px) {
   .cockpit-body {
     grid-template-columns: 1fr;
-    grid-template-rows: 38vh 1fr;
+    grid-template-rows: 42vh 1fr;
     padding: 8px 12px 12px;
+  }
+  .cockpit-body.stage-first {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+    padding: 0 10px 12px;
   }
   .topbar {
     padding: 12px 16px 8px;

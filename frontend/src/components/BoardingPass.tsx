@@ -39,30 +39,36 @@ export default function BoardingPass({ record, onOpen }: Props) {
   }
 
   return (
-    <article className="pass">
-      <header className="pass-head">
-        <p className="microlabel">Boarding pass — CERN Open Data</p>
-        <span className="pass-recid">recid {record.recid}</span>
-      </header>
-      <h3 className="pass-title">{record.title}</h3>
-      <div className="pass-stats">
-        <div className="pass-stat ink">
-          <span className="microlabel">Experiment</span>
-          <strong>{record.experiment || "CERN"}</strong>
-        </div>
-        <div className="pass-stat">
-          <span className="microlabel">Energy</span>
-          <strong>{record.collision_energy || "—"}</strong>
-        </div>
-        <div className="pass-stat sky">
-          <span className="microlabel">Size</span>
-          <strong>{record.size || "—"}</strong>
-        </div>
-        <div className="pass-stat">
-          <span className="microlabel">Files</span>
-          <strong>{record.file_count ?? "—"}</strong>
-        </div>
+    <article className="pass ticket">
+      <div className="ticket-stub" aria-hidden>
+        <span>CERN</span>
+        <span className="ticket-barcode" />
+        <strong>{record.recid}</strong>
       </div>
+      <div className="ticket-body">
+        <header className="pass-head">
+          <p className="microlabel">Boarding pass — not a chat reply</p>
+          <span className="pass-recid">opendata.cern.ch</span>
+        </header>
+        <h3 className="pass-title">{record.title}</h3>
+        <div className="pass-stats">
+          <div className="pass-stat ink">
+            <span className="microlabel">Experiment</span>
+            <strong>{record.experiment || "CERN"}</strong>
+          </div>
+          <div className="pass-stat">
+            <span className="microlabel">Energy</span>
+            <strong>{record.collision_energy || "—"}</strong>
+          </div>
+          <div className="pass-stat sky">
+            <span className="microlabel">Size</span>
+            <strong>{record.size || "—"}</strong>
+          </div>
+          <div className="pass-stat">
+            <span className="microlabel">Files</span>
+            <strong>{record.file_count ?? "—"}</strong>
+          </div>
+        </div>
       {record.doi && (
         <p className="pass-doi">
           DOI{" "}
@@ -109,6 +115,7 @@ export default function BoardingPass({ record, onOpen }: Props) {
         </ul>
       )}
       {record.citation && <p className="pass-cite">{record.citation}</p>}
+      </div>
     </article>
   );
 }

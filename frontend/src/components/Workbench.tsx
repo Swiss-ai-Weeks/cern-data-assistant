@@ -1,6 +1,7 @@
 import type { AgentResponse, RecordSummary } from "../types";
 import AnswerCard from "./AnswerCard";
 import BoardingPass from "./BoardingPass";
+import CollisionView from "./CollisionView";
 import DatasetTile from "./DatasetTile";
 
 const STARTERS = [
@@ -85,26 +86,23 @@ export default function Workbench({ idle, live, onStarter, onOpenRecord }: Props
 
   if (idle) {
     return (
-      <div className="stage idle-stage">
-        <div className="hero-word" aria-hidden>
-          beamline
-        </div>
-        <p className="microlabel">CERN Open Data — Swiss AI Weeks 2026</p>
-        <h2 className="stage-title">
-          Ask CERN, <em>in English.</em>
-        </h2>
-        <p className="stage-lead">
-          Plain English in — datasets and detectors out. If it cannot cite CERN,
-          it will not guess.
-        </p>
-        <div className="launch-grid">
-          {STARTERS.map((s) => (
-            <button key={s.k} type="button" className="launch-tile" onClick={() => onStarter(s.query)}>
-              <span className="launch-k">{s.k}</span>
-              <strong>{s.title}</strong>
-              <span className="launch-q">{s.query}</span>
+      <div className="stage idle-stage event-stage">
+        <CollisionView />
+        <div className="event-copy">
+          <p className="microlabel">Event display — opendata.cern.ch</p>
+          <h2 className="stage-title">
+            This is a collision.
+            <br />
+            <em>ChatGPT cannot search it.</em>
+          </h2>
+          <div className="punch">
+            <button type="button" className="punch-btn" onClick={() => onStarter(STARTERS[0].query)}>
+              Fire 13 TeV muons
             </button>
-          ))}
+            <button type="button" className="punch-ghost" onClick={() => onStarter(STARTERS[1].query)}>
+              Show the GPU lying
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -112,6 +110,11 @@ export default function Workbench({ idle, live, onStarter, onOpenRecord }: Props
 
   return (
     <div className="stage live-stage">
+      {live?.live && !hero && !result?.answer && (
+        <div className="live-collision">
+          <CollisionView hot />
+        </div>
+      )}
       <div className="pipe" aria-label="Agent pipeline">
         {NODES.map((n, i) => {
           const order = ["planning", "search", "ask", "fetch_record"];

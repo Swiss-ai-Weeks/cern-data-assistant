@@ -131,7 +131,7 @@ export default function Chat() {
   const followups = stageAsst?.result?.followups ?? [];
 
   return (
-    <div className="cockpit-body">
+    <div className={`cockpit-body ${turns.length === 0 ? "stage-first" : ""}`}>
       <aside className="thread">
         <div className="thread-scroll" ref={scroller}>
           {turns.length === 0 && (

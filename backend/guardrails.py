@@ -26,6 +26,11 @@ import re
 # Similarity floors (raw cosine, nomic-embed-text with search_* prefixes).
 # Calibrated on the full corpus (CERN docs + glossary + seed): on-topic top
 # hits score >= 0.75, off-topic questions <= 0.58. Tunable via env.
+# Calibrated 2026-09-14 on the 1,636-chunk corpus (nomic-embed-text, search_*
+# prefixes) with two batteries: 15 on-topic demo questions score 0.756-0.876,
+# 10 off-topic ones (pasta, World Cup, Hawking radiation, speed of light,
+# Python errors) score 0.529-0.660. Floor 0.70 leaves ~0.04 headroom on both
+# sides; 0.70-0.75 is the low-confidence band.
 MIN_TOP_SCORE = float(os.environ.get("RAG_MIN_SCORE", "0.70"))
 # Above MIN_TOP_SCORE but below MIN_TOP_SCORE + margin -> answer, but flag it.
 LOW_CONF_MARGIN = float(os.environ.get("RAG_LOW_CONF_MARGIN", "0.05"))
@@ -148,23 +153,6 @@ def strip_uncited_sentences(answer: str) -> dict:
     sentences = [x.strip() for x in _SENTENCE_SPLIT.split(answer.strip()) if x.strip()]
     kept = [x for x in sentences if _CITATION_RE.search(x)]
     return {"answer": " ".join(kept), "removed": len(sentences) - len(kept)}
-
-
-def valid_citations(answer: str, used: list, passages: list[dict]) -> list[int]:
-    """Citation rail. Keep only citation numbers that (a) the model listed OR
-    wrote inline as [n], (b) map to a real passage, and (c) point at a passage
-    relevant enough to cite. Returns the cleaned, sorted list."""
-    by_n = {p["n"]: p for p in passages}
-    inline = {int(m) for m in _CITATION_RE.findall(answer or "")}
-    listed = {int(n) for n in (used or []) if isinstance(n, (int, str)) and str(n).isdigit()}
-    candidates = (inline | listed) or listed
-
-    good = {
-        n
-        for n in candidates
-        if n in by_n and by_n[n].get("score", 0.0) >= MIN_CITE_SCORE
-    }
-    return sorted(good)
 
 
 def valid_citations(answer: str, used: list, passages: list[dict]) -> list[int]:

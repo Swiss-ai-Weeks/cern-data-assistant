@@ -1,11 +1,13 @@
 [
   {
     "title": "CMS solenoid magnet",
+    "experiment": "CMS",
     "text": "The central feature of the CMS (Compact Muon Solenoid) detector is a large superconducting solenoid magnet that generates a 3.8 tesla magnetic field. A strong, uniform solenoidal field bends the paths of charged particles produced in collisions; measuring how much a track curves reveals the particle's momentum and the sign of its charge. CMS chose a solenoid because it gives a compact detector a very strong, uniform field along the beam axis, enabling precise momentum measurement of muons and other charged particles. The magnet's return field is large enough to saturate the iron yoke that also houses the muon detectors.",
     "source": "https://home.cern/science/experiments/cms"
   },
   {
     "title": "ATLAS magnet system",
+    "experiment": "ATLAS",
     "text": "ATLAS (A Toroidal LHC ApparatuS) uses a hybrid magnet system: a central solenoid around the inner tracking detector plus very large air-core toroidal magnets for the muon spectrometer. The toroids give ATLAS its characteristic large size and allow standalone muon momentum measurement over a huge volume, while the inner solenoid bends tracks close to the collision point. This differs from CMS, which relies on a single strong solenoid.",
     "source": "https://home.cern/science/experiments/atlas"
   },
@@ -36,6 +38,7 @@
   },
   {
     "title": "Muon detection",
+    "experiment": "CMS",
     "text": "Muons are heavy, penetrating charged particles that traverse the inner detector layers and calorimeters with little energy loss, so they are identified in dedicated muon chambers at the outside of experiments like CMS and ATLAS. Because the magnetic field bends their tracks, the muon systems also measure their momentum. Many physics analyses (for example Higgs, Z boson, and top-quark studies) select events containing one or more muons.",
     "source": "https://home.cern/science/experiments/cms"
   },
@@ -56,11 +59,13 @@
   },
   {
     "title": "CMS open data formats: AOD, MiniAOD, NanoAOD",
+    "experiment": "CMS",
     "text": "CMS releases reconstructed collision data in tiered formats. AOD (Analysis Object Data) is the most complete and largest. MiniAOD is a slimmed format with the objects most analyses need. NanoAOD is a compact flat ROOT ntuple readable with common tools like uproot, suitable for many analyses without the full CMS software stack. Choosing the right format trades completeness against size and ease of use.",
     "source": "https://opendata.cern.ch/docs/cms-guide-for-research"
   },
   {
     "title": "ATLAS open data format: DAOD_PHYSLITE",
+    "experiment": "ATLAS",
     "text": "ATLAS provides open data in the DAOD_PHYSLITE format, a lightweight derived analysis format containing calibrated physics objects ready for analysis. It is stored as ROOT files and is designed to be small and quick to analyse, making it a good starting point for ATLAS open-data studies.",
     "source": "https://opendata.cern.ch/docs/atlas-physlite-getting-started"
   },
@@ -73,6 +78,23 @@
     "title": "Downloading open data with cernopendata-client",
     "text": "Files attached to a CERN Open Data record can be downloaded with the cernopendata-client command-line tool, for example 'cernopendata-client download-files --recid <RECID>'. You can also list file locations for a record. This is the recommended way to fetch dataset files programmatically for analysis.",
     "source": "https://opendata.cern.ch/docs/cernopendata-client"
+  },
+  {
+    "title": "Pile-up at the LHC",
+    "text": "Pile-up is extra proton-proton collisions in the same bunch crossing as the interesting event. At 13 TeV LHC running, an event can contain dozens of overlapping collisions, which experiments reconstruct and subtract so physics objects belong to the hard scatter. Open datasets often include pile-up simulation or mixing so analyses can be trained under realistic conditions.",
+    "source": "https://opendata.cern.ch/"
+  },
+  {
+    "title": "ALICE detector",
+    "experiment": "ALICE",
+    "text": "ALICE (A Large Ion Collider Experiment) studies quark-gluon plasma in heavy-ion collisions at the LHC. Its central tracker is a large Time Projection Chamber (TPC) in a solenoidal field, surrounded by calorimeters and muon arm detectors. ALICE open data includes Pb-Pb and proton-proton samples for reconstruction and analysis tutorials.",
+    "source": "https://home.cern/science/experiments/alice"
+  },
+  {
+    "title": "LHCb detector",
+    "experiment": "LHCb",
+    "text": "LHCb is a forward spectrometer at the LHC specialised in heavy-flavour physics (beauty and charm hadrons). Unlike the barrel detectors CMS and ATLAS, LHCb covers a limited angular region close to the beam pipe, where b-hadrons are boosted. Its open data includes stripping lines and derived datasets for flavour analyses.",
+    "source": "https://home.cern/science/experiments/lhcb"
   },
   {
     "title": "MiniAOD vs NanoAOD: which CMS format to use",

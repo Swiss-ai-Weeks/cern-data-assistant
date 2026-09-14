@@ -51,19 +51,22 @@ Three tools, visible plan, retry if CERN returns nothing.
 
 ## Phase 8 — Grounding that survives a hostile question (DONE)
 
-- ✅ **Floor recalibrated on the 1,636-chunk index**: 15 on-topic questions score ≥ 0.756, 10 off-topic
-  ("black holes", "speed of light", "cook pasta", "World Cup"…) ≤ 0.660 → `RAG_MIN_SCORE=0.70`,
-  low-confidence band 0.70–0.75. Battery: `backend/tests` + the calibration in README 4c.
-- ✅ **`seed.json` covers the demo questions**: MiniAOD vs NanoAOD, LHC Run 2 / 13 TeV pp, what a dataset
-  record contains (plus the existing CMS solenoid, ATLAS magnet, pile-up via glossary).
-- ✅ **Cite-or-refuse in the low-confidence band**: `guardrails.strip_uncited_sentences` drops every sentence
-  without a `[n]`; nothing left → `citation:none` refusal. UI shows "n uncited sentence(s) dropped".
+- ✅ **Floor recalibrated on the 1,636-chunk index** with two batteries: 15 on-topic questions score ≥ 0.756,
+  10 off-topic ("black holes", "Hawking radiation", "speed of light", "cook pasta", "World Cup"…) ≤ 0.660
+  → `RAG_MIN_SCORE=0.70`, low-confidence band 0.70–0.75 (~0.04 headroom on both sides).
+- ✅ **`seed.json` covers the demo questions**, tagged with experiment: CMS solenoid, ATLAS magnet, MiniAOD vs
+  NanoAOD, LHC Run 2 / 13 TeV pp, what a dataset record contains, pile-up, ALICE TPC, LHCb forward spectrometer.
+- ✅ **Cite-or-refuse in the low-confidence band**, two rails: `guardrails.strip_uncited_sentences` drops every
+  sentence without a `[n]` (UI shows "n uncited sentence(s) dropped"; nothing left → `citation:none`), and at
+  least one cited passage must itself clear the floor or we refuse (`grounding:low_confidence`).
 - Skipped NeMo Guardrails (own rails + LLM fact-check already cover it).
+
+---
 
 ## Phase 9 — Only if there is time
 
 - Streaming tokens so the 32B model doesn’t look “stuck”.
-- In-app **record preview** (file list from `/api/record/<id>`).
+- In-app **record preview** for every row (top hit already fetched by the agent).
 - Follow-up chat (“and the ATLAS one?”) — needs session memory.
 - Facets **sent to CERN** (`experiment:CMS`, energy) instead of filter-after-fetch.
 - A couple of mocked `ollama_client` tests.
@@ -77,7 +80,7 @@ Phase 6 (H100 demo + 4-query script)   ← DONE
      ↓
 Phase 7.1–7.3 (record tool + visible plan)  ← DONE
      ↓
-Phase 8 (recalibrate floor + seed + cite-or-drop)  ← DONE
+Phase 8 (recalibrate floor + seed + cite-or-refuse)  ← DONE
      ↓
 Phase 9 only if the pitch is already smooth
 ```

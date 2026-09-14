@@ -288,6 +288,17 @@ def _run_ask(question: str, k=None):
     # --- GROUNDING rail: fact-check the answer against the cited passages ---
     rail = "grounded" if gate == "ok" else "grounded:low_confidence"
     cited_passages = [p for p in passages if p["n"] in cited]
+    if gate == "low_confidence":
+        strong = [
+            p for p in cited_passages
+            if p.get("score_raw", p.get("score", 0.0)) >= guardrails.MIN_TOP_SCORE
+        ]
+        if not strong:
+            detail["status"] = "low_confidence"
+            return _refusal(
+                question, guardrails.NO_SOURCE_MESSAGE, "grounding:low_confidence",
+                sources=_sources(hits, cited), detail=detail, timing=timing,
+            )
     t0 = time.time()
     try:
         verdict = ollama_client.verify_grounding(answer, cited_passages)

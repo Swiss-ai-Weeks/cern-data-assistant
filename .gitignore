@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.venv/
+tf/
+dataset/*.json
+.env
+.DS_Store
+.vscode/
+*.egg-info/

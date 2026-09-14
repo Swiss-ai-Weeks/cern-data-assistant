@@ -44,6 +44,16 @@ Click **Show the GPU lying**.
 
 Backup combo: `find CMS muon datasets and explain why CMS uses a solenoid` — pass and receipt in one turn.
 
+Rescue beat (if they ask "what if the word isn't in the docs?"):
+
+> What is an atom made of?
+
+**Say:** "atom" is not a CERN glossary term, so the floor would refuse. The glossary graph maps it to
+proton / electron / ion and retries once; the answer still comes only from those CERN entries.
+
+**Expect:** low-confidence grounded answer citing Electron + Hadron, receipt line
+`expanded via CERN glossary: Proton, Electron, Ion, …`. Black holes still refuse — no glossary vocabulary to expand into.
+
 ---
 
 ## If something dies

@@ -97,6 +97,10 @@ export interface Guardrail {
   sentences_removed?: number;
   verifier_overridden?: number;
   unsupported?: string[];
+  /** glossary-graph expansion (only tried when the gate would refuse) */
+  expanded_terms?: string[];
+  expansion_tried?: string[];
+  expansion?: string;
 }
 
 export interface AskResponse {

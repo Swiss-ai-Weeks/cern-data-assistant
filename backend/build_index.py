@@ -226,6 +226,17 @@ def chunk_doc(hit: dict) -> list[dict]:
     return out
 
 
+# ~850 "glossary" records are LHCb LoKi functor reference pages ("const bool
+# nucleus = NUCLEUS ( p ) ; See also MCParticle ..."). They are not physics
+# definitions and outrank the real entries for questions like "what is an atom
+# made of", so they are left out of the knowledge base.
+_LOKI_MARKERS = ("LoKi::", "const MCParticle", "const LHCb::")
+
+
+def _is_loki_functor(definition: str) -> bool:
+    return any(m in definition for m in _LOKI_MARKERS)
+
+
 def chunk_glossary(hit: dict) -> list[dict]:
     md = hit.get("metadata", {}) or {}
     term = md.get("term") or md.get("anchor") or str(hit.get("id"))
@@ -237,6 +248,8 @@ def chunk_glossary(hit: dict) -> list[dict]:
         definition = " ".join(str(d) for d in definition)
     definition = clean_markdown(definition)
     if len(definition) < 20:
+        return []
+    if _is_loki_functor(definition):
         return []
     exp = _experiment(md)
     lines = [f"Glossary term: {term}"]

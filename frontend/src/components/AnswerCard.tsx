@@ -66,6 +66,9 @@ function Receipt({ result }: { result: AskResponse }) {
           </li>
         )}
         {result.guardrail && <li>rail {result.guardrail}</li>}
+        {d?.expanded_terms && d.expanded_terms.length > 0 && (
+          <li>expanded via CERN glossary: {d.expanded_terms.join(", ")}</li>
+        )}
         {cited.map((s) => (
           <li key={s.n}>
             [{s.n}]{" "}
@@ -107,6 +110,9 @@ export default function AnswerCard({ result }: Props) {
         d && (
           <p className="answer-meta">
             best match {d.top_score} / floor {d.threshold}
+            {d.expansion_tried && d.expansion_tried.length > 0
+              ? ` · glossary expansion tried: ${d.expansion_tried.join(", ")}`
+              : ""}
             {result.model_used ? ` · ${result.model_used} never wrote this` : ""}
           </p>
         )

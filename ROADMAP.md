@@ -11,7 +11,7 @@ Phases 0–5 are **done**. This file is only the remaining work, ordered for a h
 | Piece | What judges can see |
 |---|---|
 | **Search** | NL → keywords → CERN Open Data → ranked dataset cards (size, format, DOI, citation, `cernopendata-client`, copy) |
-| **RAG** | 1,636 chunks: 18 seed facts + 78 CERN docs (612 chunks) + 1,006 glossary terms; `nomic-embed-text` on the H100 |
+| **RAG** | 754 chunks: 21 seed facts + 78 CERN docs (612 chunks) + 121 glossary terms (LoKi code stubs dropped); glossary graph expansion on the refusal path; `nomic-embed-text` on the H100 |
 | **Guardrails** | Input / retrieval floor / citations / LLM fact-check. No CERN source → no answer. Badge in the UI |
 | **Agent** | `POST /api/agent` plans search and/or ask in one turn (the solenoid + datasets example) |
 | **Polish** | Facets, CERN HTTP cache, unit tests, `qwen2.5:32b` with `llama3.2` fallback |
@@ -57,7 +57,7 @@ Three tools, visible plan, retry if CERN returns nothing.
 
 ## Phase 8 — Grounding that survives a hostile question (DONE)
 
-- ✅ **Floor recalibrated on the 1,636-chunk index** with two batteries: 15 on-topic questions score ≥ 0.756,
+- ✅ **Floor recalibrated on the 1,636-chunk index** (re-checked on the 754-chunk index after the LoKi clean-up: same bounds) with two batteries: 15 on-topic questions score ≥ 0.756,
   10 off-topic ("black holes", "Hawking radiation", "speed of light", "cook pasta", "World Cup"…) ≤ 0.660
   → `RAG_MIN_SCORE=0.70`, low-confidence band 0.70–0.75 (~0.04 headroom on both sides).
 - ✅ **`seed.json` covers the demo questions**, tagged with experiment: CMS solenoid, ATLAS magnet, MiniAOD vs
@@ -82,6 +82,28 @@ Three tools, visible plan, retry if CERN returns nothing.
   energy / collision type / run period from `collision_information`. "proton-proton collisions at 13 TeV with
   muons" → DoubleMuon 2016 NanoAOD/MiniAOD instead of 1 hit. (`subtype` is ignored by the portal API.)
 - ✅ Mocked `ollama_client` tests (`tests/test_ollama_client.py`) + facet tests (`tests/test_facets.py`), 55 total.
+
+---
+
+## Phase 10 — Glossary-graph expansion (DONE)
+
+Question: "does it make sense to build a graph RAG so 'atoms' also finds nucleus / proton / electron?"
+Measured first: retrieval already found the right glossary entries for "What is an atom made of?" (Hadron,
+Electron, Ion at 0.63–0.67) but the 0.70 floor refused it. So no full GraphRAG (hours of build, an
+LLM-written layer between the user and CERN text); instead:
+
+- ✅ Glossary term graph inside `rag.KnowledgeBase` (built at load, no new files): nodes = glossary terms,
+  edges = the portal's "See also" links + top-5 embedding neighbours ≥ 0.75, ≤ 8 per term.
+- ✅ `ollama_client.suggest_glossary_terms` (llama3.2, temperature 0) names the vocabulary a question is
+  about; `kb.expand_terms` keeps only real glossary terms + one hop. Runs **only when the gate would refuse**,
+  retries retrieval once with `question (terms…)`; a rescued answer is always low-confidence (cite-or-drop).
+  "What is an atom made of?" 0.667 → 0.80, answered from Electron/Hadron; 10 off-topic questions still refused.
+- ✅ Every spelling variant of a glossary term ("Electron / electrons") is now a boost key (before, the
+  slash-joined string never matched, so the glossary boost was dead for 35 terms).
+- ✅ ~885 LHCb LoKi functor pages filed as "glossary" (`const bool nucleus = NUCLEUS(p)…`) dropped from the
+  index: 1,639 → 754 chunks. Floor bounds unchanged (on-topic ≥ 0.756, off-topic ≤ 0.660).
+- ✅ UI: receipt line "expanded via CERN glossary: …"; refusals show "glossary expansion tried: …".
+- ✅ Tests: `tests/test_rag_graph.py`, `tests/test_ask_expansion.py` (71 total).
 
 ---
 

@@ -480,3 +480,38 @@ def ungrounded_draft(question: str) -> str:
 def draft_allowed(rail: str) -> bool:
     """Do not generate a tempting lecture for injection / unsafe prompts."""
     return bool(rail) and not rail.startswith("input:")
+
+
+# ---------------------------------------------------------------------------
+# Glossary anchors — which CERN glossary terms is this question about?
+# ---------------------------------------------------------------------------
+
+TERMS_SYSTEM_PROMPT = """You map a question to particle-physics vocabulary so it \
+can be looked up in the CERN Open Data glossary. Reply with JSON only:
+{"terms": ["...", "..."]}
+List up to 6 single words or short noun phrases naming the particles, objects, \
+detectors, data formats or concepts the question is about, in plain singular \
+form. Example: "What is an atom made of?" -> {"terms": ["atom", "nucleus", \
+"proton", "neutron", "electron", "ion"]}. Do not answer the question."""
+
+
+def suggest_glossary_terms(question: str, model: Optional[str] = None) -> list[str]:
+    """Up to 6 lower-case candidate terms for the glossary graph. Runs on the
+    small fallback model (fast) at temperature 0. Nothing returned here is
+    ever shown or used in an answer: app.py keeps only the candidates that
+    exist in the CERN glossary, so the model cannot invent vocabulary."""
+    try:
+        data = _chat_json(TERMS_SYSTEM_PROMPT, f"Question: {question}",
+                          model=model or OLLAMA_FALLBACK_MODEL, temperature=0.0)
+    except OllamaUnavailable:
+        return []
+    terms = data.get("terms") if isinstance(data, dict) else None
+    if not isinstance(terms, list):
+        return []
+    out: list[str] = []
+    for t in terms:
+        if isinstance(t, str):
+            t = " ".join(t.strip().lower().split())[:40]
+            if t and t not in out:
+                out.append(t)
+    return out[:6]

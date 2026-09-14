@@ -40,6 +40,7 @@ log = logging.getLogger("app")
 # backend serves it, so one port (5001) carries UI + API on the H100.
 DIST_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "dist")
 SERVE_FRONTEND = os.environ.get("SERVE_FRONTEND", "0") == "1" and os.path.isdir(DIST_DIR)
+EXPAND_ENABLED = os.environ.get("RAG_EXPAND", "1") == "1"
 DEFAULT_K = int(os.environ.get("RAG_TOP_K", "6"))
 
 app = Flask(__name__, static_folder=DIST_DIR if SERVE_FRONTEND else None, static_url_path="")
@@ -287,6 +288,31 @@ def _run_ask(question: str, k=None):
     gate = guardrails.retrieval_gate(top_score)
     detail = {"status": gate, "top_score": round(top_score, 3),
               "threshold": guardrails.MIN_TOP_SCORE, "citations_removed": 0}
+
+    # --- GLOSSARY-GRAPH EXPANSION: only when the gate would refuse ----------
+    # Map the question to CERN glossary terms (+ their "see also" / nearest
+    # neighbours) and retry once, e.g. "atom" -> nucleus, proton, electron,
+    # ion. The LLM only proposes candidates; the glossary decides which
+    # survive, and an expanded answer is always held to the low-confidence
+    # rails (every sentence cited, one passage above the floor).
+    if gate == "refused" and EXPAND_ENABLED and hits:
+        t0 = time.time()
+        terms = kb.expand_terms(ollama_client.suggest_glossary_terms(question))
+        detail["expansion_tried"] = terms
+        if terms:
+            expanded = f"{question} ({', '.join(terms)})"
+            try:
+                hits2 = kb.search(ollama_client.embed(expanded), k=k, query_text=expanded)
+            except ollama_client.OllamaUnavailable:
+                hits2 = []
+            if hits2 and guardrails.retrieval_gate(hits2[0]["score_raw"]) != "refused":
+                hits, gate = hits2, "low_confidence"
+                top_score = hits[0]["score_raw"]
+                detail.update(status=gate, top_score=round(top_score, 3),
+                              expanded_terms=terms, expansion="glossary_graph")
+                log.info("glossary expansion rescued %r via %s (top %.3f)",
+                         question, terms, top_score)
+        timing["expand"] = int((time.time() - t0) * 1000)
 
     # --- RETRIEVAL rail: no CERN source above the floor -> refuse, no LLM ----
     if gate == "refused":

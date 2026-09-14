@@ -137,7 +137,9 @@ The corpus is real CERN Open Data content, cached locally on first build:
 - **78 CERN Open Data "Documentation" records** with page text (About CMS, detector and
   data-format guides, trigger, pile-up, ALICE/ATLAS/LHCb/OPERA/DELPHI/JADE docs).
   The ~9,000 auto-generated LHCb "Stripping" pages are skipped.
-- **all 1,006 CERN Open Data glossary terms**
+- **the CERN Open Data glossary** (121 physics/data terms; the ~885 LHCb LoKi functor
+  reference pages the portal also files as "glossary" are skipped: they are code stubs,
+  not definitions, and they outranked the real entries)
 
 ```bash
 # on the H100 (once):
@@ -158,7 +160,7 @@ API pulls are cached in `knowledge/raw_*.jsonl`. Health then shows
 The model is never trusted to judge its own grounding. `guardrails.py` applies:
 
 1. **Retrieval gate** — if the best passage's cosine similarity is below
-   `RAG_MIN_SCORE` (0.70, calibrated on the 1,636-chunk index: 15 on-topic demo
+   `RAG_MIN_SCORE` (0.70, calibrated on the 754-chunk index: 15 on-topic demo
    questions score ≥ 0.756, 10 off-topic ones ≤ 0.660) the API refuses *before*
    calling the LLM. Between 0.70 and 0.75 it answers but flags **low confidence**,
    and in that band every sentence must carry a citation: uncited sentences are
@@ -175,6 +177,17 @@ The model is never trusted to judge its own grounding. `guardrails.py` applies:
    (`RAG_LEXICAL_SUPPORT`, default 0.8) is a paraphrase, not new physics, and is
    kept (`verifier_overridden` in `guardrail_detail`).
 4. **Input rail** — prompt-injection and unsafe requests are refused before any model call.
+5. **Glossary-graph expansion** (only when the gate would refuse) — the glossary terms
+   form a small graph: the portal's "See also" links plus nearest neighbours among the
+   glossary embeddings. The small model names the vocabulary a question is about
+   ("What is an atom made of?" → atom, nucleus, proton, electron…), only the names that
+   exist in the CERN glossary survive, their one-hop neighbours are added, and retrieval
+   is retried once with `question (proton, electron, ion, …)`. That lifts the atom
+   question from 0.667 to 0.80 and it is answered from the Electron/Hadron/Ion entries,
+   while black holes, reactors or the World Cup stay refused (their vocabulary is not in
+   the glossary, or the retry is still under the floor). A rescued answer is always held to
+   the low-confidence rails above; `expanded_terms` / `expansion_tried` in
+   `guardrail_detail` show what happened. `RAG_EXPAND=0` turns it off.
 
 Every response carries `guardrail` (the rail that decided, e.g. `grounded`,
 `retrieval:no_source`, `grounding:unsupported`) plus `guardrail_detail: {status, top_score, threshold, citations_removed, unsupported}`

@@ -481,6 +481,12 @@ a {
   border-radius: 12px;
   padding: 20px;
 }
+.answer-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
 .answer-badge {
   display: inline-block;
   font-family: var(--font-mono);
@@ -489,7 +495,18 @@ a {
   text-transform: uppercase;
   padding: 3px 10px;
   border-radius: 999px;
-  margin-bottom: 12px;
+}
+.rail-badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 .answer-badge.ok {
   color: var(--accent-2);

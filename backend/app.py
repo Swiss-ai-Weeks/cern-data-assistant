@@ -27,6 +27,7 @@ from flask_cors import CORS
 import cern_client
 import ollama_client
 import rag
+import guardrails
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 log = logging.getLogger("app")
@@ -63,6 +64,10 @@ def health():
             "ollama_models_installed": models,
             "knowledge_base": "ready" if kb.ready else "empty",
             "knowledge_chunks": kb.size,
+            "guardrails": {
+                "min_top_score": guardrails.MIN_TOP_SCORE,
+                "min_cite_score": guardrails.MIN_CITE_SCORE,
+            },
         }
     )
 
@@ -130,8 +135,25 @@ def _run_search(user_query: str, requested_size=None, use_llm_rank: bool = True)
     }, 200
 
 
+def _refusal(question: str, message: str, rail: str, sources=None):
+    """Uniform ungrounded response shape used by every guardrail refusal."""
+    return {
+        "question": question,
+        "answer": message,
+        "grounded": False,
+        "model_used": ollama_client.OLLAMA_MODEL,
+        "guardrail": rail,
+        "sources": sources or [],
+    }, 200
+
+
 def _run_ask(question: str, k=None):
     k = k if isinstance(k, int) and 1 <= k <= 10 else 4
+
+    # --- INPUT rail: block unsafe / injection before any model call ---------
+    blocked = guardrails.screen_query(question)
+    if blocked:
+        return _refusal(question, blocked["message"], f"input:{blocked['category']}")
 
     kb = rag.get_kb()
     if not kb.ready:
@@ -147,17 +169,20 @@ def _run_ask(question: str, k=None):
         return {"error": f"Embedding model unavailable: {exc}"}, 502
 
     hits = kb.search(qvec, k=k)
-    if not hits:
-        return {
-            "question": question,
-            "answer": "I don't have a CERN source that covers that yet.",
-            "grounded": False,
-            "sources": [],
-        }, 200
 
-    # 2. build numbered passages and ask the model to answer from them only
+    # --- RETRIEVAL rail: no CERN source above the floor -> refuse -----------
+    if not guardrails.retrieval_supported(hits):
+        return _refusal(question, guardrails.NO_SOURCE_MESSAGE, "retrieval:no_source")
+
+    # 2. build numbered passages (carry the retrieval score for the rails)
     passages = [
-        {"n": i + 1, "title": h["title"], "text": h["text"], "source": h["source"]}
+        {
+            "n": i + 1,
+            "title": h["title"],
+            "text": h["text"],
+            "source": h["source"],
+            "score": round(h.get("score", 0.0), 3),
+        }
         for i, h in enumerate(hits)
     ]
     try:
@@ -165,25 +190,51 @@ def _run_ask(question: str, k=None):
     except ollama_client.OllamaUnavailable as exc:
         return {"error": f"Ollama unavailable: {exc}"}, 502
 
-    used = set(result.get("used") or [])
-    sources = [
+    answer = result.get("answer", "")
+
+    # --- CITATION rail: keep only valid, relevant citations -----------------
+    cited = guardrails.valid_citations(answer, result.get("used"), passages)
+    if not cited:
+        return _refusal(
+            question, guardrails.NO_SOURCE_MESSAGE, "citation:none",
+            sources=_sources(passages, set()),
+        )
+
+    # --- GROUNDING rail: fact-check the answer against the cited passages ---
+    rail = "grounded"
+    cited_passages = [p for p in passages if p["n"] in cited]
+    try:
+        check = ollama_client.verify_grounding(answer, cited_passages)
+        if not check.get("supported", True):
+            log.info("grounding rail rejected answer; unsupported=%s", check.get("unsupported"))
+            return _refusal(
+                question, guardrails.UNSUPPORTED_MESSAGE, "grounding:unsupported",
+                sources=_sources(passages, set(cited)),
+            )
+    except ollama_client.OllamaUnavailable:
+        rail = "grounded:unverified"  # fact-check unreachable; keep the cited answer
+
+    return {
+        "question": question,
+        "answer": answer,
+        "grounded": True,
+        "model_used": ollama_client.OLLAMA_MODEL,
+        "guardrail": rail,
+        "sources": _sources(passages, set(cited)),
+    }, 200
+
+
+def _sources(passages, cited: set):
+    return [
         {
             "n": p["n"],
             "title": p["title"],
             "source": p["source"],
-            "score": round(hits[p["n"] - 1].get("score", 0.0), 3),
-            "used": p["n"] in used,
+            "score": p["score"],
+            "used": p["n"] in cited,
         }
         for p in passages
     ]
-
-    return {
-        "question": question,
-        "answer": result.get("answer", ""),
-        "grounded": result.get("grounded", False),
-        "model_used": ollama_client.OLLAMA_MODEL,
-        "sources": sources,
-    }, 200
 
 
 @app.post("/api/search")
@@ -219,6 +270,12 @@ def assistant():
     user_query = (body.get("query") or "").strip()
     if not user_query:
         return jsonify({"error": "Field 'query' is required."}), 400
+
+    # INPUT rail applies to both routes.
+    blocked = guardrails.screen_query(user_query)
+    if blocked:
+        payload, _ = _refusal(user_query, blocked["message"], f"input:{blocked['category']}")
+        return jsonify({"mode": "ask", "route_confidence": 100, **payload}), 200
 
     route = ollama_client.classify_intent(user_query)
     intent = route["intent"]

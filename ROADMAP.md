@@ -30,10 +30,13 @@ One box that auto-decides search vs ask — the first step toward the agent.
 - ✅ `POST /api/assistant` classifies then dispatches to the shared search / ask logic; returns `mode` + `route_confidence`.
 - ✅ UI: default **"Assistant (auto)"** tab — single console that renders dataset cards or a grounded answer based on the route (manual tabs kept).
 
-## Phase 3 — Guardrails (grounding is judged)
-- NeMo Guardrails / validation layer: no physics claim without a retrieved CERN source.
-- Graceful "no CERN source for that" instead of hallucinating.
-- Every answer shows citations.
+## Phase 3 — Guardrails (grounding is judged) (DONE)
+Three deterministic rails wrap the RAG flow (`guardrails.py`) plus an LLM fact-check pass:
+- ✅ **Input rail** — block prompt-injection / unsafe / off-scope before any model call.
+- ✅ **Retrieval rail** — "no CERN source → no answer": refuse if the best passage is below a similarity floor (`RAG_MIN_SCORE`), calibrated on the seed corpus (on-topic ~0.6-0.75 vs off-topic ~0.40).
+- ✅ **Citation rail** — keep only citations that map to a retrieved passage relevant enough to cite (`RAG_MIN_CITE_SCORE`).
+- ✅ **Grounding rail** — second-pass `verify_grounding` fact-check rejects answers with claims not supported by the cited passages (caught e.g. a hallucinated Hawking-radiation answer).
+- ✅ Graceful refusals instead of hallucinating; every kept answer shows citations. Rail decision surfaced in the UI + `/api/health`.
 
 ## Phase 4 — Agentic (AIQ)
 - Wrap router + tools (search, record fetch, RAG retrieve) as an agent that chains: interpret → search → fetch metadata → explain → cite.

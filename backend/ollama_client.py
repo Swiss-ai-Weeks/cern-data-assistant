@@ -276,3 +276,43 @@ def answer_with_context(
     used = data.get("used") if isinstance(data.get("used"), list) else []
     grounded = bool(data.get("grounded", bool(answer and used)))
     return {"answer": answer, "used": used, "grounded": grounded}
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — grounding verification (fact-check rail)
+# ---------------------------------------------------------------------------
+
+GROUNDCHECK_SYSTEM_PROMPT = """You are a strict fact-checker for the CERN Data \
+Assistant. You are given an ANSWER and the numbered CONTEXT passages it was \
+supposed to be based on.
+
+Decide whether EVERY factual claim in the answer is directly supported by the \
+context. Do not use outside knowledge — if a claim is true in reality but is \
+NOT stated in the context, it is UNSUPPORTED.
+
+Respond with ONLY a JSON object of this exact shape:
+{"supported": <true|false>, "unsupported": ["<short quote or paraphrase of each unsupported claim>"]}
+
+Rules:
+- "supported" is true only if the context backs up all claims.
+- Ignore generic framing sentences with no factual content.
+- Be strict: plausible-sounding physics that isn't in the context is unsupported."""
+
+
+def verify_grounding(
+    answer: str, passages: list[dict], model: Optional[str] = None
+) -> dict:
+    """Second-pass check: does `answer` stay within `passages`? Returns
+    {"supported": bool, "unsupported": [str]}. Fails open (supported=True) only
+    if the checker itself errors, so it never blocks a good answer on an
+    infra hiccup — callers can treat OllamaUnavailable separately."""
+    context_lines = [
+        f"[{p['n']}] {p.get('title','')}\n{p.get('text','')}" for p in passages
+    ]
+    user_payload = f"ANSWER:\n{answer}\n\nCONTEXT:\n" + "\n\n".join(context_lines)
+    data = _chat_json(GROUNDCHECK_SYSTEM_PROMPT, user_payload, model=model)
+    if "supported" not in data:
+        return {"supported": True, "unsupported": []}
+    unsupported = data.get("unsupported")
+    unsupported = unsupported if isinstance(unsupported, list) else []
+    return {"supported": bool(data.get("supported")), "unsupported": unsupported}

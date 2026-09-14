@@ -66,6 +66,7 @@ export interface AskResponse {
   answer: string;
   grounded: boolean;
   model_used?: string;
+  guardrail?: string;
   sources: AskSource[];
 }
 

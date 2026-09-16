@@ -1,6 +1,6 @@
 import { FormEvent, KeyboardEvent, useRef, useState } from "react";
 import type { HealthResponse } from "../types";
-import { DEMO_SCENES, EXAMPLE_QUERIES, type DemoScene } from "../lib/demoQueries";
+import { EXAMPLE_QUERIES } from "../lib/starterQueries";
 import CollisionView from "./CollisionView";
 import SystemStatusStrip from "./SystemStatusStrip";
 
@@ -14,7 +14,6 @@ interface Props {
 
 export default function ControlRoom({ health, busy, onSubmit, onOpenTrust, presenterOn }: Props) {
   const [value, setValue] = useState("");
-  const [demoOpen, setDemoOpen] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null);
 
   function send(raw: string) {
@@ -34,11 +33,6 @@ export default function ControlRoom({ health, busy, onSubmit, onOpenTrust, prese
       e.preventDefault();
       send(value);
     }
-  }
-
-  function runDemo(scene: DemoScene) {
-    setDemoOpen(false);
-    send(DEMO_SCENES[scene].queries[0]);
   }
 
   return (
@@ -100,34 +94,6 @@ export default function ControlRoom({ health, busy, onSubmit, onOpenTrust, prese
             autoFocus
           />
           <div className="instrument-bar">
-            <div className="demo-launcher">
-              <button
-                type="button"
-                className="ghost-btn"
-                onClick={() => setDemoOpen((v) => !v)}
-                disabled={busy}
-                aria-expanded={demoOpen}
-                aria-haspopup="menu"
-              >
-                Demo sequences
-              </button>
-              {demoOpen && (
-                <div className="demo-menu" role="menu">
-                  {(Object.keys(DEMO_SCENES) as DemoScene[]).map((key) => (
-                    <button
-                      key={key}
-                      type="button"
-                      role="menuitem"
-                      className="demo-menu-item"
-                      onClick={() => runDemo(key)}
-                    >
-                      <strong>{DEMO_SCENES[key].title}</strong>
-                      <span>{DEMO_SCENES[key].description}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
             <span className="composer-hint">{busy ? "Investigating…" : "Enter ↵"}</span>
             <button className="send-btn beam-pulse" type="submit" disabled={busy || !value.trim()}>
               {busy ? "…" : "Investigate"}

@@ -33,6 +33,7 @@ import ollama_client
 import rag
 import guardrails
 from analysis.service import bp as investigations_bp
+from analysis import constraints as analysis_constraints
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 log = logging.getLogger("app")
@@ -198,7 +199,7 @@ def _run_search(user_query: str, requested_size=None, use_llm_rank: bool = True)
 
     summaries = summaries[:size]
 
-    return {
+    payload = {
         "query": user_query,
         "search_terms": search_terms,
         "facets": facets_used,
@@ -210,7 +211,8 @@ def _run_search(user_query: str, requested_size=None, use_llm_rank: bool = True)
         "model_used": model_used,
         "llm_ranked": ranking_used,
         "results": summaries,
-    }, 200
+    }
+    return analysis_constraints.enrich_search(user_query, payload), 200
 
 
 def _sources(hits: list[dict], cited: set[int]) -> list[dict]:

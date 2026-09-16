@@ -1,12 +1,12 @@
 # Beamline: a five-day plan for an evidence-driven CERN investigation workspace
 
 Status: this document is the only product plan. Checked against the repo on 16 Sep 2026.
-Planning window: five days, supplied by Lorik. Team size and judging rubric remain unknown.
+Planning window: five days, supplied by Lorik. Team size remains small; sponsor rubric is secondary to product gates.
 Capacity assumption: one primary builder with coding assistance.
 
 ## Build status
 
-Original catalog search and grounded detector Q&A still exist. The dimuon lab covers a slice of capabilities B–E. Capability A and the planned investigation/job architecture are not built. Do not pitch unchecked items below as shipped.
+Original catalog search and grounded detector Q&A still exist. The dimuon lab covers a slice of capabilities B–E. Capability A and the planned investigation/job architecture are not built. Do not ship unchecked items below as built.
 
 ### Day 1 — Prove the science path
 
@@ -15,7 +15,7 @@ Original catalog search and grounded detector Q&A still exist. The dimuon lab co
 | Canonical dimuon recipe, cut-flow, overflow/underflow | Done — `backend/analysis/recipe.py` |
 | Bounded record-12341 sample with portal checksums | Done — `backend/analysis/prepare.py` |
 | Chosen flagship story (trigger feature vs particle) | Done as copy; **not** proven on the staged sample |
-| 30 GeV feature visible on the chosen bounded sample | **Not done** — day-one pitch gate |
+| 30 GeV feature visible on the chosen bounded sample | **Not done** — day-one validation gate |
 | Critical passages saved as verbatim CERN text | Partial — curated summaries in `service.py` / `seed.json` |
 | Baseline product timings captured | **Not done** |
 
@@ -23,13 +23,13 @@ Original catalog search and grounded detector Q&A still exist. The dimuon lab co
 
 | Item | Status |
 | --- | --- |
-| Typed Investigation / AnalysisSpec / AnalysisRun records | Partial — run cache only (`runs.sqlite3`), no investigation object |
-| Job worker + streamed job transitions | **Not done** — sync Flask request |
-| Refresh reconnect to persisted investigations | **Not done** — `sessionStorage` |
-| Result-first workspace (section 7 layout) | Partial — lab overlay, not the main screen |
+| Typed Investigation / AnalysisSpec / AnalysisRun records | Partial — `schemas.py` + sessions API + UI session save |
+| Job worker + streamed job transitions | Partial — SQLite `jobs` table + `POST/GET /jobs`; SSE still **not done** |
+| Refresh reconnect to persisted investigations | Partial — server session id; full run reload via job/run ids |
+| Result-first workspace (section 7 layout) | Partial — investigation is home; three-column layout started |
 | Natural-language selection updates | Partial — keyword shortcuts in `/suggest` |
-| Editable dataset constraint labels (capability A) | **Not done** |
-| Never silently relax energy/experiment in search | **Not done** outside the dimuon lab |
+| Editable dataset constraint labels (capability A) | Partial — visible locked tags on investigation |
+| Never silently relax energy/experiment in search | Partial — `analysis/constraints.py` on `/api/search` |
 
 ### Day 3 — Deliver the distinction
 
@@ -38,7 +38,7 @@ Original catalog search and grounded detector Q&A still exist. The dimuon lab co
 | Baseline vs revision overlay and count delta | Done in the lab |
 | Export recipe + sample + sources + notebook | Partial — ZIP exists; no rendered figure, weak lockfile |
 | Documented trigger case shown beside the plot | Partial — hardcoded panel + optional RAG ask |
-| Four evidence labels (Calculated / Documented / Interpretation / Not established) | **Not done** as a product model |
+| Four evidence labels (Calculated / Documented / Interpretation / Not established) | Partial — model in API + evidence panel |
 | Frozen ~30-prompt evaluation set | **Not done** |
 
 ### Day 4 — Make it excellent
@@ -60,7 +60,22 @@ Original catalog search and grounded detector Q&A still exist. The dimuon lab co
 | Feature freeze | **Not done** |
 | Hostile / invalid query suite | **Not done** |
 | Worker restart and reconnect test | **Not done** |
-| Three consecutive demo runs + backup recording | **Not done** |
+| End-to-end smoke path passes three consecutive runs | **Not done** |
+
+
+## Product phases (execution order)
+
+Pitch scripts and presentation rehearsal are **deferred** until Phase 5 product gates pass. Build the investigation product first.
+
+| Phase | Maps to | Outcome |
+| --- | --- | --- |
+| 1 — Real analysis | Day 1 | Canonical recipe, bounded sample, validation of the reference case |
+| 2 — Investigation as product | Day 2 | Typed persistence, result-first workspace, constraints visible |
+| 3 — Evidence and revision | Day 3 | Labels, export completeness, documented vs calculated |
+| 4 — Inspection and constraints | Day 4 | Entry → docs map, catalog constraint UX |
+| 5 — Reliability | Day 5 | Hostile inputs, reconnect, smoke runs |
+
+**Phase 2 in progress:** `backend/analysis/schemas.py`, investigation sessions API (`POST/GET/PUT /api/investigations/sessions`), investigation workspace as home (frontend).
 
 ## 1. The decision
 
@@ -89,7 +104,7 @@ The existing product performs useful infrastructure work but leaves the user's s
 | Browser session storage | Retains turns within a browser session | Persists structured investigations, runs, and artifacts |
 | backend/store.py | Provides a SQLite wrapper | Is not currently wired into the app's request flow |
 
-The recent fixes improved verification failure behavior, deployment portability, and local/remote index consistency. Local tests passed 82 cases; the live demo paths and browser citation display were exercised. That is a useful starting point, not evidence of novel product value or comprehensive scientific validation.
+The recent fixes improved verification failure behavior, deployment portability, and local/remote index consistency. Local tests passed 82 cases; the live API paths and browser citation display were exercised. That is a useful starting point, not evidence of novel product value or comprehensive scientific validation.
 
 Keep the Flask backend, React frontend, CERN client, retrieval, streaming infrastructure, and H100 model service. Replace the main product journey. Do not spend the five days rebuilding infrastructure that already works.
 
@@ -128,7 +143,7 @@ Proposed flow:
 
 Do not assert that changing a slider proves the trigger cause, makes the feature disappear, or recreates the original trigger. Those behaviors depend on the selected data and available fields. The published explanation and our measured comparison are different evidence types.
 
-Day-one gate: the feature must be visible and the expected interpretation supported in the actual chosen analysis before it enters the pitch. If the bounded sample does not show it reliably, use a disclosed larger cached computation or pivot the main live demo to a well-supported Z-region investigation. Never manufacture the shape or imply an unavailable measurement.
+Day-one gate: the feature must be visible and the expected interpretation supported in the actual chosen analysis before we treat it as the default investigation story. If the bounded sample does not show it reliably, use a disclosed larger cached computation or pivot the default investigation to a well-supported Z-region story. Never manufacture the shape or imply an unavailable measurement.
 
 ## 5. The five core capabilities
 
@@ -212,7 +227,7 @@ The notebook and web result must use the same canonical recipe, rather than two 
 
 Export only the bounded sample needed for reproduction when practical; do not make the notebook blindly download an entire large dataset. If files are remote, document the precise download and verify their identity.
 
-No user accounts, public sharing service, or cloud notebook platform is required for the demo.
+No user accounts, public sharing service, or cloud notebook platform is required for v1.
 
 ## 6. Scientific evidence model
 
@@ -256,7 +271,7 @@ Suggested guided investigation title: “Particle signal or selection effect?”
 
 Chat stays available to express intent; it does not own the whole screen. The persistent object is the investigation, including its data and result.
 
-Use clear typography, a quiet scientific palette, large readable axes, consistent units, and one accent for the active selection. Judge polish by whether a person can explain what the page is showing. Remove redundant docks, decorative telemetry, repeated confidence badges, and multiple paths to the same function.
+Use clear typography, a quiet scientific palette, large readable axes, consistent units, and one accent for the active selection. Measure polish by whether a person can explain what the page is showing. Remove redundant docks, decorative telemetry, repeated confidence badges, and multiple paths to the same function.
 
 Motion should reveal a real transition, such as a histogram changing after a selection. No fake loading stages or invented live detector activity.
 
@@ -289,7 +304,7 @@ Suggested additions:
 - frontend investigation workspace, spectrum plot, selection editor, comparison view, entry inspector, evidence drawer;
 - corresponding tests and a fixed evaluation set.
 
-Persist jobs and results so page refresh can reconnect. Do not rely on a process-local singleton or background thread alone under two Gunicorn workers. For the demo, one dedicated worker with a SQLite-backed queue and bounded concurrency is enough if tested for this deployment. More infrastructure is a cost, not an achievement.
+Persist jobs and results so page refresh can reconnect. Do not rely on a process-local singleton or background thread alone under two Gunicorn workers. For v1, one dedicated worker with a SQLite-backed queue and bounded concurrency is enough if tested for this deployment. More infrastructure is a cost, not an achievement.
 
 Approved data adapters resolve files from verified portal records or manifests. Limit read volume, memory, runtime, and concurrent jobs. Never evaluate arbitrary expressions or Python supplied by the model. Cancel/reject invalid or over-budget jobs with a useful response.
 
@@ -299,7 +314,7 @@ The suggested AIQ/NeMo tooling is not currently installed. Confirm the actual ru
 
 ## 9. Data plan and early feasibility gates
 
-Two distinct paths preserve both challenge coverage and demo quality:
+Two distinct paths preserve both challenge coverage and product quality:
 
 **Core benchmark: 2012 reduced CMS muons, record 12341.**
 
@@ -314,10 +329,10 @@ Exact budgets are set from day-one measurements. Until measured, provisional lim
 Stop/adjust gates:
 
 - Cannot access/read the benchmark within the first half-day: switch to another documented accessible reduced sample, preserving its provenance and scope.
-- Cannot reliably reproduce the desired spectrum feature on day one: change the pitch to a verified feature rather than promising it.
+- Cannot reliably reproduce the desired spectrum feature on day one: change the default story to a verified feature rather than promising it.
 - No end-to-end computed plot by end of day two: cut schematic event display, extra templates, and advanced explanation features.
 - No functioning export and evidence-backed explanation by end of day three: freeze breadth and finish those paths.
-- New feature requests after day four starts are deferred unless they fix a demo blocker.
+- New feature requests after day four starts are deferred unless they fix a release blocker.
 
 ## 10. Five-day delivery schedule
 
@@ -329,9 +344,9 @@ Assume focused working days with a protected final day for reliability and prese
 | 2 — Make it a product | Typed analysis specs; job worker; investigation persistence; new result-first workspace; natural-language plan; real progress/error states | A user submits a question and obtains a chart with data identity and selections without touching a terminal |
 | 3 — Deliver the distinction | Revision comparisons; evidence panel; documented trigger case; export; useful responses to unsupported claims | Change a selection, compare measured outputs, explain the documented trap, and reproduce the exported result |
 | 4 — Make it excellent | Selected-entry inspector; schematic muon projection if affordable; detector/variable links; strict constraint UX; latency tuning; user test | A new user completes the investigation; original search/Q&A still work; core evaluation passes |
-| 5 — Make it dependable | Feature freeze; hostile/invalid queries; restart/reconnect test; clean reproduction; repeated rehearsals; pitch and short backup recording | Three consecutive successful demo runs and a tested recovery path; no unknown core blockers |
+| 5 — Make it dependable | Feature freeze; hostile/invalid queries; restart/reconnect test; clean reproduction; repeated end-to-end smoke runs | Three consecutive successful product runs and a tested recovery path; no unknown core blockers |
 
-If additional humans are available, assign one to source/physics review and one to visual QA/demo preparation. Do not use extra capacity to multiply the product scope.
+If additional humans are available, assign one to source/physics review and one to visual QA and product walkthrough prep. Do not use extra capacity to multiply the product scope.
 
 ## 11. Scope priorities and cuts
 
@@ -342,7 +357,7 @@ Must ship:
 - Result-first workspace with clear selections and provenance.
 - One meaningful parameter revision and baseline comparison.
 - Evidence-qualified interpretation of the documented benchmark.
-- Executable export and repeatable demo.
+- Executable export and repeatable reproduction.
 
 High-value next items, only after those gates:
 
@@ -388,34 +403,14 @@ Provisional release targets, to be measured rather than advertised as current pe
 - Original live search, grounded detector Q&A, and appropriate refusal regressions still pass.
 - Five beginner tasks attempted by at least one person who did not implement the UI; record completion and confusion points.
 
-These are acceptance targets, not percentages to put in a pitch before running the evaluation. Report numerator/denominator and method for any evaluation result.
+These are acceptance targets, not percentages to advertise before running the evaluation. Report numerator/denominator and method for any evaluation result.
 
-## 13. The three-minute pitch
-
-0:00–0:20 — Problem: “CERN data is open. Understanding what it actually shows still requires navigating files, software, and detector documentation.”
-
-0:20–0:50 — Ask a plain-language investigation question. Show the chosen real dataset and a computed spectrum. Explain in one sentence that each plotted entry comes from a muon-pair calculation.
-
-0:50–1:25 — Select the documented feature and ask if it is a new particle. Reveal the supporting CERN explanation about event selection. Make clear this is a known benchmark case.
-
-1:25–1:55 — Change a validated selection. Show baseline and revision, the exact parameter change, and the new computed counts. Let the judge choose a supported value if time allows.
-
-1:55–2:20 — Open a contributing entry and its evidence, or the detector link if entry inspection was cut. Trace a statement back to the underlying material.
-
-2:20–2:45 — Export the investigation and show that the notebook contains the computation, not just a search result or download command.
-
-2:45–3:00 — Close: “Beamline makes CERN data something you can investigate, question, and reproduce.”
-
-A separate short path demonstrates the exact challenge request for 13 TeV muon data and the CMS-solenoid documentation question. Do not pretend the 2012 benchmark satisfies a 13 TeV request.
-
-Use a local cache of authentic inputs with its provenance visible. If a previous run is replayed, label it as a saved run. Keep an actual recording as an outage backup and identify it as a recording. Never fake a live result.
-
-## 14. Risk and fallback decisions
+## 13. Risk and fallback decisions
 
 | Risk | Prevention or fallback |
 | --- | --- |
 | Data access is slow | Inspect early, cache authentic bounded inputs, disclose cached/fresh status |
-| Desired feature is not visible | Validate day one; change demo or use a disclosed larger computation |
+| Desired feature is not visible | Validate day one; change the default investigation or use a disclosed larger computation |
 | Physics interpretation is too strong | Separate observed values from published explanation; expert review where available |
 | Model response takes too long | Make controls and plots independent of narrative generation; cache immutable inputs |
 | Reduced data lacks variables | Capability checks; useful “not available in this sample” states; no invented controls |
@@ -423,9 +418,9 @@ Use a local cache of authentic inputs with its provenance visible. If a previous
 | Service loses state | Persist investigation/run state; test worker restart and SSE reconnect |
 | Rubric requires a named framework | Resolve day one; add bounded, truthful integration, trade off stretch work |
 | Interface becomes confusing | One workspace and one flagship story; user test before polish freeze |
-| New features destabilize demo | Day-four scope freeze and day-five rehearsal buffer |
+| New features destabilize release | Day-four scope freeze and day-five rehearsal buffer |
 
-## 15. Primary sources checked for this plan
+## 14. Primary sources checked for this plan
 
 - [CMS NanoAOD getting-started guide](https://opendata.cern.ch/docs/cms-getting-started-nanoaod): data access, Python compatibility, schema links, certified-run filtering requirements.
 - [CMS 2016H DoubleMuon NanoAOD record 30555](https://opendata.cern.ch/record/30555): 13 TeV pp data, format, size, selection information, required validation masks.
@@ -434,4 +429,4 @@ Use a local cache of authentic inputs with its provenance visible. If a previous
 - [ROOT dimuon analysis tutorial](https://root.cern/doc/master/df102__NanoAODDimuonAnalysis_8py_source.html): reference selections, calculation, spectrum, and cut-flow.
 - [CERN CMS overview](https://home.cern/science/experiments/cms/): detector explanation source; numerical details need source/era awareness rather than merging descriptions blindly.
 
-The first implementation action is the day-one scientific spike. It decides the feasible data path before a large UI redesign. This document proposes a focused five-day build; it does not authorize claiming unbuilt features or guarantee a judging result.
+The first implementation action is the day-one scientific spike. It decides the feasible data path before a large UI redesign. This document proposes a focused five-day build; it does not authorize claiming unbuilt features or guarantee an external judging result.

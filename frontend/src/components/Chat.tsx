@@ -327,6 +327,7 @@ export default function Chat({ health, helpOpen, onOpenHelp, onCloseHelp, onOpen
             setFocusId(id);
             setActiveTab("investigate");
           }}
+          onOpenFindData={focusComposer}
         />
         <AppFooter onOpenHelp={openHelp} onOpenTrust={onOpenTrust} />
       </DashboardShell>

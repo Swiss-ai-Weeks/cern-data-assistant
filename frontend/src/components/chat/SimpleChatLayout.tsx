@@ -2,7 +2,6 @@ import type { Ref } from "react";
 import type { AgentStreamEvent } from "../../api";
 import type { AgentResponse, HealthResponse, RecordSummary } from "../../types";
 import { STARTER_QUERIES } from "../../lib/starterQueries";
-import { DEMO_SCENES, type DemoScene } from "../../lib/demoQueries";
 import AgentTimeline from "../AgentTimeline";
 import AnswerCard from "../AnswerCard";
 import IntegrityRail from "../IntegrityRail";
@@ -48,8 +47,6 @@ interface Props {
   activeAsstId?: string | null;
   onSelectThread?: (asstId: string) => void;
 }
-
-const DEMO_BEATS: DemoScene[] = ["discovery", "grounded", "integrity"];
 
 function heroRecord(result: AgentResponse | null): RecordSummary | null {
   if (!result?.search?.results?.length && !result?.picked) return null;
@@ -118,29 +115,8 @@ export default function SimpleChatLayout({
               </p>
             )}
           </div>
-          <div className="demo-beats">
-            <p className="microlabel demo-beats-label">Pitch paths</p>
-            <div className="demo-beats-row">
-              {DEMO_BEATS.map((key) => {
-                const scene = DEMO_SCENES[key];
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    className="demo-beat-btn"
-                    disabled={busy}
-                    onClick={() => onStarter(scene.queries[0])}
-                  >
-                    <span className="demo-beat-kicker">{String(DEMO_BEATS.indexOf(key) + 1).padStart(2, "0")}</span>
-                    <strong className="demo-beat-title">{scene.title.replace(" demo", "")}</strong>
-                    <span className="demo-beat-hint">{scene.description}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
           <div className="simple-chat-chips">
-            <p className="microlabel simple-chat-chips-label">Or try a question</p>
+            <p className="microlabel simple-chat-chips-label">Try a question</p>
             {STARTER_QUERIES.map((q) => (
               <button key={q} type="button" className="example-chip" disabled={busy} onClick={() => onStarter(q)}>
                 {q}
@@ -190,6 +166,14 @@ export default function SimpleChatLayout({
           )}
 
           {live?.error && <div className="error-banner">{live.error}</div>}
+
+          {result?.search?.constraint_notes && result.search.constraint_notes.length > 0 && (
+            <div className="constraint-banner" role="status">
+              {result.search.constraint_notes.map((note) => (
+                <p key={note}>{note}</p>
+              ))}
+            </div>
+          )}
 
           {searchPending && <PassportSkeleton />}
 

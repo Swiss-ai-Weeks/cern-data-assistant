@@ -1,4 +1,4 @@
-import { useState, type Ref } from "react";
+import type { Ref } from "react";
 import type { AgentStreamEvent } from "../../api";
 import type { BeamlinePromptInputHandle } from "../ui/beamline-prompt-input";
 import type { AgentResponse, HealthResponse, RecordSummary } from "../../types";
@@ -47,6 +47,7 @@ interface Props {
   threadItems?: ThreadItem[];
   activeAsstId?: string | null;
   onSelectThread?: (asstId: string) => void;
+  onOpenFindData: () => void;
 }
 
 function heroRecord(result: AgentResponse | null): RecordSummary | null {
@@ -116,34 +117,35 @@ export default function InvestigateDashboard({
   threadItems = [],
   activeAsstId = null,
   onSelectThread,
+  onOpenFindData,
 }: Props) {
-  const [investigationOpen, setInvestigationOpen] = useState(false);
   if (activeTab === "investigate") {
-    if (investigationOpen) return <InvestigationWorkspace onClose={() => setInvestigationOpen(false)} />;
     return (
       <>
-        {idle && <section className="iv-launch-card" aria-label="Guided CERN investigation">
-          <div><p className="iv-eyebrow">NEW · WORKING WITH REAL DATA</p><h2>Run a CERN investigation, not just a search.</h2><p>Compute a CMS muon spectrum, change the selection, and inspect the evidence behind a documented feature.</p></div>
-          <button type="button" onClick={() => setInvestigationOpen(true)}>Open the dimuon lab →</button>
-        </section>}
-        <SimpleChatLayout
-          health={health}
-          query={query}
-          composerValue={composerValue}
-          onComposerChange={onComposerChange}
-          onSubmitComposer={onSubmitComposer}
-          busy={busy}
-          idle={idle}
-          live={live}
-          followups={followups}
-          onStarter={onStarter}
-          onOpenRecord={onOpenRecord}
-          promptInputRef={promptInputRef}
-          onOpenHelp={onOpenHelp}
-          threadItems={threadItems}
-          activeAsstId={activeAsstId}
-          onSelectThread={onSelectThread}
-        />
+        <InvestigationWorkspace onOpenFindData={onOpenFindData} />
+        {!idle && (
+          <section className="iv-catalog-band" aria-label="Catalog and documentation results">
+            <p className="iv-eyebrow">FIND DATA · ASK DOCS</p>
+            <SimpleChatLayout
+              health={health}
+              query={query}
+              composerValue={composerValue}
+              onComposerChange={onComposerChange}
+              onSubmitComposer={onSubmitComposer}
+              busy={busy}
+              idle={false}
+              live={live}
+              followups={followups}
+              onStarter={onStarter}
+              onOpenRecord={onOpenRecord}
+              promptInputRef={promptInputRef}
+              onOpenHelp={onOpenHelp}
+              threadItems={threadItems}
+              activeAsstId={activeAsstId}
+              onSelectThread={onSelectThread}
+            />
+          </section>
+        )}
       </>
     );
   }

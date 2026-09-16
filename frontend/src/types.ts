@@ -22,6 +22,7 @@ export interface RecordSummary {
   url: string;
   relevance?: number;
   why?: string;
+  constraint_fit?: string;
   files?: RecordFile[];
   license?: string | null;
   picked?: boolean;
@@ -52,6 +53,11 @@ export interface SearchResponse {
   model_used: string | null;
   llm_ranked: boolean;
   results: RecordSummary[];
+  constraints_requested?: Record<string, string | number | null>;
+  constraints_executable?: Record<string, string | number | string[]>;
+  investigation_binding?: { available: boolean; record_id: number; energy_tev: number; recipe: string };
+  constraint_match?: string;
+  constraint_notes?: string[];
 }
 
 export interface HealthResponse {

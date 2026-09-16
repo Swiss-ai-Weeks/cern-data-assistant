@@ -13,7 +13,7 @@ import zipfile
 import numpy as np
 from flask import Blueprint, current_app, jsonify, request, send_file
 
-from . import recipe
+from . import jobs, recipe, schemas
 
 bp = Blueprint('investigations', __name__, url_prefix='/api/investigations')
 DEFAULT_DIRECTORY = Path(__file__).resolve().parent.parent / 'data' / 'dimuon'
@@ -62,8 +62,11 @@ def sample():
 
 def connection():
     directory().mkdir(parents=True, exist_ok=True)
-    db = sqlite3.connect(directory() / 'runs.sqlite3', timeout=10)
+    db = sqlite3.connect(directory() / 'runs.sqlite3', timeout=10, isolation_level=None)
+    db.execute('PRAGMA journal_mode=WAL')
     db.execute('CREATE TABLE IF NOT EXISTS runs (id TEXT PRIMARY KEY, payload TEXT NOT NULL)')
+    db.execute('CREATE TABLE IF NOT EXISTS investigations (id TEXT PRIMARY KEY, payload TEXT NOT NULL)')
+    jobs.ensure_table(db)
     return db
 
 
@@ -110,7 +113,71 @@ def status():
     except FileNotFoundError as exc:
         return jsonify(ready=False, message=str(exc), sources=SOURCES)
     return jsonify(ready=True, manifest=manifest, defaults=recipe.DEFAULT_SPEC,
-                   sources=SOURCES, scope='CMS 2012 reduced muons, 8 TeV')
+                   sources=SOURCES, scope='CMS 2012 reduced muons, 8 TeV',
+                   constraints=schemas.DEFAULT_CONSTRAINTS, evidence_labels=schemas.EVIDENCE_LABELS,
+                   goal=schemas.DEFAULT_GOAL)
+
+
+def _investigation_id():
+    return hashlib.sha256(f'{time.time_ns()}'.encode()).hexdigest()[:20]
+
+
+def find_investigation(investigation_id):
+    if not re.fullmatch(r'[a-f0-9]{20}', investigation_id):
+        return None
+    with connection() as db:
+        row = db.execute('SELECT payload FROM investigations WHERE id=?', (investigation_id,)).fetchone()
+    return json.loads(row[0]) if row else None
+
+
+def store_investigation(record):
+    with connection() as db:
+        db.execute('INSERT OR REPLACE INTO investigations VALUES (?,?)', (record['id'], json.dumps(record)))
+    return record
+
+
+@bp.post('/sessions')
+def create_session():
+    body = request.get_json(silent=True) or {}
+    if not isinstance(body, dict) or set(body) - {'goal', 'spec', 'constraints', 'active_run_id', 'baseline_run_id', 'run_ids'}:
+        raise ValueError('Provide investigation fields only.')
+    spec = recipe.validate_spec(body.get('spec', {}))
+    record = schemas.investigation_record(
+        _investigation_id(), spec, goal=body.get('goal'), constraints=body.get('constraints'),
+        active_run_id=body.get('active_run_id'), baseline_run_id=body.get('baseline_run_id'),
+        run_ids=body.get('run_ids'), updated_at=datetime.now(timezone.utc).isoformat(),
+    )
+    if record['active_run_id'] and not find_run(record['active_run_id']):
+        raise ValueError('Active run was not found.')
+    return jsonify(store_investigation(record)), 201
+
+
+@bp.get('/sessions/<investigation_id>')
+def session_detail(investigation_id):
+    payload = find_investigation(investigation_id)
+    return (jsonify(payload), 200) if payload else (jsonify(error='Investigation not found.'), 404)
+
+
+@bp.put('/sessions/<investigation_id>')
+def save_session(investigation_id):
+    existing = find_investigation(investigation_id)
+    if not existing:
+        return jsonify(error='Investigation not found.'), 404
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict) or set(body) - {'goal', 'spec', 'constraints', 'active_run_id', 'baseline_run_id', 'run_ids'}:
+        raise ValueError('Provide investigation fields only.')
+    spec = recipe.validate_spec(body.get('spec', existing['spec']))
+    record = schemas.investigation_record(
+        investigation_id, spec, goal=body.get('goal', existing['goal']),
+        constraints=body.get('constraints', existing['constraints']),
+        active_run_id=body.get('active_run_id', existing['active_run_id']),
+        baseline_run_id=body.get('baseline_run_id', existing['baseline_run_id']),
+        run_ids=body.get('run_ids', existing['run_ids']),
+        updated_at=datetime.now(timezone.utc).isoformat(),
+    )
+    if record['active_run_id'] and not find_run(record['active_run_id']):
+        raise ValueError('Active run was not found.')
+    return jsonify(store_investigation(record))
 
 
 @bp.post('/runs')
@@ -120,6 +187,49 @@ def run():
         raise ValueError('Provide an object containing analysis spec only.')
     spec = recipe.validate_spec(body.get('spec', {}))
     return jsonify(materialize(spec))
+
+
+@bp.post('/jobs')
+def submit_job():
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict) or set(body) - {'spec'}:
+        raise ValueError('Provide an object containing analysis spec only.')
+    spec = recipe.validate_spec(body.get('spec', {}))
+    db = connection()
+    try:
+        job_id = jobs.create(db, spec)
+        jobs.update(db, job_id, status='running')
+    finally:
+        db.close()
+    try:
+        result = materialize(spec)
+    except Exception as exc:
+        db = connection()
+        try:
+            jobs.update(db, job_id, status='failed', error=str(exc))
+        finally:
+            db.close()
+        raise
+    db = connection()
+    try:
+        jobs.update(db, job_id, status='complete', run_id=result['id'])
+        payload = jobs.get(db, job_id)
+    finally:
+        db.close()
+    return jsonify({**payload, 'run': result})
+
+
+@bp.get('/jobs/<job_id>')
+def job_detail(job_id):
+    with connection() as db:
+        payload = jobs.get(db, job_id)
+    if not payload:
+        return jsonify(error='Analysis job not found.'), 404
+    if payload['run_id']:
+        run_payload = find_run(payload['run_id'])
+        if run_payload:
+            payload = {**payload, 'run': run_payload}
+    return jsonify(payload)
 
 
 @bp.get('/runs/<run_id>')

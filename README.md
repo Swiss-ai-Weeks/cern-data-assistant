@@ -247,7 +247,7 @@ Manual **Find datasets** / **Ask about CERN** tabs are still there.
 
 ---
 
-## Run the full stack on the H100 (demo setup)
+## Run the full stack on the H100
 
 One process on the GPU box serves the built UI **and** the API on port 5001;
 teammates only need one SSH tunnel and no local Python/Node.
@@ -262,13 +262,11 @@ scripts/start_h100.sh      # starts Ollama if needed, pulls models, builds index
 
 `start_h100.sh --rebuild` also rebuilds the RAG index and the UI bundle after a `git pull`.
 The script writes `backend/.env` with `OLLAMA_MODEL=qwen2.5:32b`, `SERVE_FRONTEND=1`, `FLASK_DEBUG=0`.
-Before a pitch, warm the 32B model so the first question is not a GPU cold-start:
+Warm the 32B model so the first request is not a GPU cold-start:
 
 ```bash
 scripts/warm_h100.sh
 ```
-
-API/reproduction rehearsal: `./scripts/judge_demo.sh`
 
 From your laptop:
 
@@ -302,9 +300,8 @@ cern-data-assistant/
 │   ├── tests/              # unittest (no network): rails, cache, flattening
 │   └── requirements.txt
 ├── scripts/
-│   ├── start_h100.sh       # one-box demo on the GPU node
-│   ├── warm_h100.sh        # keep 32B + embed model loaded
-│   └── judge_demo.sh       # pitch queries against /api/agent
+│   ├── start_h100.sh       # one-box deploy on the GPU node
+│   └── warm_h100.sh        # keep 32B + embed model loaded
 ├── HACKATHON_PLAN.md       # product plan and build status
 ├── frontend/
 │   └── src/                # React + Vite UI (Beamline)

@@ -1,0 +1,63 @@
+"""SQLite-backed analysis jobs for reconnect after refresh."""
+from datetime import datetime, timezone
+import hashlib
+import json
+import sqlite3
+import time
+
+
+def ensure_table(db: sqlite3.Connection):
+    db.execute(
+        '''CREATE TABLE IF NOT EXISTS jobs (
+            id TEXT PRIMARY KEY,
+            status TEXT NOT NULL,
+            spec TEXT NOT NULL,
+            run_id TEXT,
+            error TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )'''
+    )
+
+
+def new_id() -> str:
+    return hashlib.sha256(f'job:{time.time_ns()}'.encode()).hexdigest()[:20]
+
+
+def create(db: sqlite3.Connection, spec: dict) -> str:
+    ensure_table(db)
+    job_id = new_id()
+    now = datetime.now(timezone.utc).isoformat()
+    db.execute(
+        'INSERT INTO jobs VALUES (?,?,?,?,?,?,?)',
+        (job_id, 'queued', json.dumps(spec), None, None, now, now),
+    )
+    return job_id
+
+
+def update(db: sqlite3.Connection, job_id: str, *, status: str, run_id: str | None = None, error: str | None = None):
+    ensure_table(db)
+    now = datetime.now(timezone.utc).isoformat()
+    db.execute(
+        'UPDATE jobs SET status=?, run_id=?, error=?, updated_at=? WHERE id=?',
+        (status, run_id, error, now, job_id),
+    )
+
+
+def get(db: sqlite3.Connection, job_id: str) -> dict | None:
+    ensure_table(db)
+    row = db.execute(
+        'SELECT id, status, spec, run_id, error, created_at, updated_at FROM jobs WHERE id=?',
+        (job_id,),
+    ).fetchone()
+    if not row:
+        return None
+    return {
+        'id': row[0],
+        'status': row[1],
+        'spec': json.loads(row[2]),
+        'run_id': row[3],
+        'error': row[4],
+        'created_at': row[5],
+        'updated_at': row[6],
+    }

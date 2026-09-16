@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import type { Entries } from '../../lib/investigationApi';
+import type { Entries, VariableDoc } from '../../lib/investigationApi';
 
-export default function EntryInspector({data}: {data: Entries}) {
+export default function EntryInspector({ data, variableDocs = [] }: { data: Entries; variableDocs?: VariableDoc[] }) {
   const [index, setIndex] = useState(0);
   useEffect(() => setIndex(0), [data]);
   const event = data.entries[Math.min(index, data.entries.length-1)];
@@ -20,6 +20,19 @@ export default function EntryInspector({data}: {data: Entries}) {
         <div><p className="iv-event-mass">{event.mass.toFixed(3)} <span>GeV</span></p><p className="iv-muted">Reconstructed pair mass</p><table><thead><tr><th>Muon</th><th>pT (GeV)</th><th>η</th><th>φ (rad)</th></tr></thead><tbody>{event.muons.map((m,i) => <tr key={i}><td>μ{m.charge>0 ? '+' : '−'}</td><td>{m.pt.toFixed(2)}</td><td>{m.eta.toFixed(2)}</td><td>{m.phi.toFixed(2)}</td></tr>)}</tbody></table></div>
       </div>
       <p className="iv-caption">Directions use measured φ; detector rings are schematic, not recorded hits. {data.identity} {data.ordering}</p>
+      {variableDocs.length > 0 && (
+        <div className="iv-variable-docs">
+          <p className="iv-eyebrow">WHAT THESE QUANTITIES CONNECT TO</p>
+          <div className="iv-links">
+            {variableDocs.map((doc) => (
+              <a key={doc.id} href={doc.url} target="_blank" rel="noreferrer">
+                <span>{doc.label}</span>
+                {doc.summary} ↗
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
     </>}
   </section>;
 }

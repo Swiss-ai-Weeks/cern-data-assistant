@@ -15,7 +15,7 @@ Original catalog search and grounded detector Q&A still exist. The dimuon lab co
 | Canonical dimuon recipe, cut-flow, overflow/underflow | Done — `backend/analysis/recipe.py` |
 | Bounded record-12341 sample with portal checksums | Done — `backend/analysis/prepare.py` |
 | Chosen flagship story (trigger feature vs particle) | Done as copy; **not** proven on the staged sample |
-| 30 GeV feature visible on the chosen bounded sample | **Not done** — day-one validation gate |
+| 30 GeV feature visible on the chosen bounded sample | Partial — heuristic `reference_validation` on `/status` when sample is staged |
 | Critical passages saved as verbatim CERN text | Partial — curated summaries in `service.py` / `seed.json` |
 | Baseline product timings captured | **Not done** |
 
@@ -24,8 +24,8 @@ Original catalog search and grounded detector Q&A still exist. The dimuon lab co
 | Item | Status |
 | --- | --- |
 | Typed Investigation / AnalysisSpec / AnalysisRun records | Partial — `schemas.py` + sessions API + UI session save |
-| Job worker + streamed job transitions | Partial — SQLite `jobs` table + `POST/GET /jobs`; SSE still **not done** |
-| Refresh reconnect to persisted investigations | Partial — server session id; full run reload via job/run ids |
+| Job worker + streamed job transitions | Partial — SQLite `jobs` + `POST /jobs/stream` SSE transitions |
+| Refresh reconnect to persisted investigations | Partial — `GET /sessions/<id>/restore` reloads run history |
 | Result-first workspace (section 7 layout) | Partial — investigation is home; three-column layout started |
 | Natural-language selection updates | Partial — keyword shortcuts in `/suggest` |
 | Editable dataset constraint labels (capability A) | Partial — visible locked tags on investigation |
@@ -36,7 +36,7 @@ Original catalog search and grounded detector Q&A still exist. The dimuon lab co
 | Item | Status |
 | --- | --- |
 | Baseline vs revision overlay and count delta | Done in the lab |
-| Export recipe + sample + sources + notebook | Partial — ZIP exists; no rendered figure, weak lockfile |
+| Export recipe + sample + sources + notebook | Partial — ZIP includes `spectrum.png` when matplotlib is available; lockfile still minimal |
 | Documented trigger case shown beside the plot | Partial — hardcoded panel + optional RAG ask |
 | Four evidence labels (Calculated / Documented / Interpretation / Not established) | Partial — model in API + evidence panel |
 | Frozen ~30-prompt evaluation set | **Not done** |
@@ -47,7 +47,7 @@ Original catalog search and grounded detector Q&A still exist. The dimuon lab co
 | --- | --- |
 | Click a bin and inspect source entries | Done |
 | Schematic from actual muon kinematics | Partial — φ projection only |
-| Detector / variable documentation map | **Not done** |
+| Detector / variable documentation map | Partial — curated links on entry inspection + `/variables/docs` |
 | Strict constraint UX on catalog search | **Not done** |
 | Numeric controls independent of the model | Partial — sliders compute locally; explanation still calls Ask |
 | Beginner user test recorded | **Not done** |

@@ -11,9 +11,9 @@ import time
 import zipfile
 
 import numpy as np
-from flask import Blueprint, current_app, jsonify, request, send_file
+from flask import Blueprint, Response, current_app, jsonify, request, send_file, stream_with_context
 
-from . import jobs, recipe, schemas
+from . import evidence_map, export_render, jobs, recipe, schemas, validate
 
 bp = Blueprint('investigations', __name__, url_prefix='/api/investigations')
 DEFAULT_DIRECTORY = Path(__file__).resolve().parent.parent / 'data' / 'dimuon'
@@ -112,10 +112,20 @@ def status():
         _, manifest = sample()
     except FileNotFoundError as exc:
         return jsonify(ready=False, message=str(exc), sources=SOURCES)
-    return jsonify(ready=True, manifest=manifest, defaults=recipe.DEFAULT_SPEC,
-                   sources=SOURCES, scope='CMS 2012 reduced muons, 8 TeV',
-                   constraints=schemas.DEFAULT_CONSTRAINTS, evidence_labels=schemas.EVIDENCE_LABELS,
-                   goal=schemas.DEFAULT_GOAL)
+    baseline = materialize(recipe.DEFAULT_SPEC)
+    return jsonify(
+        ready=True,
+        manifest=manifest,
+        defaults=recipe.DEFAULT_SPEC,
+        sources=SOURCES,
+        scope='CMS 2012 reduced muons, 8 TeV',
+        constraints=schemas.DEFAULT_CONSTRAINTS,
+        evidence_labels=schemas.EVIDENCE_LABELS,
+        goal=schemas.DEFAULT_GOAL,
+        variable_docs=evidence_map.for_entry(),
+        reference_validation=validate.reference_feature_report(baseline['histogram']),
+        baseline_run_id=baseline['id'],
+    )
 
 
 def _investigation_id():
@@ -158,6 +168,28 @@ def session_detail(investigation_id):
     return (jsonify(payload), 200) if payload else (jsonify(error='Investigation not found.'), 404)
 
 
+@bp.get('/sessions/<investigation_id>/restore')
+def restore_session(investigation_id):
+    payload = find_investigation(investigation_id)
+    if not payload:
+        return jsonify(error='Investigation not found.'), 404
+    runs = []
+    seen = set()
+    for run_id in list(payload.get('run_ids') or []) + [payload.get('active_run_id'), payload.get('baseline_run_id')]:
+        if not run_id or run_id in seen:
+            continue
+        seen.add(run_id)
+        run_payload = find_run(run_id)
+        if run_payload:
+            runs.append(run_payload)
+    return jsonify({**payload, 'runs': runs})
+
+
+@bp.get('/variables/docs')
+def variable_docs():
+    return jsonify(evidence_map.for_entry())
+
+
 @bp.put('/sessions/<investigation_id>')
 def save_session(investigation_id):
     existing = find_investigation(investigation_id)
@@ -189,12 +221,11 @@ def run():
     return jsonify(materialize(spec))
 
 
-@bp.post('/jobs')
-def submit_job():
-    body = request.get_json(silent=True)
-    if not isinstance(body, dict) or set(body) - {'spec'}:
-        raise ValueError('Provide an object containing analysis spec only.')
-    spec = recipe.validate_spec(body.get('spec', {}))
+def _sse(event: dict) -> str:
+    return f'data: {json.dumps(event, ensure_ascii=False)}\n\n'
+
+
+def execute_job(spec):
     db = connection()
     try:
         job_id = jobs.create(db, spec)
@@ -216,7 +247,62 @@ def submit_job():
         payload = jobs.get(db, job_id)
     finally:
         db.close()
+    return job_id, payload, result
+
+
+@bp.post('/jobs')
+def submit_job():
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict) or set(body) - {'spec'}:
+        raise ValueError('Provide an object containing analysis spec only.')
+    spec = recipe.validate_spec(body.get('spec', {}))
+    job_id, payload, result = execute_job(spec)
     return jsonify({**payload, 'run': result})
+
+
+@bp.post('/jobs/stream')
+def stream_job():
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict) or set(body) - {'spec'}:
+        raise ValueError('Provide an object containing analysis spec only.')
+    spec = recipe.validate_spec(body.get('spec', {}))
+
+    def gen():
+        yield _sse({'type': 'status', 'step': 'queued', 'label': 'Analysis queued'})
+        db = connection()
+        try:
+            job_id = jobs.create(db, spec)
+            jobs.update(db, job_id, status='queued')
+        finally:
+            db.close()
+        yield _sse({'type': 'status', 'step': 'running', 'label': 'Computing from staged CERN sample', 'job_id': job_id})
+        try:
+            db = connection()
+            try:
+                jobs.update(db, job_id, status='running')
+            finally:
+                db.close()
+            result = materialize(spec)
+            db = connection()
+            try:
+                jobs.update(db, job_id, status='complete', run_id=result['id'])
+                payload = jobs.get(db, job_id)
+            finally:
+                db.close()
+            yield _sse({'type': 'result', 'job_id': job_id, 'job': payload, 'run': result})
+        except Exception as exc:
+            db = connection()
+            try:
+                jobs.update(db, job_id, status='failed', error=str(exc))
+            finally:
+                db.close()
+            yield _sse({'type': 'error', 'job_id': job_id, 'error': str(exc)})
+
+    return Response(
+        stream_with_context(gen()),
+        mimetype='text/event-stream',
+        headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no', 'Connection': 'keep-alive'},
+    )
 
 
 @bp.get('/jobs/<job_id>')
@@ -396,6 +482,10 @@ print('Reproduced:', result['selected_events'], 'selected events')
             f'{histogram["edges"][i]},{histogram["edges"][i+1]},{n}\n'
             for i, n in enumerate(histogram['counts']))).encode(),
     }
+    try:
+        files['spectrum.png'] = export_render.spectrum_png(histogram)
+    except Exception:
+        pass
     checksums = {manifest['sample_file']: manifest['sha256']}
     checksums.update({name: hashlib.sha256(content).hexdigest() for name, content in files.items()})
     files['SHA256SUMS'] = ''.join(f'{digest}  {name}\n' for name, digest in sorted(checksums.items())).encode()

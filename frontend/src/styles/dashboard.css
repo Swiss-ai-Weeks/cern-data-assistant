@@ -1353,6 +1353,8 @@
 .iv-evidence-panel { display: grid; gap: 12px; align-content: start; }
 .iv-calculated-card { padding: 12px; border: 1px solid color-mix(in srgb, var(--signal-ok) 35%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--signal-ok) 8%, var(--surface)); }
 .iv-calculated-card p { margin: 0; color: var(--ink-muted); font-size: 13px; line-height: 1.45; }
+.iv-job-status { margin: 0 0 12px; color: var(--cobalt); font: 12px var(--font-mono); }
+.iv-variable-docs { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line-soft); }
 .constraint-banner { margin: 12px 0; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--signal-warning) 40%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--signal-warning) 10%, var(--surface)); }
 .constraint-banner p { margin: 0; color: var(--ink-muted); font-size: 13px; line-height: 1.45; }
 .constraint-banner p + p { margin-top: 6px; }

@@ -3,13 +3,12 @@ import EntryInspector from "./EntryInspector";
 import Spectrum from "./Spectrum";
 import { askAssistant } from "../../api";
 import {
-  submitAnalysisJob,
+  restoreInvestigationSession,
+  streamAnalysisJob,
   createInvestigationSession,
   DEFAULT_SELECTION,
   getEntries,
-  getInvestigationSession,
   getInvestigationStatus,
-  getRun,
   loadSessionId,
   saveInvestigationSession,
   suggestSelection,
@@ -51,6 +50,7 @@ export default function InvestigationWorkspace({ onOpenFindData }: { onOpenFindD
   const [message, setMessage] = useState("");
   const [explanation, setExplanation] = useState<Awaited<ReturnType<typeof askAssistant>> | null>(null);
   const [explaining, setExplaining] = useState(false);
+  const [jobLabel, setJobLabel] = useState("");
   const autoStarted = useRef(false);
   const sessionBoot = useRef(false);
 
@@ -63,18 +63,18 @@ export default function InvestigationWorkspace({ onOpenFindData }: { onOpenFindD
       try {
         const existingId = loadSessionId();
         if (existingId) {
-          const remote = await getInvestigationSession(existingId);
+          const remote = await restoreInvestigationSession(existingId);
           setSession(remote);
           setSpec(remote.spec);
-          if (remote.active_run_id) {
-            const active = await getRun(remote.active_run_id);
-            setRun(active);
-            setHistory([active]);
+          const restored = remote.runs ?? [];
+          if (restored.length > 0) setHistory(restored);
+          const active = restored.find((item) => item.id === remote.active_run_id) ?? restored[restored.length - 1] ?? null;
+          if (active) setRun(active);
+          if (remote.baseline_run_id) {
+            const base = restored.find((item) => item.id === remote.baseline_run_id);
+            if (base) setBaseline(base);
           }
-          if (remote.baseline_run_id && remote.baseline_run_id !== remote.active_run_id) {
-            try { setBaseline(await getRun(remote.baseline_run_id)); } catch { /* optional */ }
-          }
-          autoStarted.current = Boolean(remote.active_run_id);
+          autoStarted.current = Boolean(active);
           return;
         }
         const created = await createInvestigationSession({ spec: saved?.spec ?? DEFAULT_SELECTION });
@@ -112,15 +112,20 @@ export default function InvestigationWorkspace({ onOpenFindData }: { onOpenFindD
   }, [status?.ready, run]);
 
   async function runSelection(next = spec, keepBaseline = true) {
-    setBusy(true); setError("");
+    setBusy(true); setError(""); setJobLabel("Starting analysis…");
     try {
-      const job = await submitAnalysisJob(next);
-      const result = job.run;
+      let result: Run | null = null;
+      for await (const event of streamAnalysisJob(next)) {
+        if (event.type === "status") setJobLabel(event.label);
+        if (event.type === "error") throw new Error(event.error);
+        if (event.type === "result") result = event.run;
+      }
+      if (!result) throw new Error("The analysis did not return a result.");
       if (keepBaseline && run && !baseline && JSON.stringify(run.spec) !== JSON.stringify(next)) setBaseline(run);
       setRun(result); setSpec(result.spec); setEntries(null); setBin(null);
       setHistory((previous) => previous.some((item) => item.id === result.id) ? previous : [...previous, result].slice(-8));
     } catch (e) { setError(e instanceof Error ? e.message : "The analysis could not run."); }
-    finally { setBusy(false); }
+    finally { setBusy(false); setJobLabel(""); }
   }
 
   async function inspect(nextBin: number) {
@@ -197,8 +202,15 @@ export default function InvestigationWorkspace({ onOpenFindData }: { onOpenFindD
         <span>{status?.ready ? `${status.manifest?.entries_read.toLocaleString()} source entries staged` : status?.message || "Checking prepared sample…"}</span>
         {status?.manifest && <a href={status.manifest.record_url} target="_blank" rel="noreferrer">CERN record {status.manifest.record_id} ↗</a>}
         {status?.manifest && <span>DOI {status.manifest.doi}</span>}
-        {session?.id && <span>Session {session.id.slice(0, 8)}</span>}
-      </div>
+      {session?.id && <span>Session {session.id.slice(0, 8)}</span>}
+      {status?.reference_validation && (
+        <span title={status.reference_validation.note}>
+          Reference check · Z {status.reference_validation.z_events.toLocaleString()} · 28–33 GeV {status.reference_validation.region_28_33_gev_events.toLocaleString()}
+          {status.reference_validation.reference_feature_visible ? " · feature above local baseline" : " · feature not confirmed on this sample"}
+        </span>
+      )}
+    </div>
+    {busy && jobLabel && <p className="iv-job-status" role="status">{jobLabel}</p>}
       {!status?.ready ? (
         <div className="iv-not-ready">
           <h2>The real-data sample is not prepared on this server yet.</h2>
@@ -325,7 +337,7 @@ export default function InvestigationWorkspace({ onOpenFindData }: { onOpenFindD
               </section>
             </aside>
           </div>
-          {entries && <EntryInspector data={entries} />}
+          {entries && <EntryInspector data={entries} variableDocs={status?.variable_docs ?? []} />}
         </>
       )}
     </section>

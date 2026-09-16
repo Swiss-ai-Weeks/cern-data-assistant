@@ -17,6 +17,18 @@ export type InvestigationSession = {
   updated_at: string | null;
   evidence_labels: EvidenceLabel[];
 };
+export type VariableDoc = { id: string; label: string; fields: string[]; url: string; summary: string };
+export type ReferenceValidation = {
+  z_peak_bin_gev: string;
+  z_events: number;
+  region_28_33_gev_events: number;
+  region_peak_bin_events: number;
+  region_peak_over_local_baseline: number;
+  z_over_neighbor_average: number;
+  reference_feature_visible: boolean;
+  z_visible: boolean;
+  note: string;
+};
 export type Status = {
   ready: boolean;
   manifest?: Manifest;
@@ -25,7 +37,14 @@ export type Status = {
   constraints?: Constraints;
   evidence_labels?: EvidenceLabel[];
   goal?: string;
+  variable_docs?: VariableDoc[];
+  reference_validation?: ReferenceValidation;
+  baseline_run_id?: string;
 };
+export type JobStreamEvent =
+  | { type: 'status'; step: string; label: string; job_id?: string }
+  | { type: 'result'; job_id: string; run: Run; job: AnalysisJob }
+  | { type: 'error'; job_id?: string; error: string };
 export type Suggestion = {action: 'selection' | 'evidence' | 'unsupported'; message: string; spec?: Selection};
 const BASE = import.meta.env.VITE_API_BASE ?? (import.meta.env.DEV ? 'http://localhost:5001' : '');
 const SESSION_KEY = 'beamline-investigation-session-id';
@@ -42,6 +61,33 @@ export const calculateRun = (spec: Selection) => api<Run>('/runs', {method: 'POS
 export type AnalysisJob = { id: string; status: string; spec: Selection; run_id: string | null; error: string | null; run?: Run };
 export const submitAnalysisJob = (spec: Selection) => api<AnalysisJob & { run: Run }>('/jobs', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({spec})});
 export const getAnalysisJob = (id: string) => api<AnalysisJob>(`/jobs/${encodeURIComponent(id)}`);
+
+export async function* streamAnalysisJob(spec: Selection): AsyncGenerator<JobStreamEvent> {
+  const response = await fetch(`${BASE}/api/investigations/jobs/stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+    body: JSON.stringify({ spec }),
+  });
+  if (!response.ok || !response.body) throw new Error(`Analysis stream failed (${response.status})`);
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const chunks = buffer.split('\n\n');
+    buffer = chunks.pop() ?? '';
+    for (const chunk of chunks) {
+      const line = chunk.split('\n').find((entry) => entry.startsWith('data: '));
+      if (!line) continue;
+      yield JSON.parse(line.slice(6)) as JobStreamEvent;
+    }
+  }
+}
+
+export type RestoredSession = InvestigationSession & { runs: Run[] };
+export const restoreInvestigationSession = (id: string) => api<RestoredSession>(`/sessions/${encodeURIComponent(id)}/restore`);
 export const getRun = (id: string) => api<Run>(`/runs/${encodeURIComponent(id)}`);
 export const getEntries = (id: string, bin: number) => api<Entries>(`/runs/${encodeURIComponent(id)}/entries?bin=${bin}`);
 export const suggestSelection = (query: string, spec: Selection) => api<Suggestion>('/suggest', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query, spec})});

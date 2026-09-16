@@ -28,8 +28,27 @@ type Turn = {
   generatedAt: string | null;
 };
 
+const INVESTIGATION_PANEL_KEY = "beamline-investigation-panel-open";
+
 function uid() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function investigationPanelOpen(): boolean {
+  try {
+    return sessionStorage.getItem(INVESTIGATION_PANEL_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function setInvestigationPanelOpen(open: boolean) {
+  try {
+    if (open) sessionStorage.setItem(INVESTIGATION_PANEL_KEY, "1");
+    else sessionStorage.removeItem(INVESTIGATION_PANEL_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 function historyForApi(turns: Turn[]): { role: string; content: string }[] {
@@ -130,6 +149,7 @@ export default function Chat({ health, helpOpen, onOpenHelp, onCloseHelp, onOpen
     return last?.id ?? null;
   });
   const [activeTab, setActiveTab] = useState<DashTab>("investigate");
+  const [investigationOpen, setInvestigationOpen] = useState(investigationPanelOpen);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
@@ -167,6 +187,8 @@ export default function Chat({ health, helpOpen, onOpenHelp, onCloseHelp, onOpen
     setHistoryOpen(false);
     onCloseHelp();
     setActiveTab("investigate");
+    setInvestigationOpen(true);
+    setInvestigationPanelOpen(true);
     const user: Turn = {
       id: uid(),
       role: "user",
@@ -222,6 +244,8 @@ export default function Chat({ health, helpOpen, onOpenHelp, onCloseHelp, onOpen
     setValue("");
     setActiveTab("investigate");
     setHistoryOpen(false);
+    setInvestigationOpen(false);
+    setInvestigationPanelOpen(false);
     clearInvestigationSession();
   }
 
@@ -266,7 +290,10 @@ export default function Chat({ health, helpOpen, onOpenHelp, onCloseHelp, onOpen
     setActiveTab("investigate");
     setHistoryOpen(false);
     onCloseHelp();
-    requestAnimationFrame(() => promptRef.current?.focus());
+    requestAnimationFrame(() => {
+      document.getElementById("beamline-composer")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      promptRef.current?.focus();
+    });
   }
 
   function openHelp() {
@@ -330,6 +357,15 @@ export default function Chat({ health, helpOpen, onOpenHelp, onCloseHelp, onOpen
           }}
           onOpenFindData={focusComposer}
           onFocusInvestigation={() => setActiveTab("investigate")}
+          investigationOpen={investigationOpen}
+          onOpenInvestigation={() => {
+            setInvestigationOpen(true);
+            setInvestigationPanelOpen(true);
+          }}
+          onCloseInvestigation={() => {
+            setInvestigationOpen(false);
+            setInvestigationPanelOpen(false);
+          }}
         />
         <AppFooter onOpenHelp={openHelp} onOpenTrust={onOpenTrust} />
       </DashboardShell>

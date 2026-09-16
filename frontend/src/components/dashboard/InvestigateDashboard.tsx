@@ -49,6 +49,9 @@ interface Props {
   onSelectThread?: (asstId: string) => void;
   onOpenFindData: () => void;
   onFocusInvestigation?: () => void;
+  investigationOpen: boolean;
+  onOpenInvestigation: () => void;
+  onCloseInvestigation: () => void;
 }
 
 function heroRecord(result: AgentResponse | null): RecordSummary | null {
@@ -120,11 +123,67 @@ export default function InvestigateDashboard({
   onSelectThread,
   onOpenFindData,
   onFocusInvestigation,
+  investigationOpen,
+  onOpenInvestigation,
+  onCloseInvestigation,
 }: Props) {
   if (activeTab === "investigate") {
+    const showWorkspace = !idle || investigationOpen;
+
+    if (idle && !investigationOpen) {
+      return (
+        <>
+          <div id="beamline-composer">
+            <SimpleChatLayout
+              health={health}
+              query={query}
+              composerValue={composerValue}
+              onComposerChange={onComposerChange}
+              onSubmitComposer={onSubmitComposer}
+              busy={busy}
+              idle
+              live={live}
+              followups={followups}
+              onStarter={onStarter}
+              onOpenRecord={onOpenRecord}
+              onOpenHelp={onOpenHelp}
+              promptInputRef={promptInputRef}
+              threadItems={threadItems}
+              activeAsstId={activeAsstId}
+              onSelectThread={onSelectThread}
+              onFocusInvestigation={onFocusInvestigation}
+            />
+          </div>
+          <section className="iv-home-investigation-cta" aria-labelledby="iv-home-cta-title">
+            <p className="iv-eyebrow">Staged real data</p>
+            <h2 id="iv-home-cta-title">CMS dimuon investigation</h2>
+            <p className="iv-home-cta-lede">
+              Compute a muon-pair spectrum from CERN record 12341, change the selection, and keep calculated counts
+              separate from the published explanation of the ~30 GeV feature.
+            </p>
+            <button type="button" className="iv-open-investigation" onClick={onOpenInvestigation}>
+              Open investigation workspace
+            </button>
+            {health?.investigation?.sample_prepared === false && (
+              <p className="iv-home-cta-warn">Sample not prepared on this host — workspace opens but the plot will not run.</p>
+            )}
+          </section>
+        </>
+      );
+    }
+
     return (
       <>
-        <InvestigationWorkspace health={health} onOpenFindData={onOpenFindData} />
+        {idle && investigationOpen && (
+          <div className="iv-home-back-row">
+            <button type="button" className="iv-home-back" onClick={onCloseInvestigation}>
+              ← Back to Beamline home
+            </button>
+          </div>
+        )}
+        {showWorkspace && (
+          <InvestigationWorkspace health={health} onOpenFindData={onOpenFindData} />
+        )}
         {!idle && (
           <section className="iv-catalog-band" aria-label="Catalog and documentation results">
             <p className="iv-eyebrow">FIND DATA · ASK DOCS</p>

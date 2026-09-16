@@ -14,7 +14,22 @@ import zipfile
 import numpy as np
 from flask import Blueprint, Response, current_app, jsonify, request, send_file, stream_with_context
 
-from . import adapters, claims, evidence_map, export_render, jobs, narrative, plan, provenance, recipe, schemas, source_passages, validate, worker
+from . import (
+    adapters,
+    claims,
+    evidence_map,
+    export_render,
+    jobs,
+    narrative,
+    plan,
+    product_summary,
+    provenance,
+    recipe,
+    schemas,
+    source_passages,
+    validate,
+    worker,
+)
 
 bp = Blueprint('investigations', __name__, url_prefix='/api/investigations')
 ANALYSIS_DIR = Path(__file__).resolve().parent
@@ -236,6 +251,24 @@ def investigation_metrics():
     )
 
 
+@bp.get('/product-summary')
+def investigation_product_summary():
+    """One JSON blob for judges, CI, and README health links."""
+    try:
+        _, manifest = sample()
+        sample_ready = True
+        baseline = resolve_baseline_run(manifest)
+        inv_status = {
+            'ready': True,
+            'day_one_gate': validate.day_one_gate(baseline['histogram'], entries_read=manifest.get('entries_read')),
+            'beginner_sessions_recorded': len(_load_beginner_sessions()),
+        }
+    except FileNotFoundError as exc:
+        sample_ready = False
+        inv_status = {'ready': False, 'message': str(exc)}
+    return jsonify(product_summary.build(sample_ready=sample_ready, investigation_status=inv_status))
+
+
 @bp.get('/status')
 def status():
     try:
@@ -256,7 +289,7 @@ def status():
         reference_validation=validate.reference_feature_report(baseline['histogram']),
         day_one_gate=validate.day_one_gate(baseline['histogram'], entries_read=manifest.get('entries_read')),
         baseline_run_id=baseline['id'],
-        adapters=adapters.list_adapters(),
+        adapters=[dict(item) for item in adapters.list_adapters()],
         executable_adapter=adapters.executable_binding(),
         product_phase=_product_phase(),
         eval_cases_frozen=_eval_case_count(),
@@ -511,6 +544,8 @@ def adapter_detail(recid):
             'raw files are not pre-filtered to valid run segments.'
         )
         payload['runnable_in_this_release'] = False
+        payload['execution_blockers'] = adapter.get('execution_blockers') or []
+        payload['roadmap'] = adapter.get('roadmap')
     elif str(recid) == adapters.EXECUTABLE['record_id']:
         payload['runnable_in_this_release'] = True
     return jsonify(payload)

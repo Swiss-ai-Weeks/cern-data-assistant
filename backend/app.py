@@ -116,6 +116,7 @@ def health():
             "serving_frontend": SERVE_FRONTEND,
             "cern_cache": cern_client.cache_stats(),
             "investigation": investigation,
+            "product_summary": "/api/investigations/product-summary",
         }
     )
 

@@ -78,6 +78,7 @@ export default function InvestigationWorkspace({
   const [claimList, setClaimList] = useState<InvestigationClaim[]>([]);
   const [revisionStory, setRevisionStory] = useState<RevisionNarrative | null>(null);
   const [sourceRefreshMsg, setSourceRefreshMsg] = useState("");
+  const [exportMsg, setExportMsg] = useState("");
   const autoStarted = useRef(false);
   const sessionBoot = useRef(false);
   const handoffPending = useRef<ReturnType<typeof consumeAgentHandoff>>(null);
@@ -326,11 +327,21 @@ export default function InvestigationWorkspace({
             </span>
           )}
           {run && (
-            <button type="button" className="iv-export iv-export-header" onClick={() => void exportRun(run.id, baseline?.id).catch((e) => setError(e instanceof Error ? e.message : "Export failed."))}>
+            <button
+              type="button"
+              className="iv-export iv-export-header"
+              onClick={() => {
+                setExportMsg("");
+                void exportRun(run.id, baseline?.id)
+                  .then(() => setExportMsg("Export ZIP downloaded (recipe, sample checksums, claims, notebook)."))
+                  .catch((e) => setError(e instanceof Error ? e.message : "Export failed."));
+              }}
+            >
               Export investigation
             </button>
           )}
           <button type="button" className="iv-close" onClick={onOpenFindData}>Find data or ask docs →</button>
+          {exportMsg && <p className="iv-export-msg" role="status">{exportMsg}</p>}
         </div>
       </div>
       {constraints && (

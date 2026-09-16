@@ -27,10 +27,22 @@ STRETCH_CATALOG = {
     'recipe': None,
     'status': 'catalog_only',
     'variables': [],
+    'required_variables_for_dimuon_recipe': [
+        'nMuon', 'Muon_pt', 'Muon_eta', 'Muon_phi', 'Muon_mass', 'Muon_charge',
+    ],
+    'execution_blockers': [
+        'No bounded NanoAOD sample is staged for this release.',
+        'Certified run / luminosity mask must be applied before physics selection.',
+        'Dimuon recipe is validated on reduced 2012 muons (record 12341) only.',
+    ],
     'quality_note': (
         'Requires certified-run masks and NanoAOD fields not wired into the home investigation adapter.'
     ),
     'record_url': 'https://opendata.cern.ch/record/30555',
+    'roadmap': (
+        'Future work: stage a bounded 30555 slice, apply certified-run filtering, '
+        'and register a second recipe adapter without changing the 8 TeV benchmark silently.'
+    ),
 }
 
 REGISTRY = {

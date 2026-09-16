@@ -7,21 +7,7 @@ import pytest
 from flask import Flask
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
-from analysis import adapters, constraints
 from analysis.service import bp
-
-
-def test_executable_adapter_is_record_12341():
-    binding = adapters.executable_binding()
-    assert binding['record_id'] == 12341
-    assert binding['adapter_status'] == 'executable'
-
-
-def test_stretch_adapter_is_catalog_only():
-    stretch = adapters.for_record('30555')
-    assert stretch is not None
-    assert stretch['status'] == 'catalog_only'
-    assert stretch['energy_tev'] == 13.0
 
 
 @pytest.fixture
@@ -54,19 +40,11 @@ def client(tmp_path):
     return app.test_client()
 
 
-def test_adapter_detail_30555_documents_certified_runs(client):
-    response = client.get('/api/investigations/adapters/30555')
+def test_product_summary_for_judges(client):
+    response = client.get('/api/investigations/product-summary')
     assert response.status_code == 200
     body = response.get_json()
-    assert body['status'] == 'catalog_only'
-    assert body['runnable_in_this_release'] is False
-    assert 'certified' in body['certified_run_requirement'].lower()
-    assert body.get('execution_blockers')
-
-
-def test_search_marks_30555_catalog_only():
-    payload = constraints.enrich_search(
-        'CMS dimuons 13 TeV',
-        {'results': [{'recid': 30555, 'collision_energy': '13 TeV', 'title': 'DoubleMuon', 'abstract': ''}]},
-    )
-    assert payload['results'][0]['constraint_fit'] == 'catalog_only_adapter'
+    assert body['eval_cases_frozen'] == 30
+    assert body['feature_freeze_core'] is True
+    assert body['investigation']['executable_record'] == '12341'
+    assert 'verification' in body

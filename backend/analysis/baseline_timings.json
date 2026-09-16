@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-09-16T01:30:25.354268+00:00",
+  "captured_at": "2026-09-16T01:38:17.134061+00:00",
   "method": "flask_test_client_bounded_npz",
   "run_samples": 3,
   "fresh_compute_ms": {

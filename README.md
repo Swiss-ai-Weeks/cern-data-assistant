@@ -10,7 +10,9 @@ Built for the HPE & NVIDIA Agentic AI Hackathon · [GitHub](https://github.com/S
 
 This is a temporary public tunnel to our running server. If it stops working, the team can bring it back with `./scripts/tunnel_public.sh` after starting the app.
 
-Health check: https://prostores-wallet-years-fifth.trycloudflare.com/api/health
+Health check: https://prostores-wallet-years-fifth.trycloudflare.com/api/health  
+
+Judges / CI snapshot: `/api/investigations/product-summary` (phase, gates, eval set, investigation status)
 
 ## What it does
 
@@ -55,6 +57,12 @@ ssh -N -L 5001:127.0.0.1:5001 launchpad-cern
 ```
 
 Open http://localhost:5001
+
+After `git pull`, restart the server:
+
+```bash
+PUBLIC_DEMO_URL=https://your-demo.trycloudflare.com ./scripts/restart_app.sh
+```
 
 **Real investigation data:** once on the server, prepare the bounded sample (large download):
 

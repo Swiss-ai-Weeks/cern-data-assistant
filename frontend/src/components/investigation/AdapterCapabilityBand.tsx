@@ -5,6 +5,8 @@ export type DataAdapter = {
   status: "executable" | "catalog_only" | string;
   quality_note?: string;
   record_url?: string;
+  execution_blockers?: string[];
+  roadmap?: string;
 };
 
 export default function AdapterCapabilityBand({ adapters }: { adapters: DataAdapter[] }) {
@@ -26,6 +28,14 @@ export default function AdapterCapabilityBand({ adapters }: { adapters: DataAdap
               Record {adapter.record_id} · {adapter.energy_tev} TeV
             </p>
             {adapter.quality_note && <p className="iv-caption">{adapter.quality_note}</p>}
+            {adapter.execution_blockers && adapter.execution_blockers.length > 0 && (
+              <ul className="iv-adapter-blockers">
+                {adapter.execution_blockers.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            )}
+            {adapter.roadmap && <p className="iv-caption iv-adapter-roadmap">{adapter.roadmap}</p>}
             {adapter.record_url && (
               <a href={adapter.record_url} target="_blank" rel="noreferrer">
                 Open CERN record ↗

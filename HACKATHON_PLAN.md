@@ -1,8 +1,66 @@
 # Beamline: a five-day plan for an evidence-driven CERN investigation workspace
 
-Status: proposed product direction and execution plan, not a claim that these features exist.
+Status: this document is the only product plan. Checked against the repo on 16 Sep 2026.
 Planning window: five days, supplied by Lorik. Team size and judging rubric remain unknown.
-Capacity assumption: one primary builder with coding assistance. Additional people increase validation and polish capacity; the core plan does not depend on them.
+Capacity assumption: one primary builder with coding assistance.
+
+## Build status
+
+Original catalog search and grounded detector Q&A still exist. The dimuon lab covers a slice of capabilities B–E. Capability A and the planned investigation/job architecture are not built. Do not pitch unchecked items below as shipped.
+
+### Day 1 — Prove the science path
+
+| Item | Status |
+| --- | --- |
+| Canonical dimuon recipe, cut-flow, overflow/underflow | Done — `backend/analysis/recipe.py` |
+| Bounded record-12341 sample with portal checksums | Done — `backend/analysis/prepare.py` |
+| Chosen flagship story (trigger feature vs particle) | Done as copy; **not** proven on the staged sample |
+| 30 GeV feature visible on the chosen bounded sample | **Not done** — day-one pitch gate |
+| Critical passages saved as verbatim CERN text | Partial — curated summaries in `service.py` / `seed.json` |
+| Baseline product timings captured | **Not done** |
+
+### Day 2 — Make it a product
+
+| Item | Status |
+| --- | --- |
+| Typed Investigation / AnalysisSpec / AnalysisRun records | Partial — run cache only (`runs.sqlite3`), no investigation object |
+| Job worker + streamed job transitions | **Not done** — sync Flask request |
+| Refresh reconnect to persisted investigations | **Not done** — `sessionStorage` |
+| Result-first workspace (section 7 layout) | Partial — lab overlay, not the main screen |
+| Natural-language selection updates | Partial — keyword shortcuts in `/suggest` |
+| Editable dataset constraint labels (capability A) | **Not done** |
+| Never silently relax energy/experiment in search | **Not done** outside the dimuon lab |
+
+### Day 3 — Deliver the distinction
+
+| Item | Status |
+| --- | --- |
+| Baseline vs revision overlay and count delta | Done in the lab |
+| Export recipe + sample + sources + notebook | Partial — ZIP exists; no rendered figure, weak lockfile |
+| Documented trigger case shown beside the plot | Partial — hardcoded panel + optional RAG ask |
+| Four evidence labels (Calculated / Documented / Interpretation / Not established) | **Not done** as a product model |
+| Frozen ~30-prompt evaluation set | **Not done** |
+
+### Day 4 — Make it excellent
+
+| Item | Status |
+| --- | --- |
+| Click a bin and inspect source entries | Done |
+| Schematic from actual muon kinematics | Partial — φ projection only |
+| Detector / variable documentation map | **Not done** |
+| Strict constraint UX on catalog search | **Not done** |
+| Numeric controls independent of the model | Partial — sliders compute locally; explanation still calls Ask |
+| Beginner user test recorded | **Not done** |
+| 13 TeV NanoAOD adapter (record 30555) | Stretch — **not done** |
+
+### Day 5 — Make it dependable
+
+| Item | Status |
+| --- | --- |
+| Feature freeze | **Not done** |
+| Hostile / invalid query suite | **Not done** |
+| Worker restart and reconnect test | **Not done** |
+| Three consecutive demo runs + backup recording | **Not done** |
 
 ## 1. The decision
 

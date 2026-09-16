@@ -18,7 +18,7 @@ http://127.0.0.1:5001  <---SSH 5001---  gunicorn :5001  (React + Flask)
                                         CERN API is public (opendata.cern.ch)
 ```
 
-Product spec: [PRODUCT_PLAN.md](PRODUCT_PLAN.md). Production deploy: [HOSTING.md](HOSTING.md). On the GPU box: `scripts/start_h100.sh` then `scripts/warm_h100.sh`. Before you push, run `./scripts/ship.sh` (frontend build + backend tests).
+Product plan: [HACKATHON_PLAN.md](HACKATHON_PLAN.md). On the GPU box: `scripts/start_h100.sh` then `scripts/warm_h100.sh`. Before you push, run `./scripts/ship.sh` (frontend build + backend tests).
 
 **Guided investigation:** Beamline now includes a bounded, reproducible CMS dimuon workspace. It computes a spectrum from a checksum-verified CERN sample, lets users revise muon selections, inspect contributing entries, and export the run provenance. See [HACKATHON_PLAN.md](HACKATHON_PLAN.md) for the five-day product direction. Prepare the sample on the GPU host with `backend/.venv/bin/python -m analysis.prepare --entries 500000` after installing `backend/analysis/requirements.txt`.
 
@@ -102,7 +102,7 @@ Confirm it sees the GPUs in `/tmp/ollama.log` (`NVIDIA H100 NVL`). Ollama listen
 ssh -N -L 5001:127.0.0.1:5001 launchpad-cern
 ```
 
-Open http://127.0.0.1:5001 — nothing else to start locally. See [DEMO.md](DEMO.md).
+Open http://127.0.0.1:5001 — nothing else to start locally.
 
 **Dev (Flask+Vite on the laptop, Ollama on the H100):**
 
@@ -268,7 +268,7 @@ Before a pitch, warm the 32B model so the first question is not a GPU cold-start
 scripts/warm_h100.sh
 ```
 
-Judge flow and full API/reproduction rehearsal: [DEMO.md](DEMO.md) · `./scripts/judge_demo.sh`
+API/reproduction rehearsal: `./scripts/judge_demo.sh`
 
 From your laptop:
 
@@ -304,9 +304,8 @@ cern-data-assistant/
 ├── scripts/
 │   ├── start_h100.sh       # one-box demo on the GPU node
 │   ├── warm_h100.sh        # keep 32B + embed model loaded
-│   └── judge_demo.sh       # four pitch queries against /api/agent
-├── DEMO.md                 # spoken judge script
-├── ROADMAP.md              # what's left
+│   └── judge_demo.sh       # pitch queries against /api/agent
+├── HACKATHON_PLAN.md       # product plan and build status
 ├── frontend/
 │   └── src/                # React + Vite UI (Beamline)
 └── dataset/                # optional local CERN JSON dumps (gitignored)

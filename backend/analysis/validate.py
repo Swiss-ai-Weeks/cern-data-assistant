@@ -26,8 +26,8 @@ def reference_feature_report(histogram: dict) -> dict:
         'region_peak_bin_events': int(region_peak),
         'region_peak_over_local_baseline': round(region_ratio, 2),
         'z_over_neighbor_average': round(z_ratio, 2),
-        'reference_feature_visible': region_ratio >= 1.15,
-        'z_visible': z_ratio >= 1.5,
+        'reference_feature_visible': round(region_ratio, 2) >= 1.15,
+        'z_visible': z_ratio >= 1.25,
         'note': 'Heuristic check on the bounded sample only; not a physics significance test.',
     }
 

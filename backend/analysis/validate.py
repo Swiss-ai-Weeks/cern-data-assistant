@@ -13,18 +13,21 @@ def reference_feature_report(histogram: dict) -> dict:
     region_counts = [counts[i] for i in region]
     region_total = sum(region_counts)
     z_count = counts[z_bin]
-    neighbor = max(1, sum(counts[max(0, z_bin - 3):z_bin] + counts[z_bin + 1:z_bin + 4]))
+    neighbor_values = counts[max(0, z_bin - 2):z_bin] + counts[z_bin + 1:z_bin + 3]
+    neighbor_avg = max(1.0, sum(neighbor_values) / max(1, len(neighbor_values)))
     region_peak = max(region_counts) if region_counts else 0
-    baseline = max(1, sum(counts[20:27]) // 7)
+    baseline = max(1, sum(counts[20:27]) / 7)
+    region_ratio = region_peak / baseline
+    z_ratio = z_count / neighbor_avg
     return {
         'z_peak_bin_gev': f'{edges[z_bin]:g}–{edges[z_bin + 1]:g}',
         'z_events': int(z_count),
         'region_28_33_gev_events': int(region_total),
         'region_peak_bin_events': int(region_peak),
-        'region_peak_over_local_baseline': round(region_peak / baseline, 2),
-        'z_over_neighbor_average': round(z_count / neighbor, 2),
-        'reference_feature_visible': region_peak >= baseline * 1.15,
-        'z_visible': z_count >= neighbor * 0.5,
+        'region_peak_over_local_baseline': round(region_ratio, 2),
+        'z_over_neighbor_average': round(z_ratio, 2),
+        'reference_feature_visible': region_ratio >= 1.15,
+        'z_visible': z_ratio >= 1.5,
         'note': 'Heuristic check on the bounded sample only; not a physics significance test.',
     }
 

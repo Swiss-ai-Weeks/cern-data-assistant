@@ -48,6 +48,7 @@ interface Props {
   activeAsstId?: string | null;
   onSelectThread?: (asstId: string) => void;
   onOpenFindData: () => void;
+  onFocusInvestigation?: () => void;
 }
 
 function heroRecord(result: AgentResponse | null): RecordSummary | null {
@@ -118,11 +119,12 @@ export default function InvestigateDashboard({
   activeAsstId = null,
   onSelectThread,
   onOpenFindData,
+  onFocusInvestigation,
 }: Props) {
   if (activeTab === "investigate") {
     return (
       <>
-        <InvestigationWorkspace onOpenFindData={onOpenFindData} />
+        <InvestigationWorkspace health={health} onOpenFindData={onOpenFindData} />
         {!idle && (
           <section className="iv-catalog-band" aria-label="Catalog and documentation results">
             <p className="iv-eyebrow">FIND DATA · ASK DOCS</p>
@@ -143,6 +145,7 @@ export default function InvestigateDashboard({
               threadItems={threadItems}
               activeAsstId={activeAsstId}
               onSelectThread={onSelectThread}
+              onFocusInvestigation={onFocusInvestigation}
             />
           </section>
         )}

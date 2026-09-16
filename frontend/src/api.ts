@@ -98,6 +98,8 @@ export type ToolDoneMeta = {
   guardrail?: string;
   verify_ms?: number;
   file_count?: number;
+  run_id?: string;
+  claims?: number;
 };
 
 type StreamTiming = { elapsed_ms?: number };
@@ -125,6 +127,7 @@ export type AgentStreamEvent =
       search?: AgentResponse["search"];
       answer?: AgentResponse["answer"];
       picked?: AgentResponse["picked"];
+      investigation?: AgentResponse["investigation"];
       meta?: ToolDoneMeta;
     } & StreamTiming)
   | ({ type: "result"; payload: AgentResponse } & StreamTiming)

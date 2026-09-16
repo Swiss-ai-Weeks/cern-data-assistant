@@ -1,4 +1,3 @@
-import json
 import sys
 from pathlib import Path
 
@@ -16,9 +15,9 @@ def client(tmp_path):
     sample_file = tmp_path / 'sample-0000000000000000.npz'
     np.savez_compressed(
         sample_file,
-        pt=np.array([[10.0, 12.0], [4.0, 5.0]]),
+        pt=np.array([[10.0, 12.0], [20.0, 22.0]]),
         eta=np.zeros((2, 2)),
-        phi=np.array([[0.0, 3.1], [1.0, 2.0]]),
+        phi=np.array([[0.0, 3.1], [0.5, 2.5]]),
         mass=np.full((2, 2), 0.105),
         charge=np.array([[1, -1], [1, -1]]),
         entry=np.array([1, 2]),
@@ -42,12 +41,19 @@ def client(tmp_path):
     return app.test_client()
 
 
-def test_job_stream_returns_result_event(client):
-    response = client.post('/api/investigations/jobs/stream', json={'spec': DEFAULT_SPEC})
-    assert response.status_code == 200
-    events = []
-    for block in response.data.decode().split('\n\n'):
-        line = next((l for l in block.split('\n') if l.startswith('data: ')), None)
-        if line:
-            events.append(json.loads(line[6:]))
-    assert any(event['type'] == 'result' for event in events)
+def test_session_brief_includes_claims_and_runs(client):
+    session = client.post('/api/investigations/sessions', json={'spec': DEFAULT_SPEC}).get_json()
+    baseline = client.post('/api/investigations/runs', json={'spec': DEFAULT_SPEC}).get_json()
+    revised = client.post('/api/investigations/runs', json={'spec': {**DEFAULT_SPEC, 'min_pt': 5}}).get_json()
+    client.put(
+        f"/api/investigations/sessions/{session['id']}",
+        json={
+            'active_run_id': revised['id'],
+            'baseline_run_id': baseline['id'],
+            'run_ids': [baseline['id'], revised['id']],
+        },
+    )
+    brief = client.get(f"/api/investigations/sessions/{session['id']}/brief").get_json()
+    assert brief['active_run']['id'] == revised['id']
+    assert len(brief['claims']) >= 3
+    assert brief['narrative']['summary']

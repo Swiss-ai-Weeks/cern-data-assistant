@@ -13,6 +13,7 @@ def test_thirteen_tev_query_does_not_bind_investigation():
     assert payload['constraint_match'] == 'energy_mismatch'
     assert payload['investigation_binding']['available'] is False
     assert payload['constraint_notes']
+    assert any('30555' in note for note in payload['constraint_notes'])
 
 
 def test_eight_tev_query_notes_executable_adapter():

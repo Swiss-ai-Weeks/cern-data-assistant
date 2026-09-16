@@ -79,6 +79,21 @@ export default function ResearchPassport({
             Partial metadata from catalog — open the portal for full fields.
           </div>
         )}
+        {search?.investigation_binding && !search.investigation_binding.available && (
+          <div className="passport-banner warn" role="status">
+            Home investigation stays on CMS 8 TeV record {search.investigation_binding.record_id}. This catalog result does not switch the runnable sample.
+          </div>
+        )}
+        {record.constraint_fit === "catalog_only_adapter" && (
+          <div className="passport-banner warn" role="status">
+            Record {record.recid} is catalog-supported only — NanoAOD adapter is not wired into the investigation workspace yet.
+          </div>
+        )}
+        {record.constraint_fit === "executable_sample" && (
+          <div className="passport-banner ok" role="status">
+            This record matches the bounded CMS investigation sample used on the Investigate tab.
+          </div>
+        )}
 
         <div className="passport-header-row">
           <div className="passport-header-main">

@@ -60,6 +60,11 @@ export interface SearchResponse {
   constraint_notes?: string[];
 }
 
+export interface InvestigationHealth {
+  sample_prepared: boolean;
+  recommended_gunicorn_workers?: number;
+}
+
 export interface HealthResponse {
   cern_api: "ok" | "unreachable";
   ollama: "ok" | "unreachable";
@@ -72,6 +77,7 @@ export interface HealthResponse {
     search: { size: number; hits: number; misses: number };
     record: { size: number; hits: number; misses: number };
   };
+  investigation?: InvestigationHealth;
 }
 
 export interface AskSource {
@@ -126,6 +132,28 @@ export type AssistantResponse =
   | (SearchResponse & { mode: "search"; route_confidence: number })
   | (AskResponse & { mode: "ask"; route_confidence: number });
 
+export interface AgentInvestigationResult {
+  ready: boolean;
+  message?: string;
+  interpretation?: { action: string; message: string; spec?: { min_pt: number; max_abs_eta: number; charge: string } };
+  baseline_run_id?: string;
+  run?: {
+    id: string;
+    spec: { min_pt: number; max_abs_eta: number; charge: string };
+    selected_events: number;
+    plotted_events: number;
+    histogram: { edges: number[]; counts: number[] };
+  };
+  claims?: { id: string; evidence_label: string; label: string; statement: string }[];
+  reference_validation?: {
+    region_28_33_gev_events?: number;
+    reference_feature_visible?: boolean;
+    z_peak_bin_gev?: string;
+    z_visible?: boolean;
+    note?: string;
+  };
+}
+
 export interface AgentResponse {
   query: string;
   goal: string;
@@ -133,10 +161,12 @@ export interface AgentResponse {
     search_query: string | null;
     ask_query: string | null;
     retried?: string | null;
+    investigation?: boolean;
   };
   tools_used: string[];
   search: SearchResponse | null;
   answer: AskResponse | null;
+  investigation?: AgentInvestigationResult;
   picked?: {
     recid: number | string;
     title: string;

@@ -1,7 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Run } from '../../lib/investigationApi';
+import type { ReferenceValidation, Run } from '../../lib/investigationApi';
 
-export default function Spectrum({run, baseline, selectedBin, onSelect}: {run: Run; baseline: Run | null; selectedBin: number | null; onSelect: (bin: number) => void}) {
+export default function Spectrum({
+  run,
+  baseline,
+  selectedBin,
+  onSelect,
+  referenceValidation,
+  histogramDelta,
+}: {
+  run: Run;
+  baseline: Run | null;
+  selectedBin: number | null;
+  onSelect: (bin: number) => void;
+  referenceValidation?: ReferenceValidation;
+  histogramDelta?: { low: number; high: number; delta: number }[];
+}) {
   const host = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(650);
   const [hover, setHover] = useState<number | null>(null);
@@ -28,6 +42,10 @@ export default function Spectrum({run, baseline, selectedBin, onSelect}: {run: R
       {tickValues.map(n => <g key={n}><line x1={left} x2={right} y1={y(n)} y2={y(n)} className="iv-gridline" /><text x={left-10} y={y(n)+4} textAnchor="end" className="iv-tick">{n >= 1000 ? `${n/1000}k` : Math.round(n)}</text></g>)}
       <g clipPath="url(#iv-plot-clip)">
         <rect x={x(28)} y={top} width={x(33)-x(28)} height={bottom-top} className="iv-region" />
+        <rect x={x(90)} y={top} width={Math.max(2, x(92)-x(90))} height={bottom-top} className="iv-region-z" />
+        {histogramDelta?.map((row, i) => row.delta !== 0 ? (
+          <rect key={`${row.low}-${i}`} x={x(row.low)} y={top + (bottom-top) * 0.72} width={Math.max(1, x(row.high)-x(row.low))} height={Math.min(18, Math.abs(row.delta))} className={row.delta > 0 ? 'iv-delta-up' : 'iv-delta-down'} opacity={0.35} />
+        ) : null)}
         {baseline && <path d={path(baseline.histogram.counts)} className="iv-reference-line" />}
         <path d={path(run.histogram.counts)} className="iv-spectrum-line" />
         {highlighted !== null && <rect x={x(highlighted)} y={top} width={Math.max(2,x(1)-x(0))} height={bottom-top} className="iv-highlight" />}
@@ -42,6 +60,10 @@ export default function Spectrum({run, baseline, selectedBin, onSelect}: {run: R
       <span><strong>{run.histogram.underflow.toLocaleString()}</strong> below · <strong>{run.histogram.overflow.toLocaleString()}</strong> above</span>
     </div>
     <div className="iv-chart-bottom"><span>{highlighted === null ? 'Click the spectrum to inspect real entries.' : `${highlighted}–${highlighted+1} GeV · ${run.histogram.counts[highlighted].toLocaleString()} events`}</span><label>Inspect bin <select aria-label="Inspect mass bin" value={selectedBin ?? ''} onChange={e => onSelect(Number(e.target.value))}><option value="" disabled>Select…</option>{run.histogram.counts.map((_, i) => <option value={i} key={i}>{i}–{i+1} GeV</option>)}</select></label></div>
-    <p className="iv-caption">Shaded: region discussed in CERN’s reference analysis. The annotation is a literature reference, not an automated discovery claim.</p>
+    <p className="iv-caption">
+      Shaded 28–33 GeV: region discussed in CERN’s reference analysis
+      {referenceValidation?.z_visible ? ` · Z peak visible near ${referenceValidation.z_peak_bin_gev} GeV on this sample` : ""}.
+      Delta ticks (when comparing) show bin-level event shifts versus the reference run.
+    </p>
   </div>;
 }

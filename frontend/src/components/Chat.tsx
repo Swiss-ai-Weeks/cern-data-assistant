@@ -98,6 +98,7 @@ function applyEvent(t: Turn, ev: AgentStreamEvent, query: string): Turn {
         search: ev.search !== undefined ? ev.search : prev.search,
         answer: ev.answer !== undefined ? ev.answer : prev.answer,
         picked: ev.picked !== undefined ? ev.picked : prev.picked,
+        investigation: ev.investigation !== undefined ? ev.investigation : prev.investigation,
       },
     };
   }
@@ -328,6 +329,7 @@ export default function Chat({ health, helpOpen, onOpenHelp, onCloseHelp, onOpen
             setActiveTab("investigate");
           }}
           onOpenFindData={focusComposer}
+          onFocusInvestigation={() => setActiveTab("investigate")}
         />
         <AppFooter onOpenHelp={openHelp} onOpenTrust={onOpenTrust} />
       </DashboardShell>

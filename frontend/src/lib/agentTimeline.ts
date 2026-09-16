@@ -51,6 +51,12 @@ function metaDetail(ev: AgentStreamEvent): string | undefined {
     if (ev.tool === "fetch_record" && m.file_count != null) {
       return `${m.file_count} files attached`;
     }
+    if (ev.tool === "investigation") {
+      const parts: string[] = [];
+      if (m.run_id) parts.push(`run ${String(m.run_id).slice(0, 8)}…`);
+      if (m.claims != null) parts.push(`${m.claims} claims`);
+      return parts.join(" · ") || "Computed dimuon spectrum";
+    }
   }
   if (ev.type === "status") return ev.label;
   if (ev.type === "plan" && ev.goal) return ev.goal;
@@ -127,9 +133,19 @@ export function buildTimeline(
   }
 
   // Skip stages that never ran (search-only or ask-only turns)
+  const investigationRan = events.some((e) => e.type === "tool_done" && e.tool === "investigation");
   const searchRan = events.some((e) => e.type === "tool_done" && e.tool === "search");
   const askRan = events.some((e) => e.type === "tool_done" && e.tool === "ask");
   const fetchRan = events.some((e) => e.type === "tool_done" && e.tool === "fetch_record");
+  if (investigationRan) {
+    byId.get("search_catalog")!.state = "pending";
+    byId.get("rank_records")!.state = "pending";
+    byId.get("retrieve_docs")!.state = "pending";
+    byId.get("prepare_handoff")!.state = "pending";
+    const verify = byId.get("verify_grounding")!;
+    verify.state = "complete";
+    verify.label = "Computed investigation claims";
+  }
   if (!searchRan) {
     byId.get("search_catalog")!.state = "pending";
     byId.get("rank_records")!.state = "pending";

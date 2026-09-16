@@ -1,7 +1,7 @@
 """Parse dataset constraints from natural language; never silently relax execution."""
 import re
 
-from . import schemas
+from . import adapters, schemas
 
 EXECUTABLE = schemas.DEFAULT_CONSTRAINTS
 
@@ -33,8 +33,12 @@ def _record_energy(record: dict) -> float | None:
 
 
 def _fit_record(record: dict, requested: dict, executable: dict) -> str:
-    if str(record.get('recid')) == str(executable['record_id']):
+    recid = str(record.get('recid'))
+    if recid == str(executable['record_id']):
         return 'executable_sample'
+    adapter = adapters.for_record(recid)
+    if adapter and adapter.get('status') == 'catalog_only':
+        return 'catalog_only_adapter'
     energy = _record_energy(record)
     if requested.get('requested_energy_tev') and energy:
         if abs(energy - requested['requested_energy_tev']) < 0.01:
@@ -64,6 +68,11 @@ def enrich_search(query: str, payload: dict) -> dict:
             f"{executable['energy_tev']:g} TeV CMS reduced muons (record {executable['record_id']}). "
             'Catalog results are shown without switching the analysis sample.'
         )
+        if abs(req_energy - 13.0) < 0.01:
+            notes.append(
+                'CERN record 30555 (2016 DoubleMuon NanoAOD at 13 TeV) appears in catalog search, '
+                'but there is no second runnable adapter in this release. Opening those files does not change the home spectrum.'
+            )
     elif requested.get('experiment') and requested['experiment'] != executable['experiment']:
         match = 'experiment_mismatch'
         notes.append(

@@ -18,6 +18,8 @@ import BeamlineComposerStrip from "./BeamlineComposerStrip";
 import OtherRecordsList from "./OtherRecordsList";
 import SessionThread, { type ThreadItem } from "./SessionThread";
 import TurnSummary from "./TurnSummary";
+import InvestigationAgentCard from "../investigation/InvestigationAgentCard";
+import { storeAgentHandoff } from "../../lib/investigationApi";
 
 interface LiveTurn {
   steps: string[];
@@ -46,6 +48,7 @@ interface Props {
   threadItems?: ThreadItem[];
   activeAsstId?: string | null;
   onSelectThread?: (asstId: string) => void;
+  onFocusInvestigation?: () => void;
 }
 
 function heroRecord(result: AgentResponse | null): RecordSummary | null {
@@ -80,6 +83,7 @@ export default function SimpleChatLayout({
   threadItems = [],
   activeAsstId = null,
   onSelectThread,
+  onFocusInvestigation,
 }: Props) {
   const result = live?.result ?? null;
   const hero = heroRecord(result);
@@ -176,6 +180,28 @@ export default function SimpleChatLayout({
           )}
 
           {searchPending && <PassportSkeleton />}
+
+          {result?.investigation && (
+            <InvestigationAgentCard
+              data={result.investigation}
+              onOpenWorkspace={() => {
+                const inv = result.investigation;
+                if (inv?.ready && inv.run) {
+                  storeAgentHandoff({
+                    run: inv.run as import("../../lib/investigationApi").Run,
+                    baselineRunId: inv.baseline_run_id ?? null,
+                    spec: {
+                      min_pt: inv.run.spec.min_pt,
+                      max_abs_eta: inv.run.spec.max_abs_eta,
+                      charge: inv.run.spec.charge as import("../../lib/investigationApi").Selection["charge"],
+                    },
+                    focusBin: /bump|peak|30/.test(query.toLowerCase()) ? 30 : null,
+                  });
+                }
+                onFocusInvestigation?.();
+              }}
+            />
+          )}
 
           {hero && (
             <ResearchPassport

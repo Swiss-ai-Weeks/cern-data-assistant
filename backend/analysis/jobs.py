@@ -24,6 +24,31 @@ def new_id() -> str:
     return hashlib.sha256(f'job:{time.time_ns()}'.encode()).hexdigest()[:20]
 
 
+def claim_next(db: sqlite3.Connection) -> tuple[str, dict] | None:
+    ensure_table(db)
+    db.execute('BEGIN IMMEDIATE')
+    try:
+        row = db.execute(
+            "SELECT id, spec FROM jobs WHERE status='queued' ORDER BY created_at LIMIT 1"
+        ).fetchone()
+        if not row:
+            db.execute('ROLLBACK')
+            return None
+        job_id = row[0]
+        db.execute(
+            "UPDATE jobs SET status='running', updated_at=? WHERE id=? AND status='queued'",
+            (datetime.now(timezone.utc).isoformat(), job_id),
+        )
+        if db.total_changes == 0:
+            db.execute('ROLLBACK')
+            return None
+        db.execute('COMMIT')
+        return job_id, json.loads(row[1])
+    except Exception:
+        db.execute('ROLLBACK')
+        raise
+
+
 def create(db: sqlite3.Connection, spec: dict) -> str:
     ensure_table(db)
     job_id = new_id()

@@ -58,7 +58,8 @@ def validate_constraints(value):
 
 
 def investigation_record(investigation_id, spec, *, goal=DEFAULT_GOAL, constraints=None,
-                         active_run_id=None, baseline_run_id=None, run_ids=None, updated_at=None):
+                         active_run_id=None, baseline_run_id=None, run_ids=None,
+                         pending_job_id=None, updated_at=None):
     return {
         'id': investigation_id,
         'goal': goal if isinstance(goal, str) and goal.strip() else DEFAULT_GOAL,
@@ -67,6 +68,7 @@ def investigation_record(investigation_id, spec, *, goal=DEFAULT_GOAL, constrain
         'active_run_id': active_run_id,
         'baseline_run_id': baseline_run_id,
         'run_ids': list(run_ids or []),
+        'pending_job_id': pending_job_id,
         'updated_at': updated_at,
         'evidence_labels': EVIDENCE_LABELS,
     }

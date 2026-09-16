@@ -32,7 +32,7 @@ import cern_client
 import ollama_client
 import rag
 import guardrails
-from analysis.service import bp as investigations_bp
+from analysis.service import bp as investigations_bp, init_investigation_worker
 from analysis import constraints as analysis_constraints
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -48,6 +48,7 @@ DEFAULT_K = int(os.environ.get("RAG_TOP_K", "6"))
 app = Flask(__name__, static_folder=DIST_DIR if SERVE_FRONTEND else None, static_url_path="")
 CORS(app)  # dev-friendly: allow the Vite dev server to call this API
 app.register_blueprint(investigations_bp)
+init_investigation_worker(app)
 
 DEFAULT_SIZE = 8
 MAX_SIZE = 25
@@ -70,6 +71,13 @@ def health():
         cern_ok = False
 
     kb = rag.get_kb()
+    investigation = {"sample_prepared": False, "recommended_gunicorn_workers": 1}
+    try:
+        from analysis.service import directory
+
+        investigation["sample_prepared"] = (directory() / "manifest.json").exists()
+    except RuntimeError:
+        pass
     return jsonify(
         {
             "cern_api": "ok" if cern_ok else "unreachable",
@@ -86,6 +94,7 @@ def health():
             },
             "serving_frontend": SERVE_FRONTEND,
             "cern_cache": cern_client.cache_stats(),
+            "investigation": investigation,
         }
     )
 
@@ -494,6 +503,25 @@ def _fetch_top_record(search_payload: dict) -> dict | None:
     }
 
 
+def _try_investigation_agent(user_query: str):
+    from analysis.investigation_agent import handle_query
+    from analysis.service import compare_run_payload, directory, materialize, merged_sources
+
+    def sample_ready():
+        try:
+            return (directory() / "manifest.json").exists()
+        except RuntimeError:
+            return False
+
+    return handle_query(
+        user_query,
+        materialize_fn=materialize,
+        sample_ready_fn=sample_ready,
+        merged_sources_fn=lambda: merged_sources(cached_verbatim=True),
+        compare_fn=compare_run_payload,
+    )
+
+
 def _followups(plan: dict, search, answer) -> list[str]:
     """Deterministic next questions a researcher would actually type."""
     out: list[str] = []
@@ -545,6 +573,51 @@ def _agent_events(user_query: str, body: dict, history=None):
             "followups": _followups({}, None, refusal),
         }
         yield _sse({"type": "result", "payload": payload}, t0)
+        return
+
+    inv_payload = _try_investigation_agent(user_query)
+    if inv_payload:
+        yield _sse(
+            {
+                "type": "status",
+                "step": "investigation",
+                "timeline_stage": "interpret_intent",
+                "label": "Run bounded CMS dimuon investigation",
+            },
+            t0,
+        )
+        yield _sse(
+            {
+                "type": "tool_done",
+                "tool": "investigation",
+                "timeline_stage": "verify_grounding",
+                "investigation": inv_payload.get("investigation"),
+                "meta": {
+                    "run_id": (inv_payload.get("investigation") or {}).get("run", {}).get("id"),
+                    "claims": len((inv_payload.get("investigation") or {}).get("claims") or []),
+                },
+            },
+            t0,
+        )
+        yield _sse({"type": "result", "payload": inv_payload}, t0)
+        try:
+            from store import get_store
+
+            st = get_store()
+            inv = inv_payload.get("investigation") or {}
+            run = inv.get("run") or {}
+            st.add_event(
+                "agent-investigation",
+                None,
+                "investigation_complete",
+                {
+                    "query": user_query,
+                    "run_id": run.get("id"),
+                    "selected_events": run.get("selected_events"),
+                },
+            )
+        except Exception:
+            log.debug("investigation audit log skipped", exc_info=True)
         return
 
     yield _sse(

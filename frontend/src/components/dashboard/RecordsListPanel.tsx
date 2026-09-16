@@ -1,3 +1,4 @@
+import { constraintFitLabel } from "../../lib/constraintFitLabel";
 import { glanceFromRecord } from "../../lib/recordVisual";
 import type { RecordSummary } from "../../types";
 import Panel from "../ui/Panel";
@@ -18,6 +19,7 @@ export default function RecordsListPanel({ records, heroRecid, onOpen }: Props) 
           {records.slice(0, 6).map((r) => {
             const top = heroRecid != null && String(r.recid) === String(heroRecid);
             const g = glanceFromRecord(r);
+            const fit = constraintFitLabel(r.constraint_fit);
             return (
               <li key={r.recid}>
                 <button
@@ -34,6 +36,9 @@ export default function RecordsListPanel({ records, heroRecid, onOpen }: Props) 
                         .filter(Boolean)
                         .join(" · ")}
                     </span>
+                    {r.constraint_fit && (
+                      <span className={`record-constraint-fit ${fit.tone}`}>{fit.label}</span>
+                    )}
                   </span>
                 </button>
               </li>

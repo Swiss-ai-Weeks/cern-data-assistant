@@ -7,8 +7,9 @@ import pytest
 from flask import Flask
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
+from analysis import jobs
 from analysis.recipe import DEFAULT_SPEC
-from analysis.service import bp, init_investigation_worker
+from analysis.service import bp, connection, enqueue_job, init_investigation_worker
 
 
 @pytest.fixture
@@ -42,12 +43,28 @@ def client(tmp_path):
     return app.test_client()
 
 
-def test_job_stream_returns_result_event(client):
-    response = client.post('/api/investigations/jobs/stream', json={'spec': DEFAULT_SPEC})
-    assert response.status_code == 200
+def _collect_sse(response):
     events = []
     for block in response.data.decode().split('\n\n'):
         line = next((l for l in block.split('\n') if l.startswith('data: ')), None)
         if line:
             events.append(json.loads(line[6:]))
+    return events
+
+
+def test_job_stream_reconnect_by_id(client):
+    with client.application.app_context():
+        job_id = enqueue_job(DEFAULT_SPEC)
+    response = client.get(f'/api/investigations/jobs/{job_id}/stream')
+    assert response.status_code == 200
+    events = _collect_sse(response)
+    assert any(event['type'] == 'result' for event in events)
+
+
+def test_job_stream_post_reconnect(client):
+    with client.application.app_context():
+        job_id = enqueue_job(DEFAULT_SPEC)
+    response = client.post('/api/investigations/jobs/stream', json={'job_id': job_id})
+    assert response.status_code == 200
+    events = _collect_sse(response)
     assert any(event['type'] == 'result' for event in events)

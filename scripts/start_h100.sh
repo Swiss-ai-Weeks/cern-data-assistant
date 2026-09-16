@@ -63,4 +63,7 @@ curl -s 127.0.0.1:11434/api/embed -d "{\"model\":\"$EMBED\",\"input\":\"warm\",\
 # ---- 6. Serve UI + API on :5001 ----------------------------------------------
 PORT=$(grep -E '^PORT=' .env | cut -d= -f2); PORT=${PORT:-5001}
 echo ">> serving on http://127.0.0.1:$PORT  (tunnel: ssh -L $PORT:127.0.0.1:$PORT launchpad)"
-exec gunicorn -w 2 --threads 4 -b "127.0.0.1:$PORT" --timeout 300 --access-logfile - app:app
+WORKERS=${GUNICORN_WORKERS:-1}
+echo ">> gunicorn workers=$WORKERS (set GUNICORN_WORKERS=1 for investigation job queue)"
+export GUNICORN_WORKERS="$WORKERS"
+exec gunicorn -w "$WORKERS" --threads 4 -b "127.0.0.1:$PORT" --timeout 300 --access-logfile - app:app

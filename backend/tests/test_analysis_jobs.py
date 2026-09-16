@@ -7,7 +7,7 @@ from flask import Flask
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 from analysis.recipe import DEFAULT_SPEC
-from analysis.service import bp
+from analysis.service import bp, init_investigation_worker
 
 
 @pytest.fixture
@@ -37,6 +37,7 @@ def client(tmp_path):
     app = Flask(__name__)
     app.config['ANALYSIS_DIRECTORY'] = tmp_path
     app.register_blueprint(bp)
+    init_investigation_worker(app)
     return app.test_client()
 
 

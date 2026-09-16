@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "description": "Held-out paraphrases — not used to tune suggest(); regression only.",
+  "cases": [
+    {"id": "para-pt", "query": "tighten momentum: both muons need at least 12 GeV", "expect_action": "selection", "expect_min_pt": 12},
+    {"id": "para-evidence", "query": "is the structure near thirty gev a new resonance", "expect_action": "evidence"},
+    {"id": "para-unsupported", "query": "turn on isolation requirements for these muons", "expect_action": "unsupported"},
+    {"id": "para-energy", "query": "recompute using thirteen tev collisions", "expect_action": "unsupported"},
+    {"id": "para-charge", "query": "keep only same-sign dimuons", "expect_action": "selection", "expect_charge": "same"}
+  ]
+}

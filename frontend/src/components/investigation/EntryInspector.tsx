@@ -9,7 +9,24 @@ export default function EntryInspector({ data, variableDocs = [] }: { data: Entr
     <div className="iv-panel-heading"><div><p className="iv-eyebrow">FROM THE ACTUAL DATA</p><h3>Inside {data.low}–{data.high} GeV</h3></div><span className="iv-pill">{data.total.toLocaleString()} entries</span></div>
     {!event ? <p className="iv-muted">No events in this bin pass the current selection. Try a neighboring bin or loosen the selection.</p> : <>
       <div className="iv-entry-tabs">{data.entries.map((e,i) => <button type="button" key={e.entry} aria-pressed={i===index} onClick={() => setIndex(i)}>Entry {e.entry.toLocaleString()}</button>)}</div>
-      <div className="iv-event-detail">
+      <div className="iv-event-detail iv-event-dual">
+        <svg viewBox="0 0 220 205" role="img" aria-label="η–φ plane; dot radius scales with muon pT (not to scale).">
+          <title>η vs φ · pT-sized markers</title>
+          {[ -2, 0, 2 ].map((etaLine) => (
+            <line key={etaLine} x1={20 + (etaLine + 2.5) * 36} y1={20} x2={20 + (etaLine + 2.5) * 36} y2={185} className="iv-event-ring" />
+          ))}
+          {event.muons.map((m, i) => {
+            const cx = 20 + (m.eta + 2.5) * 36;
+            const cy = 170 - (m.phi + Math.PI) / (2 * Math.PI) * 150;
+            const r = Math.min(14, 4 + m.pt / 4);
+            return (
+              <g key={`eta-${i}`}>
+                <circle cx={cx} cy={cy} r={r} className={`iv-muon-dot iv-muon-${i}`} />
+                <text x={cx} y={cy - r - 4} textAnchor="middle" className="iv-muon-label">μ{m.charge > 0 ? "+" : "−"}</text>
+              </g>
+            );
+          })}
+        </svg>
         <svg viewBox="0 0 220 205" role="img" aria-label="Schematic transverse muon directions, calculated from the selected entry’s azimuthal angles. Arrow length is not a momentum scale.">
           <title>Measured directions · schematic projection</title>
           {[35,60,85].map(r => <circle key={r} cx="110" cy="98" r={r} className="iv-event-ring" />)}

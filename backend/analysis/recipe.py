@@ -3,12 +3,26 @@
 Inputs contain only the exactly-two-muon subset of a declared source-entry range.
 All kinematics are computed in float64; no model participates in numerical work.
 """
+import hashlib
+import json
 import math
+from pathlib import Path
+
 import numpy as np
 
 VERSION = 'dimuon-v1'
 DEFAULT_SPEC = {'min_pt': 0.0, 'max_abs_eta': 5.0, 'charge': 'opposite'}
 EDGES = np.linspace(0.0, 120.0, 121)
+
+
+def deterministic_run_id(manifest: dict, spec: dict, *, recipe_path: Path | None = None) -> str:
+    recipe_path = recipe_path or Path(__file__)
+    recipe_hash = hashlib.sha256(recipe_path.read_bytes()).hexdigest()
+    key = json.dumps(
+        {'spec': validate_spec(spec), 'sample': manifest['sha256'], 'recipe': recipe_hash},
+        sort_keys=True,
+    )
+    return hashlib.sha256(key.encode()).hexdigest()[:20]
 
 
 def validate_spec(value):

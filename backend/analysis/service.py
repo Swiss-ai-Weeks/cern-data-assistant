@@ -13,7 +13,7 @@ import zipfile
 import numpy as np
 from flask import Blueprint, Response, current_app, jsonify, request, send_file, stream_with_context
 
-from . import evidence_map, export_render, jobs, recipe, schemas, validate
+from . import adapters, claims, evidence_map, export_render, jobs, narrative, plan, provenance, recipe, schemas, source_passages, validate, worker
 
 bp = Blueprint('investigations', __name__, url_prefix='/api/investigations')
 DEFAULT_DIRECTORY = Path(__file__).resolve().parent.parent / 'data' / 'dimuon'
@@ -78,12 +78,21 @@ def find_run(run_id):
     return json.loads(row[0]) if row else None
 
 
+def resolve_baseline_run(manifest: dict | None = None) -> dict:
+    if manifest is None:
+        _, manifest = sample()
+    run_id = recipe.deterministic_run_id(manifest, recipe.DEFAULT_SPEC)
+    cached = find_run(run_id)
+    if cached:
+        return cached
+    return materialize(recipe.DEFAULT_SPEC)
+
+
 def materialize(spec):
     started = time.monotonic()
     data, manifest = sample()
     recipe_hash = hashlib.sha256(Path(recipe.__file__).read_bytes()).hexdigest()
-    key = json.dumps({'spec': spec, 'sample': manifest['sha256'], 'recipe': recipe_hash}, sort_keys=True)
-    run_id = hashlib.sha256(key.encode()).hexdigest()[:20]
+    run_id = recipe.deterministic_run_id(manifest, spec)
     previous = find_run(run_id)
     if previous:
         return {**previous, 'cached': True}
@@ -106,18 +115,58 @@ def unavailable(error):
     return jsonify(error=str(error)), 503
 
 
+@bp.get('/metrics')
+def investigation_metrics():
+    timings = []
+    with connection() as db:
+        rows = db.execute('SELECT payload FROM runs').fetchall()
+    for row in rows:
+        payload = json.loads(row[0])
+        ms = payload.get('compute_ms')
+        if ms is None:
+            continue
+        timings.append({
+            'run_id': payload.get('id'),
+            'compute_ms': ms,
+            'cached': bool(payload.get('cached')),
+            'selected_events': payload.get('selected_events'),
+            'created_at': payload.get('created_at'),
+        })
+    timings.sort(key=lambda item: item.get('created_at') or '', reverse=True)
+    recent = timings[:25]
+    fresh = [item['compute_ms'] for item in recent if not item['cached']]
+    fresh.sort()
+
+    def percentile(values, pct):
+        if not values:
+            return None
+        idx = min(len(values) - 1, max(0, int(round((pct / 100) * (len(values) - 1)))))
+        return values[idx]
+
+    return jsonify(
+        recent_runs=recent,
+        fresh_compute_ms={
+            'count': len(fresh),
+            'p50': percentile(fresh, 50),
+            'p95': percentile(fresh, 95),
+            'max': fresh[-1] if fresh else None,
+        },
+        cached_runs=sum(1 for item in recent if item['cached']),
+    )
+
+
 @bp.get('/status')
 def status():
     try:
         _, manifest = sample()
     except FileNotFoundError as exc:
         return jsonify(ready=False, message=str(exc), sources=SOURCES)
-    baseline = materialize(recipe.DEFAULT_SPEC)
+    baseline = resolve_baseline_run(manifest)
     return jsonify(
         ready=True,
         manifest=manifest,
         defaults=recipe.DEFAULT_SPEC,
-        sources=SOURCES,
+        sources=merged_sources(cached_verbatim=True),
         scope='CMS 2012 reduced muons, 8 TeV',
         constraints=schemas.DEFAULT_CONSTRAINTS,
         evidence_labels=schemas.EVIDENCE_LABELS,
@@ -125,7 +174,100 @@ def status():
         variable_docs=evidence_map.for_entry(),
         reference_validation=validate.reference_feature_report(baseline['histogram']),
         baseline_run_id=baseline['id'],
+        adapters=adapters.list_adapters(),
+        executable_adapter=adapters.executable_binding(),
     )
+
+
+def merged_sources(*, cached_verbatim: bool = False):
+    merged = [{**source, 'verbatim': False} for source in SOURCES]
+    passages = (
+        source_passages.bundle_cached(directory())
+        if cached_verbatim
+        else source_passages.bundle(directory())
+    )
+    for item in passages:
+        merged.append({
+            'id': f"record-{item['id']}",
+            'title': item['title'],
+            'url': item['url'],
+            'kind': item['kind'],
+            'summary': item['text'][:320] + ('…' if len(item['text']) > 320 else ''),
+            'excerpt': item['text'][:1200] + ('…' if len(item['text']) > 1200 else ''),
+            'verbatim': True,
+            'sha256': item['sha256'],
+            'fetched_at': item['fetched_at'],
+        })
+    return merged
+
+
+SESSION_FIELDS = {'goal', 'spec', 'constraints', 'active_run_id', 'baseline_run_id', 'run_ids', 'pending_job_id'}
+
+
+def init_investigation_worker(app):
+    import threading
+
+    worker.worker.start(app, connection, materialize)
+
+    def warm_baseline():
+        with app.app_context():
+            try:
+                materialize(recipe.DEFAULT_SPEC)
+            except Exception:
+                current_app.logger.exception('baseline warm-up failed')
+
+    threading.Thread(target=warm_baseline, name='investigation-baseline-warm', daemon=True).start()
+
+
+def compare_run_payload(run_id: str, baseline_id: str) -> dict:
+    current = find_run(run_id)
+    baseline = find_run(baseline_id)
+    if not current or not baseline:
+        raise ValueError('One or both investigation runs were not found.')
+    if current['manifest']['sha256'] != baseline['manifest']['sha256']:
+        raise ValueError('Runs use different prepared samples and cannot be compared.')
+    hist_a = current['histogram']
+    hist_b = baseline['histogram']
+    if hist_a['edges'] != hist_b['edges']:
+        raise ValueError('Histogram binning differs between runs.')
+    bin_delta = [
+        {
+            'low': hist_a['edges'][i],
+            'high': hist_a['edges'][i + 1],
+            'current': hist_a['counts'][i],
+            'baseline': hist_b['counts'][i],
+            'delta': hist_a['counts'][i] - hist_b['counts'][i],
+        }
+        for i in range(len(hist_a['counts']))
+    ]
+    cutflow_b = {step['label']: step['count'] for step in baseline['cutflow']}
+    cutflow_delta = [
+        {
+            'label': step['label'],
+            'current': step['count'],
+            'baseline': cutflow_b.get(step['label'], 0),
+            'delta': step['count'] - cutflow_b.get(step['label'], 0),
+        }
+        for step in current['cutflow']
+    ]
+    return {
+        'run_id': run_id,
+        'baseline_run_id': baseline_id,
+        'spec_current': current['spec'],
+        'spec_baseline': baseline['spec'],
+        'selected_events_delta': current['selected_events'] - baseline['selected_events'],
+        'plotted_events_delta': current['plotted_events'] - baseline['plotted_events'],
+        'histogram_delta': bin_delta,
+        'cutflow_delta': cutflow_delta,
+    }
+
+
+def enqueue_job(spec):
+    db = connection()
+    try:
+        return jobs.create(db, spec)
+    finally:
+        db.close()
 
 
 def _investigation_id():
@@ -149,13 +291,14 @@ def store_investigation(record):
 @bp.post('/sessions')
 def create_session():
     body = request.get_json(silent=True) or {}
-    if not isinstance(body, dict) or set(body) - {'goal', 'spec', 'constraints', 'active_run_id', 'baseline_run_id', 'run_ids'}:
+    if not isinstance(body, dict) or set(body) - SESSION_FIELDS:
         raise ValueError('Provide investigation fields only.')
     spec = recipe.validate_spec(body.get('spec', {}))
     record = schemas.investigation_record(
         _investigation_id(), spec, goal=body.get('goal'), constraints=body.get('constraints'),
         active_run_id=body.get('active_run_id'), baseline_run_id=body.get('baseline_run_id'),
-        run_ids=body.get('run_ids'), updated_at=datetime.now(timezone.utc).isoformat(),
+        run_ids=body.get('run_ids'), pending_job_id=body.get('pending_job_id'),
+        updated_at=datetime.now(timezone.utc).isoformat(),
     )
     if record['active_run_id'] and not find_run(record['active_run_id']):
         raise ValueError('Active run was not found.')
@@ -185,9 +328,84 @@ def restore_session(investigation_id):
     return jsonify({**payload, 'runs': runs})
 
 
+@bp.get('/sessions/<investigation_id>/brief')
+def session_brief(investigation_id):
+    payload = find_investigation(investigation_id)
+    if not payload:
+        return jsonify(error='Investigation not found.'), 404
+    runs = []
+    seen = set()
+    for run_id in list(payload.get('run_ids') or []) + [payload.get('active_run_id'), payload.get('baseline_run_id')]:
+        if not run_id or run_id in seen:
+            continue
+        seen.add(run_id)
+        run_payload = find_run(run_id)
+        if run_payload:
+            runs.append(run_payload)
+    active = find_run(payload.get('active_run_id')) if payload.get('active_run_id') else None
+    baseline = find_run(payload.get('baseline_run_id')) if payload.get('baseline_run_id') else None
+    comparison = None
+    claims_payload = []
+    narrative_payload = None
+    if active:
+        ref_val = validate.reference_feature_report(active['histogram'])
+        comparison = None
+        if baseline and active['id'] != baseline['id']:
+            try:
+                comparison = compare_run_payload(active['id'], baseline['id'])
+                narrative_payload = narrative.revision_narrative(comparison)
+            except ValueError:
+                comparison = None
+        claims_payload = claims.build_claims(
+            active,
+            baseline=baseline if comparison else None,
+            comparison=comparison,
+            reference_validation=ref_val,
+            sources=merged_sources(cached_verbatim=True),
+        )
+    pending_job = None
+    if payload.get('pending_job_id'):
+        with connection() as db:
+            pending_job = jobs.get(db, payload['pending_job_id'])
+    return jsonify(
+        session=payload,
+        runs=runs,
+        active_run=active,
+        baseline_run=baseline,
+        comparison=comparison,
+        narrative=narrative_payload,
+        claims=claims_payload,
+        pending_job=pending_job,
+        status={
+            'sample_ready': True,
+            'reference_validation': validate.reference_feature_report(active['histogram']) if active else None,
+        },
+    )
+
+
+@bp.get('/runs/<run_id>/provenance')
+def run_provenance(run_id):
+    payload = find_run(run_id)
+    if not payload:
+        return jsonify(error='Investigation run not found.'), 404
+    return jsonify(provenance.run_lineage(payload))
+
+
 @bp.get('/variables/docs')
 def variable_docs():
     return jsonify(evidence_map.for_entry())
+
+
+@bp.post('/sources/refresh')
+def refresh_sources():
+    refreshed = []
+    errors = []
+    for recid in source_passages.RECORDS:
+        try:
+            refreshed.append(source_passages.load_or_fetch(directory(), recid, force=True))
+        except Exception as exc:
+            errors.append({'id': recid, 'error': str(exc)})
+    return jsonify(refreshed=refreshed, errors=errors, sources=merged_sources())
 
 
 @bp.put('/sessions/<investigation_id>')
@@ -196,15 +414,22 @@ def save_session(investigation_id):
     if not existing:
         return jsonify(error='Investigation not found.'), 404
     body = request.get_json(silent=True)
-    if not isinstance(body, dict) or set(body) - {'goal', 'spec', 'constraints', 'active_run_id', 'baseline_run_id', 'run_ids'}:
+    if not isinstance(body, dict) or set(body) - SESSION_FIELDS:
         raise ValueError('Provide investigation fields only.')
     spec = recipe.validate_spec(body.get('spec', existing['spec']))
+    pending = body.get('pending_job_id', existing.get('pending_job_id'))
+    if pending is not None and pending != existing.get('pending_job_id'):
+        with connection() as db:
+            job_payload = jobs.get(db, pending)
+        if not job_payload:
+            raise ValueError('Pending analysis job was not found.')
     record = schemas.investigation_record(
         investigation_id, spec, goal=body.get('goal', existing['goal']),
         constraints=body.get('constraints', existing['constraints']),
         active_run_id=body.get('active_run_id', existing['active_run_id']),
         baseline_run_id=body.get('baseline_run_id', existing['baseline_run_id']),
         run_ids=body.get('run_ids', existing['run_ids']),
+        pending_job_id=pending,
         updated_at=datetime.now(timezone.utc).isoformat(),
     )
     if record['active_run_id'] and not find_run(record['active_run_id']):
@@ -225,28 +450,40 @@ def _sse(event: dict) -> str:
     return f'data: {json.dumps(event, ensure_ascii=False)}\n\n'
 
 
-def execute_job(spec):
-    db = connection()
-    try:
-        job_id = jobs.create(db, spec)
-        jobs.update(db, job_id, status='running')
-    finally:
-        db.close()
-    try:
-        result = materialize(spec)
-    except Exception as exc:
+def _job_event_stream(job_id: str, *, announce_queued: bool = False):
+    if announce_queued:
+        yield _sse({'type': 'status', 'step': 'queued', 'label': 'Analysis queued', 'job_id': job_id})
+    seen_running = False
+    deadline = time.monotonic() + 120
+    while time.monotonic() < deadline:
         db = connection()
         try:
-            jobs.update(db, job_id, status='failed', error=str(exc))
+            payload = jobs.get(db, job_id)
         finally:
             db.close()
-        raise
-    db = connection()
-    try:
-        jobs.update(db, job_id, status='complete', run_id=result['id'])
-        payload = jobs.get(db, job_id)
-    finally:
-        db.close()
+        if not payload:
+            yield _sse({'type': 'error', 'job_id': job_id, 'error': 'Analysis job not found.'})
+            return
+        if payload['status'] == 'running' and not seen_running:
+            seen_running = True
+            yield _sse({'type': 'status', 'step': 'running', 'label': 'Computing from staged CERN sample', 'job_id': job_id})
+        if payload['status'] == 'complete':
+            run_payload = find_run(payload['run_id'])
+            yield _sse({'type': 'result', 'job_id': job_id, 'job': payload, 'run': run_payload})
+            return
+        if payload['status'] == 'failed':
+            yield _sse({'type': 'error', 'job_id': job_id, 'error': payload.get('error') or 'Analysis job failed.'})
+            return
+        if payload['status'] == 'queued' and not announce_queued and not seen_running:
+            yield _sse({'type': 'status', 'step': 'queued', 'label': 'Analysis queued', 'job_id': job_id})
+        time.sleep(0.2)
+    yield _sse({'type': 'error', 'job_id': job_id, 'error': 'Analysis job timed out.'})
+
+
+def execute_job(spec):
+    job_id = enqueue_job(spec)
+    payload = worker.wait_for_job(connection, job_id)
+    result = find_run(payload['run_id'])
     return job_id, payload, result
 
 
@@ -263,43 +500,50 @@ def submit_job():
 @bp.post('/jobs/stream')
 def stream_job():
     body = request.get_json(silent=True)
-    if not isinstance(body, dict) or set(body) - {'spec'}:
-        raise ValueError('Provide an object containing analysis spec only.')
+    if not isinstance(body, dict) or set(body) - {'spec', 'job_id'}:
+        raise ValueError('Provide analysis spec or an existing job_id.')
+    job_id = body.get('job_id')
+    if job_id:
+        if not isinstance(job_id, str) or not re.fullmatch(r'[a-f0-9]{20}', job_id):
+            raise ValueError('Provide a valid analysis job_id.')
+        with connection() as db:
+            existing = jobs.get(db, job_id)
+        if not existing:
+            return jsonify(error='Analysis job not found.'), 404
+
+        def reconnect():
+            yield from _job_event_stream(job_id, announce_queued=False)
+
+        return _sse_response(reconnect)
+    if 'spec' not in body:
+        raise ValueError('Provide analysis spec or an existing job_id.')
     spec = recipe.validate_spec(body.get('spec', {}))
 
     def gen():
-        yield _sse({'type': 'status', 'step': 'queued', 'label': 'Analysis queued'})
-        db = connection()
-        try:
-            job_id = jobs.create(db, spec)
-            jobs.update(db, job_id, status='queued')
-        finally:
-            db.close()
-        yield _sse({'type': 'status', 'step': 'running', 'label': 'Computing from staged CERN sample', 'job_id': job_id})
-        try:
-            db = connection()
-            try:
-                jobs.update(db, job_id, status='running')
-            finally:
-                db.close()
-            result = materialize(spec)
-            db = connection()
-            try:
-                jobs.update(db, job_id, status='complete', run_id=result['id'])
-                payload = jobs.get(db, job_id)
-            finally:
-                db.close()
-            yield _sse({'type': 'result', 'job_id': job_id, 'job': payload, 'run': result})
-        except Exception as exc:
-            db = connection()
-            try:
-                jobs.update(db, job_id, status='failed', error=str(exc))
-            finally:
-                db.close()
-            yield _sse({'type': 'error', 'job_id': job_id, 'error': str(exc)})
+        new_job_id = enqueue_job(spec)
+        yield from _job_event_stream(new_job_id, announce_queued=True)
 
+    return _sse_response(gen)
+
+
+@bp.get('/jobs/<job_id>/stream')
+def stream_job_reconnect(job_id):
+    if not re.fullmatch(r'[a-f0-9]{20}', job_id):
+        return jsonify(error='Analysis job not found.'), 404
+    with connection() as db:
+        existing = jobs.get(db, job_id)
+    if not existing:
+        return jsonify(error='Analysis job not found.'), 404
+
+    def reconnect():
+        yield from _job_event_stream(job_id, announce_queued=False)
+
+    return _sse_response(reconnect)
+
+
+def _sse_response(generator):
     return Response(
-        stream_with_context(gen()),
+        stream_with_context(generator()),
         mimetype='text/event-stream',
         headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no', 'Connection': 'keep-alive'},
     )
@@ -357,49 +601,68 @@ def suggest():
     if not isinstance(body, dict) or not isinstance(body.get('query'), str) or len(body['query']) > 1000:
         raise ValueError('Enter an investigation request of at most 1,000 characters.')
     spec = recipe.validate_spec(body.get('spec', {}))
-    query = body['query'].strip().lower()
-    if not query:
-        raise ValueError('Enter a request.')
-    energy = re.search(r'(\d+(?:\.\d+)?)\s*tev', query)
-    if energy and float(energy[1]) != 8:
-        return jsonify(action='unsupported', message='This investigation uses CMS 2012 data at 8 TeV. Use Search & explain to find another energy; the sample will not be silently changed.')
-    unavailable = re.search(
-        r'\b(?:require|select|filter|cut|apply|change|set|use)\b.*\b(?:isolat\w*|trigger(?: bits?)?|detector hits?|luminosity)\b',
-        query,
+    return jsonify(plan.interpret_investigation_query(body['query'], spec))
+
+
+@bp.get('/runs/<run_id>/compare')
+def compare_runs(run_id):
+    baseline_id = request.args.get('baseline')
+    if not baseline_id:
+        raise ValueError('Provide baseline run id as ?baseline=<run_id>.')
+    try:
+        return jsonify(compare_run_payload(run_id, baseline_id))
+    except ValueError as exc:
+        msg = str(exc)
+        if 'not found' in msg:
+            return jsonify(error=msg), 404
+        return jsonify(error=msg), 409
+
+
+@bp.get('/runs/<run_id>/claims')
+def run_claims(run_id):
+    payload = find_run(run_id)
+    if not payload:
+        return jsonify(error='Investigation run not found.'), 404
+    baseline_id = request.args.get('baseline')
+    baseline = find_run(baseline_id) if baseline_id else None
+    comparison = None
+    if baseline:
+        try:
+            comparison = compare_run_payload(run_id, baseline_id)
+        except ValueError:
+            comparison = None
+    focus_bin = request.args.get('bin')
+    try:
+        focus_bin = int(focus_bin) if focus_bin is not None else None
+    except (TypeError, ValueError):
+        focus_bin = None
+    ref_val = validate.reference_feature_report(payload['histogram'])
+    return jsonify(
+        run_id=run_id,
+        claims=claims.build_claims(
+            payload,
+            baseline=baseline,
+            comparison=comparison,
+            reference_validation=ref_val,
+            sources=merged_sources(cached_verbatim=True),
+            focus_bin=focus_bin,
+        ),
     )
-    if unavailable:
-        return jsonify(
-            action='unsupported',
-            message='That selection is not available in this reduced sample. It retains muon pT, η, φ, mass and charge, but not isolation, trigger bits, raw detector hits or luminosity. Use Search & explain to find a richer CERN format; Beamline will not invent the missing field.',
-        )
-    if re.search(r'\b(higgs|discover|discovery|new particle|significance|prove)\b', query):
-        return jsonify(action='evidence', message='A peak alone does not establish a new particle. Inspect the calculation and the reference explanation; this preview does not estimate discovery significance.')
-    if re.search(r'\b(why|explain|trigger|bump|peak)\b', query):
-        return jsonify(action='evidence', message='The reference analysis documents a trigger-related feature around 30 GeV. That is a published explanation, not a cause inferred from changing these controls.')
-    updated = dict(spec)
-    changes = []
-    if re.search(r'\b(reset|original|baseline)\b', query):
-        updated = dict(recipe.DEFAULT_SPEC)
-        changes.append('Return to the reference selection.')
-    charge = re.search(r'\b(same|opposite|any)[ -]charges?\b', query)
-    if charge:
-        updated['charge'] = charge[1]
-        changes.append(f"Select {charge[1]} charges.")
-    momentum = re.search(r'(?:above|over|at least|minimum|pt\s*(?:>|>=|=)?|momentum(?:\s+to)?)\s*(\d+(?:\.\d+)?)\s*(?:gev)?', query)
-    if momentum:
-        updated['min_pt'] = float(momentum[1])
-        changes.append(f"Require both muons to have pT ≥ {updated['min_pt']:g} GeV.")
-    elif re.search(r'\b(harder|harder cuts|stricter|tighten|higher momentum)\b', query):
-        updated['min_pt'] = min(50.0, max(10.0, float(spec.get('min_pt', 0)) + 5.0))
-        changes.append(f"Raise the minimum pT to {updated['min_pt']:g} GeV for both muons.")
-    eta = re.search(r'(?:eta|acceptance)\s*(?:below|under|<|<=|=|to)?\s*(\d+(?:\.\d+)?)', query)
-    if eta:
-        updated['max_abs_eta'] = float(eta[1])
-        changes.append(f"Require both muons to have |η| ≤ {updated['max_abs_eta']:g}.")
-    if not changes:
-        return jsonify(action='unsupported', message='This first investigation supports muon momentum, charge and acceptance. Try “both muons above 10 GeV”, “same charge”, or use Search & explain for broader questions.')
-    updated = recipe.validate_spec(updated)
-    return jsonify(action='selection', spec=updated, message=' '.join(changes) + ' Review the controls, then run the selection.')
+
+
+@bp.get('/runs/<run_id>/narrative')
+def run_narrative(run_id):
+    baseline_id = request.args.get('baseline')
+    if not baseline_id:
+        raise ValueError('Provide baseline run id as ?baseline=<run_id>.')
+    try:
+        comparison = compare_run_payload(run_id, baseline_id)
+    except ValueError as exc:
+        msg = str(exc)
+        if 'not found' in msg:
+            return jsonify(error=msg), 404
+        return jsonify(error=msg), 409
+    return jsonify(narrative.revision_narrative(comparison))
 
 
 @bp.get('/runs/<run_id>/export')
@@ -448,31 +711,45 @@ print('Reproduced:', result['selected_events'], 'selected events')
                 "plt.xlabel('Muon-pair invariant mass (GeV)')\n",
                 "plt.ylabel('Events / 1 GeV')\n", "plt.title('CMS open data · 2012 · 8 TeV · bounded sample')\n",
                 "plt.savefig('spectrum.png', dpi=160, bbox_inches='tight')\n", 'plt.show()\n']}]}
-    provenance = {
+    baseline_id = request.args.get('baseline')
+    lineage = provenance.run_lineage(payload)
+    provenance_doc = {
         'schema': 'beamline-investigation-export/v1',
         'run_id': run_id,
+        'lineage': lineage,
         'created_at': payload['created_at'],
         'exported_at': datetime.now(timezone.utc).isoformat(),
         'sample_sha256': manifest['sha256'],
         'recipe_sha256': payload['recipe_sha256'],
         'source_record': manifest['record_url'],
         'source_doi': manifest['doi'],
-        'sources': [{'title': source['title'], 'url': source['url']} for source in SOURCES],
+        'sources': [{'title': source['title'], 'url': source['url'], 'verbatim': source.get('verbatim', False)} for source in merged_sources()],
         'scope': manifest['scope'],
         'sampling': manifest['sampling'],
         'scientific_limit': 'Reproduction verifies computation and provenance; it does not establish discovery significance.',
     }
+    if baseline_id:
+        provenance_doc['baseline_run_id'] = baseline_id
     histogram = payload['histogram']
+    ref_val = validate.reference_feature_report(histogram)
+    export_claims = claims.build_claims(
+        payload,
+        reference_validation=ref_val,
+        sources=merged_sources(cached_verbatim=True),
+    )
     files = {
         'manifest.json': json.dumps(manifest, indent=2).encode(),
         'analysis.json': json.dumps(payload['spec'], indent=2).encode(),
         'result.json': json.dumps(payload, indent=2).encode(),
-        'sources.json': json.dumps(SOURCES, indent=2).encode(),
-        'provenance.json': json.dumps(provenance, indent=2).encode(),
+        'sources.json': json.dumps(merged_sources(), indent=2).encode(),
+        'source_passages.json': json.dumps(source_passages.bundle(directory()), indent=2).encode(),
+        'claims.json': json.dumps({'run_id': run_id, 'claims': export_claims}, indent=2).encode(),
+        'run_provenance.json': json.dumps(lineage, indent=2).encode(),
+        'provenance.json': json.dumps({**provenance_doc, 'claims_count': len(export_claims)}, indent=2).encode(),
         'investigation.ipynb': json.dumps(notebook, indent=2).encode(),
         'recipe.py': recipe_bytes,
         'reproduce.py': replay.encode(),
-        'requirements.txt': f'numpy=={np.__version__}\nmatplotlib==3.10.8\n'.encode(),
+        'requirements.txt': Path(__file__).with_name('export_lock.txt').read_bytes(),
         'README.md': ('# Reproduce this investigation\n\nExtract all files. Create a Python environment.\n'
                       'Run `sha256sum -c SHA256SUMS`, then `pip install -r requirements.txt` and '
                       '`python reproduce.py`. Open investigation.ipynb to draw the plot.\n\n' +
@@ -482,6 +759,16 @@ print('Reproduced:', result['selected_events'], 'selected events')
             f'{histogram["edges"][i]},{histogram["edges"][i+1]},{n}\n'
             for i, n in enumerate(histogram['counts']))).encode(),
     }
+    if baseline_id:
+        try:
+            comparison = compare_run_payload(run_id, baseline_id)
+            files['comparison.json'] = json.dumps(comparison, indent=2).encode()
+            files['narrative.json'] = json.dumps(narrative.revision_narrative(comparison), indent=2).encode()
+            baseline_run = find_run(baseline_id)
+            if baseline_run:
+                files['baseline_result.json'] = json.dumps(baseline_run, indent=2).encode()
+        except ValueError:
+            pass
     try:
         files['spectrum.png'] = export_render.spectrum_png(histogram)
     except Exception:

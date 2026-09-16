@@ -1,14 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import EntryInspector from "./EntryInspector";
+import InvestigationClaims from "./InvestigationClaims";
 import Spectrum from "./Spectrum";
 import { askAssistant } from "../../api";
+import type { HealthResponse } from "../../types";
 import {
-  restoreInvestigationSession,
+  followAnalysisJob,
+  getSessionBrief,
   streamAnalysisJob,
   createInvestigationSession,
   DEFAULT_SELECTION,
+  compareRuns,
+  exportRun,
   getEntries,
+  getRun,
   getInvestigationStatus,
+  getRunClaims,
+  getRunNarrative,
+  consumeAgentHandoff,
   loadSessionId,
   saveInvestigationSession,
   suggestSelection,
@@ -16,6 +25,9 @@ import {
   type InvestigationSession,
   type Run,
   type Selection,
+  type InvestigationClaim,
+  type RevisionNarrative,
+  type RunComparison,
   type Status,
 } from "../../lib/investigationApi";
 
@@ -34,7 +46,13 @@ function loadLocalFallback(): SavedInvestigation | null {
   } catch { return null; }
 }
 
-export default function InvestigationWorkspace({ onOpenFindData }: { onOpenFindData: () => void }) {
+export default function InvestigationWorkspace({
+  health,
+  onOpenFindData,
+}: {
+  health: HealthResponse | null;
+  onOpenFindData: () => void;
+}) {
   const [saved] = useState(loadLocalFallback);
   const [status, setStatus] = useState<Status | null>(null);
   const [session, setSession] = useState<InvestigationSession | null>(null);
@@ -51,10 +69,27 @@ export default function InvestigationWorkspace({ onOpenFindData }: { onOpenFindD
   const [explanation, setExplanation] = useState<Awaited<ReturnType<typeof askAssistant>> | null>(null);
   const [explaining, setExplaining] = useState(false);
   const [jobLabel, setJobLabel] = useState("");
+  const [comparison, setComparison] = useState<RunComparison | null>(null);
+  const [claimList, setClaimList] = useState<InvestigationClaim[]>([]);
+  const [revisionStory, setRevisionStory] = useState<RevisionNarrative | null>(null);
   const autoStarted = useRef(false);
   const sessionBoot = useRef(false);
+  const handoffPending = useRef<ReturnType<typeof consumeAgentHandoff>>(null);
 
   useEffect(() => { getInvestigationStatus().then(setStatus).catch((e) => setError(e.message)); }, []);
+
+  useEffect(() => {
+    handoffPending.current = consumeAgentHandoff();
+  }, []);
+
+  function applyHandoff(handoff: NonNullable<ReturnType<typeof consumeAgentHandoff>>) {
+    setRun(handoff.run);
+    setSpec(handoff.spec);
+    setHistory((prev) => prev.some((r) => r.id === handoff.run.id) ? prev : [...prev, handoff.run]);
+    autoStarted.current = true;
+    if (handoff.baselineRunId) void getRun(handoff.baselineRunId).then(setBaseline).catch(() => { /* optional */ });
+    if (handoff.focusBin != null) void inspect(handoff.focusBin);
+  }
 
   useEffect(() => {
     if (sessionBoot.current || !status?.ready) return;
@@ -63,22 +98,47 @@ export default function InvestigationWorkspace({ onOpenFindData }: { onOpenFindD
       try {
         const existingId = loadSessionId();
         if (existingId) {
-          const remote = await restoreInvestigationSession(existingId);
-          setSession(remote);
-          setSpec(remote.spec);
-          const restored = remote.runs ?? [];
-          if (restored.length > 0) setHistory(restored);
-          const active = restored.find((item) => item.id === remote.active_run_id) ?? restored[restored.length - 1] ?? null;
-          if (active) setRun(active);
-          if (remote.baseline_run_id) {
-            const base = restored.find((item) => item.id === remote.baseline_run_id);
-            if (base) setBaseline(base);
+          const brief = await getSessionBrief(existingId);
+          setSession(brief.session);
+          setSpec(brief.session.spec);
+          if (brief.runs.length > 0) setHistory(brief.runs);
+          if (brief.active_run) setRun(brief.active_run);
+          if (brief.baseline_run) setBaseline(brief.baseline_run);
+          if (brief.claims.length) setClaimList(brief.claims);
+          if (brief.narrative) setRevisionStory(brief.narrative);
+          if (brief.comparison) setComparison(brief.comparison);
+          if (brief.session.pending_job_id) {
+            autoStarted.current = true;
+            void resumeJob(brief.session.pending_job_id, brief.session.spec);
+          } else {
+            autoStarted.current = Boolean(brief.active_run);
           }
-          autoStarted.current = Boolean(active);
+          if (handoffPending.current?.run) {
+            const h = handoffPending.current;
+            handoffPending.current = null;
+            applyHandoff(h);
+            void saveInvestigationSession(brief.session.id, {
+              active_run_id: h.run.id,
+              baseline_run_id: h.baselineRunId ?? brief.baseline_run?.id ?? null,
+              run_ids: [...new Set([...brief.runs.map((r) => r.id), h.run.id])],
+              spec: h.run.spec,
+            }).then(setSession).catch(() => { /* local ok */ });
+          }
           return;
         }
         const created = await createInvestigationSession({ spec: saved?.spec ?? DEFAULT_SELECTION });
         setSession(created);
+        if (handoffPending.current?.run) {
+          applyHandoff(handoffPending.current);
+          const h = handoffPending.current;
+          handoffPending.current = null;
+          void saveInvestigationSession(created.id, {
+            active_run_id: h.run.id,
+            baseline_run_id: h.baselineRunId ?? null,
+            run_ids: [h.run.id],
+            spec: h.run.spec,
+          }).then(setSession);
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not load the investigation session.");
       }
@@ -105,26 +165,83 @@ export default function InvestigationWorkspace({ onOpenFindData }: { onOpenFindD
   }, [session?.id, run?.id, baseline?.id, history.length]);
 
   useEffect(() => {
+    if (status?.baseline_run_id && !baseline && history.length === 0) {
+      void getRun(status.baseline_run_id).then(setBaseline).catch(() => { /* optional */ });
+    }
+  }, [status?.baseline_run_id, baseline, history.length]);
+
+  useEffect(() => {
+    if (!run?.id) {
+      setComparison(null);
+      setRevisionStory(null);
+      setClaimList([]);
+      return;
+    }
+    if (!baseline?.id || run.id === baseline.id) {
+      setComparison(null);
+      setRevisionStory(null);
+      void getRunClaims(run.id, null, bin).then((r) => setClaimList(r.claims)).catch(() => setClaimList([]));
+      return;
+    }
+    void compareRuns(run.id, baseline.id).then(setComparison).catch(() => setComparison(null));
+    void getRunNarrative(run.id, baseline.id).then(setRevisionStory).catch(() => setRevisionStory(null));
+    void getRunClaims(run.id, baseline.id, bin).then((r) => setClaimList(r.claims)).catch(() => setClaimList([]));
+  }, [run?.id, baseline?.id, bin]);
+
+  useEffect(() => {
     if (status?.ready && !run && !autoStarted.current) {
       autoStarted.current = true;
       void runSelection(DEFAULT_SELECTION, false);
     }
   }, [status?.ready, run]);
 
+  async function persistPendingJob(jobId: string | null, nextSpec = spec) {
+    if (!session?.id) return;
+    try {
+      const updated = await saveInvestigationSession(session.id, { pending_job_id: jobId, spec: nextSpec });
+      setSession(updated);
+    } catch { /* keep local state */ }
+  }
+
+  async function consumeJobStream(
+    events: AsyncGenerator<{ type: string; label?: string; error?: string; run?: Run; job_id?: string }>,
+    next: Selection,
+    keepBaseline: boolean,
+  ) {
+    let result: Run | null = null;
+    let pendingJobId: string | null = null;
+    for await (const event of events) {
+      if (event.type === "status") {
+        setJobLabel(event.label ?? "Computing…");
+        if (event.job_id) {
+          pendingJobId = event.job_id;
+          void persistPendingJob(event.job_id, next);
+        }
+      }
+      if (event.type === "error") throw new Error(event.error ?? "Analysis failed.");
+      if (event.type === "result" && event.run) result = event.run;
+    }
+    if (!result) throw new Error("The analysis did not return a result.");
+    await persistPendingJob(null, result.spec);
+    if (keepBaseline && run && !baseline && JSON.stringify(run.spec) !== JSON.stringify(next)) setBaseline(run);
+    setRun(result); setSpec(result.spec); setEntries(null); setBin(null);
+    setHistory((previous) => previous.some((item) => item.id === result!.id) ? previous : [...previous, result!].slice(-8));
+    return pendingJobId;
+  }
+
   async function runSelection(next = spec, keepBaseline = true) {
     setBusy(true); setError(""); setJobLabel("Starting analysis…");
     try {
-      let result: Run | null = null;
-      for await (const event of streamAnalysisJob(next)) {
-        if (event.type === "status") setJobLabel(event.label);
-        if (event.type === "error") throw new Error(event.error);
-        if (event.type === "result") result = event.run;
-      }
-      if (!result) throw new Error("The analysis did not return a result.");
-      if (keepBaseline && run && !baseline && JSON.stringify(run.spec) !== JSON.stringify(next)) setBaseline(run);
-      setRun(result); setSpec(result.spec); setEntries(null); setBin(null);
-      setHistory((previous) => previous.some((item) => item.id === result.id) ? previous : [...previous, result].slice(-8));
+      await consumeJobStream(streamAnalysisJob(next), next, keepBaseline);
     } catch (e) { setError(e instanceof Error ? e.message : "The analysis could not run."); }
+    finally { setBusy(false); setJobLabel(""); }
+  }
+
+  async function resumeJob(jobId: string, next = spec) {
+    setBusy(true); setError(""); setJobLabel("Reconnecting to analysis…");
+    try {
+      await consumeJobStream(followAnalysisJob(jobId), next, true);
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not reconnect to the analysis job."); }
     finally { setBusy(false); setJobLabel(""); }
   }
 
@@ -181,7 +298,21 @@ export default function InvestigationWorkspace({ onOpenFindData }: { onOpenFindD
           <h1>Particle signal or selection effect?</h1>
           <p className="iv-lede">{goal ?? "Compute a real CMS muon-pair spectrum, change the selection, and inspect the evidence behind the interpretation."}</p>
         </div>
-        <button type="button" className="iv-close" onClick={onOpenFindData}>Find data or ask docs →</button>
+        <div className="iv-header-actions">
+          <div className="iv-service-pill" aria-label="Service status">
+            <span className={health?.cern_api === "ok" ? "ok" : "down"}>CERN {health?.cern_api ?? "…"}</span>
+            <span className={health?.ollama === "ok" ? "ok" : "down"}>Model {health?.ollama ?? "…"}</span>
+            <span className={health?.investigation?.sample_prepared ? "ok" : "down"}>
+              Sample {health?.investigation?.sample_prepared ? "staged" : "missing"}
+            </span>
+          </div>
+          {run && (
+            <button type="button" className="iv-export iv-export-header" onClick={() => void exportRun(run.id, baseline?.id).catch((e) => setError(e instanceof Error ? e.message : "Export failed."))}>
+              Export investigation
+            </button>
+          )}
+          <button type="button" className="iv-close" onClick={onOpenFindData}>Find data or ask docs →</button>
+        </div>
       </div>
       {constraints && (
         <div className="iv-constraints" aria-label="Dataset constraints">
@@ -258,8 +389,12 @@ export default function InvestigationWorkspace({ onOpenFindData }: { onOpenFindD
                   ))}
                 </div>
               )}
-              {run && <button type="button" className="iv-export" onClick={() => { window.location.href = `/api/investigations/runs/${run.id}/export`; }}>Export reproducible investigation</button>}
               {baseline && <button type="button" className="iv-compare" onClick={() => setMessage("The dashed line is the original selection; the solid line is the current revision.")}>Compare with original</button>}
+              {run && (
+                <button type="button" className="iv-region-btn" onClick={() => void inspect(30)}>
+                  Inspect documented 30 GeV region
+                </button>
+              )}
             </section>
             <section className="iv-main-panel">
               {!run ? (
@@ -270,12 +405,37 @@ export default function InvestigationWorkspace({ onOpenFindData }: { onOpenFindD
                 </div>
               ) : (
                 <>
-                  <Spectrum run={run} baseline={baseline} selectedBin={bin} onSelect={inspect} />
+                  <Spectrum
+                    run={run}
+                    baseline={baseline}
+                    selectedBin={bin}
+                    onSelect={inspect}
+                    referenceValidation={status?.reference_validation}
+                    histogramDelta={comparison?.histogram_delta}
+                  />
+                  {revisionStory && (
+                    <div className="iv-revision-narrative" role="status">
+                      <p className="iv-eyebrow">REVISION LOG</p>
+                      <p>{revisionStory.summary}</p>
+                      {revisionStory.histogram_shifts.length > 0 && (
+                        <ul>{revisionStory.histogram_shifts.map((line) => <li key={line}>{line}</li>)}</ul>
+                      )}
+                    </div>
+                  )}
                   {baseline && run.id !== baseline.id && (
                     <div className="iv-delta">
                       <span>Selection impact</span>
-                      <strong>{(run.selected_events - baseline.selected_events).toLocaleString()} events</strong>
+                      <strong>{(comparison?.selected_events_delta ?? run.selected_events - baseline.selected_events).toLocaleString()} events</strong>
                       <small>{((run.selected_events / baseline.selected_events - 1) * 100).toFixed(1)}% versus the original run</small>
+                      {comparison && (() => {
+                        const peak = comparison.histogram_delta.reduce(
+                          (best, bin) => (Math.abs(bin.delta) > Math.abs(best.delta) ? bin : best),
+                          comparison.histogram_delta[0],
+                        );
+                        return peak && peak.delta !== 0 ? (
+                          <small>Largest bin shift {peak.low}–{peak.high} GeV: {peak.delta > 0 ? "+" : ""}{peak.delta.toLocaleString()} events</small>
+                        ) : null;
+                      })()}
                     </div>
                   )}
                 </>
@@ -289,6 +449,7 @@ export default function InvestigationWorkspace({ onOpenFindData }: { onOpenFindD
                   <p className="iv-caption">Counts come from the staged sample and validated recipe, not from the language model.</p>
                 </section>
               )}
+              {claimList.length > 0 && <InvestigationClaims claims={claimList} />}
               {evidenceLabels.length > 0 && (
                 <section className="iv-evidence-model" aria-label="Evidence labels">
                   <p className="iv-eyebrow">EVIDENCE MODEL</p>
@@ -328,10 +489,21 @@ export default function InvestigationWorkspace({ onOpenFindData }: { onOpenFindD
                 </div>
                 <div className="iv-links">
                   {(status?.sources || []).map((source) => (
-                    <a key={source.id} href={source.url} target="_blank" rel="noreferrer">
-                      <span>{source.kind}</span>
-                      {source.title} ↗
-                    </a>
+                    source.verbatim ? (
+                      <details key={source.id} className="iv-source-verbatim">
+                        <summary>
+                          <span>{source.kind} · sha256 {source.sha256?.slice(0, 12)}…</span>
+                          {source.title}
+                        </summary>
+                        <p>{source.excerpt || source.summary}</p>
+                        <a href={source.url} target="_blank" rel="noreferrer">Open CERN record ↗</a>
+                      </details>
+                    ) : (
+                      <a key={source.id} href={source.url} target="_blank" rel="noreferrer">
+                        <span>{source.kind}</span>
+                        {source.title} ↗
+                      </a>
+                    )
                   ))}
                 </div>
               </section>

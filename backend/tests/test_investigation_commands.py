@@ -75,10 +75,45 @@ def test_export_is_self_contained_and_tamper_evident(tmp_path):
     assert response.status_code == 200
     with zipfile.ZipFile(io.BytesIO(response.data)) as archive:
         names = set(archive.namelist())
-        assert {'SHA256SUMS', 'provenance.json', 'reproduce.py', 'investigation.ipynb'} <= names
+        assert {'SHA256SUMS', 'provenance.json', 'reproduce.py', 'investigation.ipynb', 'claims.json'} <= names
         for line in archive.read('SHA256SUMS').decode().splitlines():
             expected, name = line.split('  ', 1)
             assert hashlib.sha256(archive.read(name)).hexdigest() == expected
         provenance = json.loads(archive.read('provenance.json'))
         assert provenance['run_id'] == created['id']
         assert provenance['sample_sha256'] == digest
+        assert 'source_passages.json' in names
+        lock = Path(__file__).parents[1] / 'analysis' / 'export_lock.txt'
+        assert archive.read('requirements.txt') == lock.read_bytes()
+
+
+def test_export_reproduce_script_matches_result(tmp_path):
+    sample_file = tmp_path / 'sample-0000000000000000.npz'
+    np.savez_compressed(sample_file, pt=np.array([[10.0, 12.0]]), eta=np.zeros((1, 2)),
+                        phi=np.array([[0.0, np.pi]]), mass=np.full((1, 2), 0.105),
+                        charge=np.array([[1, -1]]), entry=np.array([42]))
+    digest = hashlib.sha256(sample_file.read_bytes()).hexdigest()
+    manifest = {'sample_file': sample_file.name, 'sha256': digest, 'entries_read': 1,
+                'record_url': 'https://opendata.cern.ch/record/12341', 'doi': 'test-doi',
+                'scope': 'Test scope.', 'sampling': 'Test sampling.', 'identity': 'test'}
+    (tmp_path / 'manifest.json').write_text(json.dumps(manifest))
+    app = Flask(__name__)
+    app.config['ANALYSIS_DIRECTORY'] = tmp_path
+    app.register_blueprint(bp)
+    test_client = app.test_client()
+    created = test_client.post('/api/investigations/runs', json={'spec': DEFAULT_SPEC}).get_json()
+    response = test_client.get(f"/api/investigations/runs/{created['id']}/export")
+    extract = tmp_path / 'bundle'
+    extract.mkdir()
+    with zipfile.ZipFile(io.BytesIO(response.data)) as archive:
+        archive.extractall(extract)
+    import subprocess
+    proc = subprocess.run(
+        [sys.executable, 'reproduce.py'],
+        cwd=extract,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert proc.returncode == 0, proc.stderr or proc.stdout
+    assert 'Reproduced:' in proc.stdout

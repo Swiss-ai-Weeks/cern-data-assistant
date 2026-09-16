@@ -1,5 +1,6 @@
-import json
+import io
 import sys
+import zipfile
 from pathlib import Path
 
 import numpy as np
@@ -8,7 +9,7 @@ from flask import Flask
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 from analysis.recipe import DEFAULT_SPEC
-from analysis.service import bp, init_investigation_worker
+from analysis.service import bp
 
 
 @pytest.fixture
@@ -16,18 +17,18 @@ def client(tmp_path):
     sample_file = tmp_path / 'sample-0000000000000000.npz'
     np.savez_compressed(
         sample_file,
-        pt=np.array([[10.0, 12.0], [4.0, 5.0]]),
-        eta=np.zeros((2, 2)),
-        phi=np.array([[0.0, 3.1], [1.0, 2.0]]),
-        mass=np.full((2, 2), 0.105),
-        charge=np.array([[1, -1], [1, -1]]),
-        entry=np.array([1, 2]),
+        pt=np.array([[10.0, 12.0]]),
+        eta=np.zeros((1, 2)),
+        phi=np.array([[0.0, 3.1]]),
+        mass=np.full((1, 2), 0.105),
+        charge=np.array([[1, -1]]),
+        entry=np.array([1]),
     )
     digest = __import__('hashlib').sha256(sample_file.read_bytes()).hexdigest()
     manifest = {
         'sample_file': sample_file.name,
         'sha256': digest,
-        'entries_read': 2,
+        'entries_read': 1,
         'record_url': 'https://opendata.cern.ch/record/12341',
         'doi': 'test',
         'scope': 'test',
@@ -38,16 +39,14 @@ def client(tmp_path):
     app = Flask(__name__)
     app.config['ANALYSIS_DIRECTORY'] = tmp_path
     app.register_blueprint(bp)
-    init_investigation_worker(app)
     return app.test_client()
 
 
-def test_job_stream_returns_result_event(client):
-    response = client.post('/api/investigations/jobs/stream', json={'spec': DEFAULT_SPEC})
+def test_export_with_baseline_includes_comparison(client):
+    base = client.post('/api/investigations/runs', json={'spec': DEFAULT_SPEC}).get_json()
+    rev = client.post('/api/investigations/runs', json={'spec': {**DEFAULT_SPEC, 'min_pt': 10}}).get_json()
+    response = client.get(f"/api/investigations/runs/{rev['id']}/export?baseline={base['id']}")
     assert response.status_code == 200
-    events = []
-    for block in response.data.decode().split('\n\n'):
-        line = next((l for l in block.split('\n') if l.startswith('data: ')), None)
-        if line:
-            events.append(json.loads(line[6:]))
-    assert any(event['type'] == 'result' for event in events)
+    with zipfile.ZipFile(io.BytesIO(response.data)) as archive:
+        names = set(archive.namelist())
+        assert {'comparison.json', 'narrative.json', 'baseline_result.json', 'run_provenance.json'} <= names

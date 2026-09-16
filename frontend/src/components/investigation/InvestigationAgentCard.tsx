@@ -36,6 +36,9 @@ export default function InvestigationAgentCard({
         <div><dt>Selected</dt><dd>{run.selected_events.toLocaleString()}</dd></div>
         <div><dt>Plotted</dt><dd>{run.plotted_events.toLocaleString()}</dd></div>
         <div><dt>pT cut</dt><dd>≥ {run.spec.min_pt} GeV</dd></div>
+        <div><dt>Run</dt><dd className="tnum">{run.id.slice(0, 10)}…</dd></div>
+        <div><dt>Compute</dt><dd>{data.cached ? "Cached" : `${data.compute_ms ?? run.compute_ms ?? "—"} ms`}</dd></div>
+        <div><dt>Recipe</dt><dd className="tnum">{data.provenance?.recipe_sha256?.slice(0, 8) ?? run.recipe_sha256?.slice(0, 8) ?? "—"}…</dd></div>
       </dl>
       {topClaims.length > 0 && (
         <ul className="iv-agent-claims">

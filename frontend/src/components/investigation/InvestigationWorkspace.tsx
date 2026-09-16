@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import EntryInspector from "./EntryInspector";
 import InvestigationClaims from "./InvestigationClaims";
+import InvestigationProvenance from "./InvestigationProvenance";
+import AdapterCapabilityBand from "./AdapterCapabilityBand";
+import BeginnerChecklistPanel from "./BeginnerChecklistPanel";
+import DayOneGateBanner from "./DayOneGateBanner";
 import Spectrum from "./Spectrum";
 import { askAssistant } from "../../api";
 import type { HealthResponse } from "../../types";
@@ -21,6 +25,7 @@ import {
   loadSessionId,
   saveInvestigationSession,
   suggestSelection,
+  refreshVerbatimSources,
   type EvidenceLabel,
   type InvestigationSession,
   type Run,
@@ -72,6 +77,7 @@ export default function InvestigationWorkspace({
   const [comparison, setComparison] = useState<RunComparison | null>(null);
   const [claimList, setClaimList] = useState<InvestigationClaim[]>([]);
   const [revisionStory, setRevisionStory] = useState<RevisionNarrative | null>(null);
+  const [sourceRefreshMsg, setSourceRefreshMsg] = useState("");
   const autoStarted = useRef(false);
   const sessionBoot = useRef(false);
   const handoffPending = useRef<ReturnType<typeof consumeAgentHandoff>>(null);
@@ -305,7 +311,20 @@ export default function InvestigationWorkspace({
             <span className={health?.investigation?.sample_prepared ? "ok" : "down"}>
               Sample {health?.investigation?.sample_prepared ? "staged" : "missing"}
             </span>
+            {status?.product_phase?.feature_freeze_core && (
+              <span className="ok" title={status.product_phase.scope_locked?.join(" · ")}>
+                Phase {status.product_phase.phase} · core frozen
+              </span>
+            )}
+            {status?.eval_cases_frozen != null && status.eval_cases_frozen > 0 && (
+              <span>Eval {status.eval_cases_frozen} frozen</span>
+            )}
           </div>
+          {session?.id && (
+            <span className="iv-session-pill" title={`Investigation session ${session.id}`}>
+              Saved · {session.id.slice(0, 8)}
+            </span>
+          )}
           {run && (
             <button type="button" className="iv-export iv-export-header" onClick={() => void exportRun(run.id, baseline?.id).catch((e) => setError(e instanceof Error ? e.message : "Export failed."))}>
               Export investigation
@@ -328,6 +347,14 @@ export default function InvestigationWorkspace({
           <p className="iv-caption">Locked for this analysis. Use Find data to search other energies or formats; the sample will not change silently.</p>
         </div>
       )}
+      {status?.day_one_gate && <DayOneGateBanner gate={status.day_one_gate} />}
+      {status?.adapters && <AdapterCapabilityBand adapters={status.adapters} />}
+      {status?.beginner_checklist && status.beginner_checklist.length > 0 && (
+        <BeginnerChecklistPanel
+          tasks={status.beginner_checklist}
+          sessionsRecorded={status.beginner_sessions_recorded ?? 0}
+        />
+      )}
       <div className="iv-source-strip">
         <span>CMS · reduced muons · 2012 · 8 TeV</span>
         <span>{status?.ready ? `${status.manifest?.entries_read.toLocaleString()} source entries staged` : status?.message || "Checking prepared sample…"}</span>
@@ -340,6 +367,28 @@ export default function InvestigationWorkspace({
           {status.reference_validation.reference_feature_visible ? " · feature above local baseline" : " · feature not confirmed on this sample"}
         </span>
       )}
+      {status?.ready && (
+        <button
+          type="button"
+          className="iv-source-refresh"
+          onClick={() => {
+            setSourceRefreshMsg("");
+            void refreshVerbatimSources()
+              .then((r) => {
+                setStatus((prev) => (prev ? { ...prev, sources: r.sources } : prev));
+                setSourceRefreshMsg(
+                  r.errors.length
+                    ? `Refreshed ${r.refreshed.length}; ${r.errors.length} failed.`
+                    : `Refreshed ${r.refreshed.length} CERN passages.`,
+                );
+              })
+              .catch((e) => setError(e instanceof Error ? e.message : "Source refresh failed."));
+          }}
+        >
+          Refresh CERN passages
+        </button>
+      )}
+      {sourceRefreshMsg && <span>{sourceRefreshMsg}</span>}
     </div>
     {busy && jobLabel && <p className="iv-job-status" role="status">{jobLabel}</p>}
       {!status?.ready ? (
@@ -361,6 +410,7 @@ export default function InvestigationWorkspace({
           <div className="iv-product-layout">
             <section className="iv-controls">
               <p className="iv-eyebrow">ACTIVE SELECTION</p>
+              <p className="iv-caption">Sliders change the recipe locally. Run recomputes the histogram without calling the language model.</p>
               <label>Muon pT minimum <span>{spec.min_pt} GeV</span><input type="range" min="0" max="50" step="1" value={spec.min_pt} onChange={(e) => setSpec({ ...spec, min_pt: Number(e.target.value) })} /></label>
               <label>Maximum |η| <span>{spec.max_abs_eta}</span><input type="range" min="0.5" max="5" step="0.1" value={spec.max_abs_eta} onChange={(e) => setSpec({ ...spec, max_abs_eta: Number(e.target.value) })} /></label>
               <label>Charge pairing
@@ -442,6 +492,7 @@ export default function InvestigationWorkspace({
               )}
             </section>
             <aside className="iv-evidence-panel" aria-label="Evidence and documentation">
+              {run && <InvestigationProvenance run={run} />}
               {run && (
                 <section className="iv-calculated-card">
                   <p className="iv-eyebrow">CALCULATED FROM THIS SAMPLE</p>

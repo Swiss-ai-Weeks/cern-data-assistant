@@ -12,6 +12,35 @@ def _ref_bin(low: float, high: float, run_id: str) -> dict:
     return {'kind': 'histogram_bin', 'run_id': run_id, 'low_gev': low, 'high_gev': high}
 
 
+def resolve_refs(run: dict, refs: list[dict], *, baseline: dict | None = None) -> list[dict]:
+    """Materialize claim pointers into inspectable values (senior evidence audit)."""
+    resolved: list[dict] = []
+    hist = run.get('histogram') or {}
+    edges = hist.get('edges') or []
+    counts = hist.get('counts') or []
+    for ref in refs or []:
+        kind = ref.get('kind')
+        item = {'kind': kind, **{k: v for k, v in ref.items() if k != 'kind'}}
+        if kind == 'run_field':
+            target = run if ref.get('run_id') == run.get('id') else baseline
+            field = ref.get('field')
+            if target and field:
+                value = target.get(field) if field != 'spec' else target.get('spec')
+                item['value'] = value
+        elif kind == 'histogram_bin':
+            low = ref.get('low_gev')
+            high = ref.get('high_gev')
+            if low is not None and high is not None and edges:
+                for i in range(len(counts)):
+                    if abs(edges[i] - float(low)) < 1e-6 and abs(edges[i + 1] - float(high)) < 1e-6:
+                        item['value'] = {'events': counts[i], 'low_gev': low, 'high_gev': high}
+                        break
+        elif kind == 'source':
+            item['value'] = {'source_id': ref.get('source_id'), 'url': ref.get('url')}
+        resolved.append(item)
+    return resolved
+
+
 def _ref_source(source_id: str, url: str | None = None) -> dict:
     ref = {'kind': 'source', 'source_id': source_id}
     if url:
@@ -147,4 +176,5 @@ def build_claims(
     label_index = {item['id']: item for item in schemas.EVIDENCE_LABELS}
     for claim in claims:
         claim['label'] = label_index.get(claim['evidence_label'], {}).get('label', claim['evidence_label'])
+        claim['resolved_refs'] = resolve_refs(run, claim.get('refs') or [], baseline=baseline)
     return claims

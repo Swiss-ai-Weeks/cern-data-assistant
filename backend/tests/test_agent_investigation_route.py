@@ -47,3 +47,4 @@ def test_agent_routes_dimuon_question_to_investigation_tool(client):
     assert body.get('tools_used') == ['investigation']
     assert body['investigation']['ready'] is True
     assert body['investigation']['run']['selected_events'] >= 0
+    assert body['investigation'].get('provenance', {}).get('run_id') == body['investigation']['run']['id']

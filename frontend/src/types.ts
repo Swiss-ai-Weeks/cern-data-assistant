@@ -143,8 +143,13 @@ export interface AgentInvestigationResult {
     selected_events: number;
     plotted_events: number;
     histogram: { edges: number[]; counts: number[] };
+    compute_ms?: number;
+    recipe_sha256?: string;
   };
   claims?: { id: string; evidence_label: string; label: string; statement: string }[];
+  provenance?: { run_id?: string; recipe_sha256?: string; sample_sha256?: string; deterministic_id?: string };
+  compute_ms?: number;
+  cached?: boolean;
   reference_validation?: {
     region_28_33_gev_events?: number;
     reference_feature_visible?: boolean;

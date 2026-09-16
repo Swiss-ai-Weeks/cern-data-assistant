@@ -1,0 +1,24 @@
+{
+  "captured_at": "2026-09-16T01:30:25.354268+00:00",
+  "method": "flask_test_client_bounded_npz",
+  "run_samples": 3,
+  "fresh_compute_ms": {
+    "count": 3,
+    "max": 4,
+    "p50": 1,
+    "p95": 4
+  },
+  "product_targets": {
+    "version": 1,
+    "description": "Provisional release timing targets from HACKATHON_PLAN section 12 (measured, not advertised).",
+    "fresh_compute_p95_ms": 2000,
+    "fresh_compute_p50_ms": 1200,
+    "cached_run_visible_ms": 5000,
+    "language_plan_explanation_ms": 20000
+  },
+  "product_gates": {
+    "fresh_compute_p50_within_target": true,
+    "fresh_compute_p95_within_target": true
+  },
+  "capture_wall_ms": 12
+}

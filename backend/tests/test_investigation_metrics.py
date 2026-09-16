@@ -1,3 +1,4 @@
+import json
 import sys
 from pathlib import Path
 
@@ -47,3 +48,23 @@ def test_metrics_lists_recent_runs(client):
     body = response.get_json()
     assert body['recent_runs']
     assert body['fresh_compute_ms']['count'] >= 1
+    assert body['product_targets']['fresh_compute_p95_ms'] == 2000
+    assert 'fresh_compute_p95_within_target' in body['product_gates']
+    assert body['baseline_timings'] is not None
+
+
+def test_capture_baseline_timings_script():
+    import subprocess
+
+    root = Path(__file__).resolve().parents[2]
+    proc = subprocess.run(
+        [sys.executable, str(root / 'scripts' / 'capture_baseline_timings.py')],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr or proc.stdout
+    payload = json.loads((root / 'backend' / 'analysis' / 'baseline_timings.json').read_text())
+    assert payload.get('captured_at')
+    assert payload['fresh_compute_ms']['count'] >= 1

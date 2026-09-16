@@ -18,4 +18,7 @@ source .venv/bin/activate
 pip install -q -r requirements.txt pytest
 python -m pytest tests/ -q
 
+echo ">> product gates"
+bash ../scripts/run_product_checks.sh
+
 echo ">> OK — deploy with SERVE_FRONTEND=1"

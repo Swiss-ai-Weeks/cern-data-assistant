@@ -19,12 +19,21 @@ class AnalysisWorker:
         self._materialize: Callable | None = None
         self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
+        self._sync = False
 
-    def start(self, app, connection_factory, materialize_fn):
+    def configure(self, app, connection_factory, materialize_fn, *, sync: bool = False):
         with self._lock:
             self._app = app
             self._connection = connection_factory
             self._materialize = materialize_fn
+            self._sync = sync
+
+    def start(self, app, connection_factory, materialize_fn, *, sync: bool = False):
+        self.configure(app, connection_factory, materialize_fn, sync=sync)
+        if sync:
+            log.info('analysis worker in synchronous mode (no background thread)')
+            return
+        with self._lock:
             if self._thread and self._thread.is_alive():
                 return
             self._thread = threading.Thread(target=self._loop, name='beamline-analysis-worker', daemon=True)
@@ -70,6 +79,42 @@ class AnalysisWorker:
                 jobs.update(db, job_id, status='failed', error=str(exc))
             finally:
                 db.close()
+
+    def process_job(self, job_id: str) -> None:
+        """Run one queued job inline (tests and single-worker deployments)."""
+        if not self._app or not self._connection or not self._materialize:
+            raise RuntimeError('Analysis worker is not configured.')
+        with self._app.app_context():
+            db = self._connection()
+            try:
+                payload = jobs.get(db, job_id)
+            finally:
+                db.close()
+            if not payload:
+                raise ValueError('Analysis job not found.')
+            if payload['status'] == 'complete':
+                return
+            if payload['status'] == 'failed':
+                raise RuntimeError(payload.get('error') or 'Analysis job failed.')
+            db = self._connection()
+            try:
+                jobs.update(db, job_id, status='running')
+            finally:
+                db.close()
+            try:
+                result = self._materialize(payload['spec'])
+                db = self._connection()
+                try:
+                    jobs.update(db, job_id, status='complete', run_id=result['id'])
+                finally:
+                    db.close()
+            except Exception as exc:
+                db = self._connection()
+                try:
+                    jobs.update(db, job_id, status='failed', error=str(exc))
+                finally:
+                    db.close()
+                raise
 
 
 worker = AnalysisWorker()

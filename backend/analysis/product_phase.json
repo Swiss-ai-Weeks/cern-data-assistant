@@ -1,0 +1,16 @@
+{
+  "phase": 5,
+  "name": "Reliability",
+  "feature_freeze_core": true,
+  "frozen_at": "2026-09-16",
+  "scope_locked": [
+    "CMS 2012 reduced muons record 12341 dimuon recipe",
+    "Catalog search and grounded detector Q&A",
+    "Evidence-qualified claims and export bundle"
+  ],
+  "stretch_deferred": [
+    "Runnable 13 TeV NanoAOD adapter (record 30555)",
+    "Full detector hit schematic",
+    "Public accounts and sharing"
+  ]
+}

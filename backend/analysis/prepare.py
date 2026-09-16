@@ -98,7 +98,16 @@ def prepare(entries, directory=DIRECTORY):
         json.dump(manifest, tmp, indent=2)
         manifest_temp = tmp.name
     os.replace(manifest_temp, directory / 'manifest.json')
-    print(json.dumps(manifest, indent=2), flush=True)
+    from . import recipe, validate
+
+    result = recipe.calculate(data, recipe.DEFAULT_SPEC, manifest)
+    gate = validate.day_one_gate(result['histogram'], entries_read=limit)
+    gate_path = directory / 'day_one_gate.json'
+    with tempfile.NamedTemporaryFile(mode='w', dir=directory, suffix='.json', delete=False) as tmp:
+        json.dump(gate, tmp, indent=2)
+        gate_temp = tmp.name
+    os.replace(gate_temp, gate_path)
+    print(json.dumps({**manifest, 'day_one_gate': gate}, indent=2), flush=True)
 
 
 if __name__ == '__main__':

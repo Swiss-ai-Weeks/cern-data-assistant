@@ -18,6 +18,19 @@ export default function InvestigationClaims({ claims }: { claims: InvestigationC
             <span className="iv-claim-label">{claim.label}</span>
             <p>{claim.statement}</p>
             {claim.excerpt && <blockquote>{claim.excerpt}</blockquote>}
+            {claim.resolved_refs && claim.resolved_refs.length > 0 && (
+              <details className="iv-claim-refs">
+                <summary>Linked fields ({claim.resolved_refs.length})</summary>
+                <ul>
+                  {claim.resolved_refs.map((ref, i) => (
+                    <li key={`${claim.id}-ref-${i}`}>
+                      <code>{ref.kind}</code>
+                      {"value" in ref && ref.value != null ? `: ${JSON.stringify(ref.value)}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
           </li>
         ))}
       </ul>

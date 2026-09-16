@@ -27,3 +27,42 @@ def reference_feature_report(histogram: dict) -> dict:
         'z_visible': z_count >= neighbor * 0.5,
         'note': 'Heuristic check on the bounded sample only; not a physics significance test.',
     }
+
+
+def day_one_gate(histogram: dict, *, entries_read: int | None = None) -> dict:
+    """
+    Day-1 product gate: the documented ~30 GeV discussion region and Z vicinity should
+    both be visible on the bounded reference selection before we treat the flagship story as proven.
+    """
+    report = reference_feature_report(histogram)
+    z_ok = bool(report.get('z_visible'))
+    feature_ok = bool(report.get('reference_feature_visible'))
+    passed = feature_ok and z_ok
+    if passed:
+        message = (
+            'The bounded sample shows elevated activity in 28–33 GeV and a Z-region peak '
+            'consistent with the documented reference case on this selection.'
+        )
+    elif not feature_ok and not z_ok:
+        message = (
+            'Neither the 28–33 GeV heuristic nor the Z-region peak cleared on this sample. '
+            'Re-prepare with more entries or disclose a cached reference run before demoing the trigger story.'
+        )
+    elif not feature_ok:
+        message = (
+            'Z-region activity is present, but the 28–33 GeV heuristic did not clear on this bounded sample. '
+            'The trigger-feature narrative may be weak until the sample or selection is adjusted.'
+        )
+    else:
+        message = (
+            'The 28–33 GeV heuristic cleared, but the Z peak is weak on this sample. '
+            'Check sample size and the default opposite-charge selection.'
+        )
+    return {
+        'passed': passed,
+        'reference_feature_visible': feature_ok,
+        'z_visible': z_ok,
+        'entries_read': entries_read,
+        'reference_validation': report,
+        'message': message,
+    }

@@ -7,21 +7,8 @@ import pytest
 from flask import Flask
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
-from analysis import adapters, constraints
+from analysis.recipe import DEFAULT_SPEC
 from analysis.service import bp
-
-
-def test_executable_adapter_is_record_12341():
-    binding = adapters.executable_binding()
-    assert binding['record_id'] == 12341
-    assert binding['adapter_status'] == 'executable'
-
-
-def test_stretch_adapter_is_catalog_only():
-    stretch = adapters.for_record('30555')
-    assert stretch is not None
-    assert stretch['status'] == 'catalog_only'
-    assert stretch['energy_tev'] == 13.0
 
 
 @pytest.fixture
@@ -54,18 +41,27 @@ def client(tmp_path):
     return app.test_client()
 
 
-def test_adapter_detail_30555_documents_certified_runs(client):
-    response = client.get('/api/investigations/adapters/30555')
-    assert response.status_code == 200
-    body = response.get_json()
-    assert body['status'] == 'catalog_only'
-    assert body['runnable_in_this_release'] is False
-    assert 'certified' in body['certified_run_requirement'].lower()
+def test_status_includes_product_gates_and_checklist(client):
+    body = client.get('/api/investigations/status').get_json()
+    assert body['ready'] is True
+    assert body['product_phase']['feature_freeze_core'] is True
+    assert body['eval_cases_frozen'] == 30
+    assert len(body['beginner_checklist']) == 5
 
 
-def test_search_marks_30555_catalog_only():
-    payload = constraints.enrich_search(
-        'CMS dimuons 13 TeV',
-        {'results': [{'recid': 30555, 'collision_energy': '13 TeV', 'title': 'DoubleMuon', 'abstract': ''}]},
+def test_record_beginner_session_persists(client):
+    listed = client.get('/api/investigations/beginner-checklist').get_json()
+    task_id = listed['tasks'][0]['id']
+    response = client.post(
+        '/api/investigations/beginner-checklist/sessions',
+        json={
+            'tester': 'Reviewer A',
+            'results': [{'task_id': task_id, 'completed': True, 'notes': 'Named record 12341.'}],
+            'confusion_notes': 'None',
+        },
     )
-    assert payload['results'][0]['constraint_fit'] == 'catalog_only_adapter'
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['sessions_recorded'] == 1
+    again = client.get('/api/investigations/beginner-checklist').get_json()
+    assert len(again['sessions']) == 1

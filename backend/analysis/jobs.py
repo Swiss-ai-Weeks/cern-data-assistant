@@ -69,6 +69,18 @@ def update(db: sqlite3.Connection, job_id: str, *, status: str, run_id: str | No
     )
 
 
+def queue_stats(db: sqlite3.Connection) -> dict:
+    ensure_table(db)
+    rows = db.execute('SELECT status, COUNT(*) FROM jobs GROUP BY status').fetchall()
+    counts = {status: count for status, count in rows}
+    return {
+        'queued': int(counts.get('queued', 0)),
+        'running': int(counts.get('running', 0)),
+        'complete': int(counts.get('complete', 0)),
+        'failed': int(counts.get('failed', 0)),
+    }
+
+
 def get(db: sqlite3.Connection, job_id: str) -> dict | None:
     ensure_table(db)
     row = db.execute(

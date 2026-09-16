@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "description": "Provisional release timing targets from HACKATHON_PLAN section 12 (measured, not advertised).",
+  "fresh_compute_p95_ms": 2000,
+  "fresh_compute_p50_ms": 1200,
+  "cached_run_visible_ms": 5000,
+  "language_plan_explanation_ms": 20000
+}

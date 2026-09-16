@@ -150,7 +150,14 @@ export default function SimpleChatLayout({
           {threadItems.length > 0 && onSelectThread && (
             <SessionThread items={threadItems} activeAsstId={activeAsstId} onSelect={onSelectThread} />
           )}
-          {query && <TurnSummary query={query} result={result} goal={live?.text || undefined} />}
+          {query && (
+            <TurnSummary
+              query={query}
+              result={result}
+              goal={live?.text || undefined}
+              search={result?.search ?? null}
+            />
+          )}
 
           {live?.live && (
             <AgentTimeline
@@ -172,7 +179,16 @@ export default function SimpleChatLayout({
           {live?.error && <div className="error-banner">{live.error}</div>}
 
           {result?.search?.constraint_notes && result.search.constraint_notes.length > 0 && (
-            <div className="constraint-banner" role="status">
+            <div
+              className={`constraint-banner constraint-banner-${result.search.constraint_match ?? "catalog"}`}
+              role="status"
+              aria-live="polite"
+            >
+              <p className="constraint-banner-title">
+                {result.search.constraint_match === "energy_mismatch" || result.search.constraint_match === "experiment_mismatch"
+                  ? "Catalog results only — the runnable sample did not change"
+                  : "Dataset constraints applied to this search"}
+              </p>
               {result.search.constraint_notes.map((note) => (
                 <p key={note}>{note}</p>
               ))}

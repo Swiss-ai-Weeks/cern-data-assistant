@@ -17,4 +17,9 @@ python -m pytest -q \
   tests/test_eval_paraphrase.py \
   tests/test_session_brief.py \
   tests/test_export_baseline.py \
-  tests/test_provenance.py
+  tests/test_provenance.py \
+  tests/test_claims_resolve.py \
+  tests/test_worker_sync.py \
+  tests/test_beginner_checklist.py \
+  tests/test_day_one_gate.py
+python ../scripts/capture_baseline_timings.py

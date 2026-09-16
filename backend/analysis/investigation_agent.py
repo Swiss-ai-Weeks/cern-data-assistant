@@ -1,7 +1,7 @@
 """Agent bridge: route spectrum/dimuon intent to deterministic investigation tools."""
 from __future__ import annotations
 
-from . import claims, plan, recipe, validate
+from . import claims, plan, provenance, recipe, validate
 
 
 def handle_query(query: str, *, materialize_fn, sample_ready_fn, merged_sources_fn, compare_fn):
@@ -54,6 +54,9 @@ def handle_query(query: str, *, materialize_fn, sample_ready_fn, merged_sources_
             'run': run,
             'claims': claim_list,
             'reference_validation': ref_val,
+            'provenance': provenance.run_lineage(run),
+            'compute_ms': run.get('compute_ms'),
+            'cached': bool(run.get('cached')),
         },
         'search': None,
         'answer': None,

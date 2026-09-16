@@ -179,7 +179,9 @@ export default function InvestigateDashboard({
         {threadItems.length > 0 && onSelectThread && (
           <SessionThread items={threadItems} activeAsstId={activeAsstId} onSelect={onSelectThread} />
         )}
-        {query && <TurnSummary query={query} result={result} goal={live?.text || undefined} />}
+        {query && (
+          <TurnSummary query={query} result={result} goal={live?.text || undefined} search={result?.search ?? null} />
+        )}
 
       {activeTab === "about" && <TrustAbout onOpenTrust={onOpenTrust} />}
 

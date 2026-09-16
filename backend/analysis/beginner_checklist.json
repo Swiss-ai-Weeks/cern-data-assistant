@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "description": "Five beginner tasks from HACKATHON_PLAN section 12 — record completion with a non-implementer.",
+  "tasks": [
+    {
+      "id": "pick-dataset",
+      "prompt": "Explain which CERN dataset this investigation uses and why it was chosen.",
+      "success_criteria": "Names record 12341, 8 TeV CMS reduced muons, and mentions bounded sample."
+    },
+    {
+      "id": "read-selection",
+      "prompt": "Describe the active muon selection in plain language.",
+      "success_criteria": "Mentions pT, η, and charge pairing without opening a terminal."
+    },
+    {
+      "id": "run-revision",
+      "prompt": "Change the selection and describe what changed in the plot or counts.",
+      "success_criteria": "Runs a revision and cites a numeric delta or cut-flow change."
+    },
+    {
+      "id": "evidence-limits",
+      "prompt": "What does the documentation say about the ~30 GeV feature, and what is not established?",
+      "success_criteria": "Separates documented trigger explanation from calculated counts; no discovery claim."
+    },
+    {
+      "id": "reproduce",
+      "prompt": "Export the investigation and state what someone else would need to reproduce the plot.",
+      "success_criteria": "Mentions recipe, sample checksum, and export or notebook path."
+    }
+  ],
+  "sessions": []
+}

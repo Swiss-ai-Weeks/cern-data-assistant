@@ -73,11 +73,32 @@ def health():
     kb = rag.get_kb()
     investigation = {"sample_prepared": False, "recommended_gunicorn_workers": 1}
     try:
-        from analysis.service import directory
+        from analysis.service import (
+            _eval_case_count,
+            _product_phase,
+            directory,
+        )
 
         investigation["sample_prepared"] = (directory() / "manifest.json").exists()
+        phase = _product_phase()
+        if phase:
+            investigation["product_phase"] = phase.get("phase")
+            investigation["feature_freeze_core"] = bool(phase.get("feature_freeze_core"))
+        investigation["eval_cases_frozen"] = _eval_case_count()
+        if investigation["sample_prepared"]:
+            from analysis.service import resolve_baseline_run, sample
+            from analysis.validate import day_one_gate
+
+            _, manifest = sample()
+            baseline = resolve_baseline_run(manifest)
+            investigation["day_one_gate"] = day_one_gate(
+                baseline["histogram"],
+                entries_read=manifest.get("entries_read"),
+            )
     except RuntimeError:
         pass
+    except Exception:
+        log.debug("investigation health extras skipped", exc_info=True)
     return jsonify(
         {
             "cern_api": "ok" if cern_ok else "unreachable",
@@ -614,6 +635,10 @@ def _agent_events(user_query: str, body: dict, history=None):
                     "query": user_query,
                     "run_id": run.get("id"),
                     "selected_events": run.get("selected_events"),
+                    "recipe_sha256": run.get("recipe_sha256"),
+                    "sample_sha256": (run.get("manifest") or {}).get("sha256"),
+                    "cached": bool(run.get("cached")),
+                    "compute_ms": run.get("compute_ms"),
                 },
             )
         except Exception:

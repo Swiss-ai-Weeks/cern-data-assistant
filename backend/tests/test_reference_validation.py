@@ -11,7 +11,7 @@ def test_reference_validation_shape():
         'counts': [1] * 120,
     }
     histogram['counts'][30] = 50
-    histogram['counts'][90] = 200
+    histogram['counts'][91] = 200
     report = reference_feature_report(histogram)
     assert report['region_28_33_gev_events'] >= 50
     assert 'reference_feature_visible' in report

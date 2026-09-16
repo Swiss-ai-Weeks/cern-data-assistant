@@ -29,6 +29,15 @@ export type InvestigationSession = {
   evidence_labels: EvidenceLabel[];
 };
 export type VariableDoc = { id: string; label: string; fields: string[]; url: string; summary: string };
+export type DayOneGate = {
+  passed: boolean;
+  message: string;
+  reference_feature_visible?: boolean;
+  z_visible?: boolean;
+  entries_read?: number;
+  reference_validation?: ReferenceValidation;
+};
+
 export type ReferenceValidation = {
   z_peak_bin_gev: string;
   z_events: number;
@@ -40,6 +49,31 @@ export type ReferenceValidation = {
   z_visible: boolean;
   note: string;
 };
+export type DataAdapter = {
+  record_id: string;
+  title: string;
+  energy_tev: number;
+  experiment?: string;
+  format?: string;
+  status: string;
+  quality_note?: string;
+  record_url?: string;
+};
+
+export type ProductPhase = {
+  phase: number;
+  name: string;
+  feature_freeze_core?: boolean;
+  scope_locked?: string[];
+  stretch_deferred?: string[];
+};
+
+export type BeginnerTask = {
+  id: string;
+  prompt: string;
+  success_criteria: string;
+};
+
 export type Status = {
   ready: boolean;
   manifest?: Manifest;
@@ -50,7 +84,13 @@ export type Status = {
   goal?: string;
   variable_docs?: VariableDoc[];
   reference_validation?: ReferenceValidation;
+  day_one_gate?: DayOneGate;
   baseline_run_id?: string;
+  adapters?: DataAdapter[];
+  product_phase?: ProductPhase;
+  eval_cases_frozen?: number;
+  beginner_checklist?: BeginnerTask[];
+  beginner_sessions_recorded?: number;
 };
 export type JobStreamEvent =
   | { type: 'status'; step: string; label: string; job_id?: string }
@@ -168,6 +208,7 @@ export type InvestigationClaim = {
   statement: string;
   excerpt?: string;
   refs?: { kind: string; run_id?: string; field?: string; source_id?: string; url?: string }[];
+  resolved_refs?: { kind: string; value?: unknown }[];
 };
 export type RevisionNarrative = {
   summary: string;
@@ -215,6 +256,25 @@ export async function saveInvestigationSession(id: string, body: Partial<Investi
   return api<InvestigationSession>(`/sessions/${encodeURIComponent(id)}`, {
     method: 'PUT',
     headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body),
+  });
+}
+
+export async function refreshVerbatimSources() {
+  return api<{ refreshed: unknown[]; errors: { id: string; error: string }[]; sources: Source[] }>(
+    '/sources/refresh',
+    { method: 'POST' },
+  );
+}
+
+export async function recordBeginnerSession(body: {
+  tester: string;
+  results: { task_id: string; completed: boolean; notes?: string }[];
+  confusion_notes?: string;
+}) {
+  return api<{ entry: { id: string }; sessions_recorded: number }>('/beginner-checklist/sessions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
 }

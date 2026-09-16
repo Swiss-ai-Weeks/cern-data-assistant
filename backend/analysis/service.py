@@ -2,6 +2,7 @@
 from datetime import datetime, timezone
 from functools import lru_cache
 import hashlib
+import os
 import io
 import json
 from pathlib import Path
@@ -16,7 +17,13 @@ from flask import Blueprint, Response, current_app, jsonify, request, send_file,
 from . import adapters, claims, evidence_map, export_render, jobs, narrative, plan, provenance, recipe, schemas, source_passages, validate, worker
 
 bp = Blueprint('investigations', __name__, url_prefix='/api/investigations')
-DEFAULT_DIRECTORY = Path(__file__).resolve().parent.parent / 'data' / 'dimuon'
+ANALYSIS_DIR = Path(__file__).resolve().parent
+DEFAULT_DIRECTORY = ANALYSIS_DIR.parent / 'data' / 'dimuon'
+PRODUCT_TARGETS_PATH = ANALYSIS_DIR / 'product_targets.json'
+BASELINE_TIMINGS_PATH = ANALYSIS_DIR / 'baseline_timings.json'
+PRODUCT_PHASE_PATH = ANALYSIS_DIR / 'product_phase.json'
+BEGINNER_CHECKLIST_PATH = ANALYSIS_DIR / 'beginner_checklist.json'
+EVAL_CASES_PATH = ANALYSIS_DIR / 'eval_cases.json'
 SOURCES = [
     {'id': 'analysis', 'title': 'CMS dimuon spectrum: the documented trigger effect',
      'url': 'https://opendata.cern.ch/record/12342', 'kind': 'CERN documentation',
@@ -115,6 +122,71 @@ def unavailable(error):
     return jsonify(error=str(error)), 503
 
 
+@lru_cache(maxsize=1)
+def _product_targets():
+    if not PRODUCT_TARGETS_PATH.is_file():
+        return {}
+    return json.loads(PRODUCT_TARGETS_PATH.read_text(encoding='utf-8'))
+
+
+@lru_cache(maxsize=1)
+def _product_phase():
+    if not PRODUCT_PHASE_PATH.is_file():
+        return {}
+    return json.loads(PRODUCT_PHASE_PATH.read_text(encoding='utf-8'))
+
+
+@lru_cache(maxsize=1)
+def _beginner_checklist_template():
+    if not BEGINNER_CHECKLIST_PATH.is_file():
+        return {'tasks': []}
+    return json.loads(BEGINNER_CHECKLIST_PATH.read_text(encoding='utf-8'))
+
+
+def _eval_case_count() -> int:
+    if not EVAL_CASES_PATH.is_file():
+        return 0
+    payload = json.loads(EVAL_CASES_PATH.read_text(encoding='utf-8'))
+    return len(payload.get('cases') or [])
+
+
+def _beginner_sessions_path() -> Path:
+    return directory() / 'beginner_sessions.json'
+
+
+def _load_beginner_sessions() -> list:
+    path = _beginner_sessions_path()
+    if not path.is_file():
+        return []
+    try:
+        payload = json.loads(path.read_text(encoding='utf-8'))
+    except json.JSONDecodeError:
+        return []
+    return payload if isinstance(payload, list) else payload.get('sessions') or []
+
+
+def _percentile(values, pct):
+    if not values:
+        return None
+    idx = min(len(values) - 1, max(0, int(round((pct / 100) * (len(values) - 1)))))
+    return values[idx]
+
+
+def _product_gates(fresh_stats: dict, targets: dict) -> dict:
+    p50 = fresh_stats.get('p50')
+    p95 = fresh_stats.get('p95')
+    p50_target = targets.get('fresh_compute_p50_ms')
+    p95_target = targets.get('fresh_compute_p95_ms')
+    return {
+        'fresh_compute_p50_within_target': (
+            p50 is not None and p50_target is not None and p50 <= p50_target
+        ),
+        'fresh_compute_p95_within_target': (
+            p95 is not None and p95_target is not None and p95 <= p95_target
+        ),
+    }
+
+
 @bp.get('/metrics')
 def investigation_metrics():
     timings = []
@@ -136,22 +208,31 @@ def investigation_metrics():
     recent = timings[:25]
     fresh = [item['compute_ms'] for item in recent if not item['cached']]
     fresh.sort()
+    fresh_stats = {
+        'count': len(fresh),
+        'p50': _percentile(fresh, 50),
+        'p95': _percentile(fresh, 95),
+        'max': fresh[-1] if fresh else None,
+    }
+    targets = _product_targets()
+    baseline_snapshot = None
+    if BASELINE_TIMINGS_PATH.is_file():
+        try:
+            baseline_snapshot = json.loads(BASELINE_TIMINGS_PATH.read_text(encoding='utf-8'))
+        except json.JSONDecodeError:
+            baseline_snapshot = {'error': 'invalid baseline_timings.json'}
 
-    def percentile(values, pct):
-        if not values:
-            return None
-        idx = min(len(values) - 1, max(0, int(round((pct / 100) * (len(values) - 1)))))
-        return values[idx]
-
+    with connection() as db:
+        queue = jobs.queue_stats(db)
     return jsonify(
         recent_runs=recent,
-        fresh_compute_ms={
-            'count': len(fresh),
-            'p50': percentile(fresh, 50),
-            'p95': percentile(fresh, 95),
-            'max': fresh[-1] if fresh else None,
-        },
+        fresh_compute_ms=fresh_stats,
         cached_runs=sum(1 for item in recent if item['cached']),
+        job_queue=queue,
+        worker_mode='sync' if _worker_sync_enabled(current_app) else 'background',
+        product_targets=targets or None,
+        product_gates=_product_gates(fresh_stats, targets) if targets else None,
+        baseline_timings=baseline_snapshot,
     )
 
 
@@ -173,9 +254,14 @@ def status():
         goal=schemas.DEFAULT_GOAL,
         variable_docs=evidence_map.for_entry(),
         reference_validation=validate.reference_feature_report(baseline['histogram']),
+        day_one_gate=validate.day_one_gate(baseline['histogram'], entries_read=manifest.get('entries_read')),
         baseline_run_id=baseline['id'],
         adapters=adapters.list_adapters(),
         executable_adapter=adapters.executable_binding(),
+        product_phase=_product_phase(),
+        eval_cases_frozen=_eval_case_count(),
+        beginner_checklist=_beginner_checklist_template().get('tasks') or [],
+        beginner_sessions_recorded=len(_load_beginner_sessions()),
     )
 
 
@@ -204,10 +290,17 @@ def merged_sources(*, cached_verbatim: bool = False):
 SESSION_FIELDS = {'goal', 'spec', 'constraints', 'active_run_id', 'baseline_run_id', 'run_ids', 'pending_job_id'}
 
 
+def _worker_sync_enabled(app) -> bool:
+    if app.config.get('ANALYSIS_WORKER_SYNC') is not None:
+        return bool(app.config['ANALYSIS_WORKER_SYNC'])
+    return os.environ.get('BEAMLINE_ANALYSIS_WORKER_SYNC', '').lower() in ('1', 'true', 'yes')
+
+
 def init_investigation_worker(app):
     import threading
 
-    worker.worker.start(app, connection, materialize)
+    sync = _worker_sync_enabled(app)
+    worker.worker.start(app, connection, materialize, sync=sync)
 
     def warm_baseline():
         with app.app_context():
@@ -216,7 +309,14 @@ def init_investigation_worker(app):
             except Exception:
                 current_app.logger.exception('baseline warm-up failed')
 
-    threading.Thread(target=warm_baseline, name='investigation-baseline-warm', daemon=True).start()
+    if sync:
+        with app.app_context():
+            try:
+                materialize(recipe.DEFAULT_SPEC)
+            except Exception:
+                app.logger.exception('baseline warm-up failed')
+    else:
+        threading.Thread(target=warm_baseline, name='investigation-baseline-warm', daemon=True).start()
 
 
 def compare_run_payload(run_id: str, baseline_id: str) -> dict:
@@ -265,9 +365,12 @@ def compare_run_payload(run_id: str, baseline_id: str) -> dict:
 def enqueue_job(spec):
     db = connection()
     try:
-        return jobs.create(db, spec)
+        job_id = jobs.create(db, spec)
     finally:
         db.close()
+    if _worker_sync_enabled(current_app):
+        worker.worker.process_job(job_id)
+    return job_id
 
 
 def _investigation_id():
@@ -396,6 +499,23 @@ def variable_docs():
     return jsonify(evidence_map.for_entry())
 
 
+@bp.get('/adapters/<recid>')
+def adapter_detail(recid):
+    adapter = adapters.for_record(recid)
+    if not adapter:
+        return jsonify(error=f'No adapter metadata for record {recid}.'), 404
+    payload = dict(adapter)
+    if str(recid) == '30555':
+        payload['certified_run_requirement'] = (
+            'NanoAOD inputs must be filtered with the CMS certified run/luminosity mask; '
+            'raw files are not pre-filtered to valid run segments.'
+        )
+        payload['runnable_in_this_release'] = False
+    elif str(recid) == adapters.EXECUTABLE['record_id']:
+        payload['runnable_in_this_release'] = True
+    return jsonify(payload)
+
+
 @bp.post('/sources/refresh')
 def refresh_sources():
     refreshed = []
@@ -405,7 +525,58 @@ def refresh_sources():
             refreshed.append(source_passages.load_or_fetch(directory(), recid, force=True))
         except Exception as exc:
             errors.append({'id': recid, 'error': str(exc)})
-    return jsonify(refreshed=refreshed, errors=errors, sources=merged_sources())
+    return jsonify(refreshed=refreshed, errors=errors, sources=merged_sources(cached_verbatim=True))
+
+
+@bp.get('/beginner-checklist')
+def beginner_checklist():
+    template = _beginner_checklist_template()
+    return jsonify(
+        tasks=template.get('tasks') or [],
+        sessions=_load_beginner_sessions(),
+        description=template.get('description'),
+    )
+
+
+@bp.post('/beginner-checklist/sessions')
+def record_beginner_session():
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        raise ValueError('Provide a session object with task results.')
+    tester = (body.get('tester') or '').strip()
+    if not tester or len(tester) > 120:
+        raise ValueError('Provide a short tester label (who ran the checklist).')
+    results = body.get('results')
+    if not isinstance(results, list) or not results:
+        raise ValueError('Provide results: [{task_id, completed, notes}]')
+    allowed_ids = {task['id'] for task in _beginner_checklist_template().get('tasks') or []}
+    cleaned = []
+    for row in results:
+        if not isinstance(row, dict):
+            continue
+        task_id = row.get('task_id')
+        if task_id not in allowed_ids:
+            continue
+        cleaned.append({
+            'task_id': task_id,
+            'completed': bool(row.get('completed')),
+            'notes': str(row.get('notes') or '')[:2000],
+        })
+    if not cleaned:
+        raise ValueError('No valid task results were provided.')
+    entry = {
+        'id': hashlib.sha256(f'{time.time_ns()}:{tester}'.encode()).hexdigest()[:16],
+        'tester': tester,
+        'recorded_at': datetime.now(timezone.utc).isoformat(),
+        'results': cleaned,
+        'confusion_notes': str(body.get('confusion_notes') or '')[:4000],
+    }
+    sessions = _load_beginner_sessions()
+    sessions.append(entry)
+    path = _beginner_sessions_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(sessions, indent=2) + '\n', encoding='utf-8')
+    return jsonify(entry=entry, sessions_recorded=len(sessions))
 
 
 @bp.put('/sessions/<investigation_id>')

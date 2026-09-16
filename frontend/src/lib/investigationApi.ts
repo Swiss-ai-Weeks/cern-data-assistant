@@ -160,21 +160,6 @@ export type ProductSummary = {
 };
 
 export const getProductSummary = () => api<ProductSummary>('/product-summary');
-
-export type ProductSummary = {
-  product: string;
-  repository: string;
-  public_demo_url: string | null;
-  feature_freeze_core: boolean;
-  eval_cases_frozen: number;
-  investigation: {
-    sample_ready: boolean;
-    day_one_gate_passed?: boolean;
-    beginner_sessions_recorded?: number;
-  };
-};
-
-export const getProductSummary = () => api<ProductSummary>('/product-summary');
 export const calculateRun = (spec: Selection) => api<Run>('/runs', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({spec})});
 export type AnalysisJob = { id: string; status: string; spec: Selection; run_id: string | null; error: string | null; run?: Run };
 export const submitAnalysisJob = (spec: Selection) => api<AnalysisJob & { run: Run }>('/jobs', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({spec})});

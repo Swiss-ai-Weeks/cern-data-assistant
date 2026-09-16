@@ -3,6 +3,7 @@
 @import "./styles/components.css";
 @import "./styles/motion.css";
 @import "./styles/product.css";
+@import "./styles/reconstruction.css";
 
 * {
   box-sizing: border-box;

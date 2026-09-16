@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import json
+import re
 import time
 import logging
 from typing import Any, Optional
@@ -390,6 +391,22 @@ def plan_tasks(
     """Decompose a request into optional search + ask sub-tasks. Falls back to
     the single-intent router if planning fails. `history` is prior turns
     [{role, content}] so follow-ups resolve against the conversation."""
+    # Explicit catalog requests do not need a 32B model round trip. Keeping the
+    # user's constraints intact is also safer than paraphrasing energies or
+    # experiments before the deterministic CERN search parser sees them.
+    plain = (user_message or '').strip()
+    lower = plain.lower()
+    search_signal = re.search(r'\b(find|search|show|need|looking|dataset|datasets|data|collisions?)\b', lower)
+    domain_signal = re.search(r'\b(tev|muons?|electrons?|photons?|protons?|collisions?|cms|atlas|lhcb|alice)\b', lower)
+    explanation_signal = re.search(r'\b(why|explain|what is|what are|how does|how do|compare)\b', lower)
+    if not history and search_signal and domain_signal and not explanation_signal:
+        return {
+            'goal': 'Find CERN Open Data records matching the stated constraints.',
+            'search_query': plain,
+            'ask_query': None,
+            'strategy': 'deterministic',
+        }
+
     payload = user_message
     if history:
         lines = []
@@ -429,7 +446,12 @@ def plan_tasks(
         else:
             ask_q = user_message
 
-    return {"goal": goal or user_message, "search_query": search_q, "ask_query": ask_q}
+    return {
+        "goal": goal or user_message,
+        "search_query": search_q,
+        "ask_query": ask_q,
+        "strategy": "model",
+    }
 
 
 # ---------------------------------------------------------------------------

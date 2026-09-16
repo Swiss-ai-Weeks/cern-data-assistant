@@ -53,18 +53,19 @@ def test_metrics_lists_recent_runs(client):
     assert body['baseline_timings'] is not None
 
 
-def test_capture_baseline_timings_script():
+def test_capture_baseline_timings_script(tmp_path):
     import subprocess
 
     root = Path(__file__).resolve().parents[2]
+    output = tmp_path / 'timings.json'
     proc = subprocess.run(
-        [sys.executable, str(root / 'scripts' / 'capture_baseline_timings.py')],
+        [sys.executable, str(root / 'scripts' / 'capture_baseline_timings.py'), '--output', str(output)],
         cwd=root,
         capture_output=True,
         text=True,
         check=False,
     )
     assert proc.returncode == 0, proc.stderr or proc.stdout
-    payload = json.loads((root / 'backend' / 'analysis' / 'baseline_timings.json').read_text())
+    payload = json.loads(output.read_text())
     assert payload.get('captured_at')
     assert payload['fresh_compute_ms']['count'] >= 1

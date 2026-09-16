@@ -56,10 +56,10 @@ export default function BottomDock({
   return (
     <div className="bottom-dock-wrap">
       <nav className="bottom-dock" aria-label="Main navigation">
-        <DockBtn label="Ask" active={askActive} onClick={onGoHome}>
+        <DockBtn label="Explore" active={askActive} onClick={onGoHome}>
           <HomeIcon />
         </DockBtn>
-        <DockBtn label="Lab" active={labActive} onClick={onOpenLab}>
+        <DockBtn label="Analysis" active={labActive} onClick={onOpenLab}>
           <GridIcon />
         </DockBtn>
         <DockBtn label="History" active={historyOpen} onClick={onToggleHistory}>

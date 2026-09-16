@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import hashlib
+import argparse
 import json
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib import request as urlrequest
 
 import numpy as np
 from flask import Flask
@@ -50,8 +52,97 @@ def _client(tmp_path: Path):
     return app.test_client()
 
 
+def _percentile(values: list[int], pct: int) -> int | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    index = min(len(ordered) - 1, max(0, round((pct / 100) * (len(ordered) - 1))))
+    return ordered[index]
+
+
+def _live_capture(base_url: str, count: int) -> dict:
+    base_url = base_url.rstrip('/')
+    with urlrequest.urlopen(f'{base_url}/api/investigations/status', timeout=20) as response:
+        status = json.load(response)
+    if not status.get('ready'):
+        raise RuntimeError(status.get('message') or 'Live investigation sample is not ready.')
+
+    # Fractional pT values avoid colliding with normal slider-generated runs, so the
+    # measurement exercises fresh computation rather than the deterministic cache.
+    nonce = (time.time_ns() % 800_000) / 1_000_000
+    specs = [
+        {**DEFAULT_SPEC, 'min_pt': round(2.1 + nonce + i * 3.7, 6), 'max_abs_eta': 2.4}
+        for i in range(count)
+    ]
+    runs = []
+    wall_values = []
+    started = time.monotonic()
+    for spec in specs:
+        body = json.dumps({'spec': spec}).encode()
+        req = urlrequest.Request(
+            f'{base_url}/api/investigations/runs', data=body,
+            headers={'Content-Type': 'application/json'}, method='POST',
+        )
+        run_started = time.monotonic()
+        with urlrequest.urlopen(req, timeout=30) as response:
+            run = json.load(response)
+        wall_ms = round((time.monotonic() - run_started) * 1000)
+        if run.get('cached'):
+            raise RuntimeError(f"Expected a fresh live run, but {run.get('id')} was cached.")
+        wall_values.append(wall_ms)
+        runs.append({
+            'run_id': run['id'], 'compute_ms': run['compute_ms'], 'wall_ms': wall_ms,
+            'selected_events': run['selected_events'], 'spec': run['spec'],
+        })
+    compute_values = [int(item['compute_ms']) for item in runs]
+    fresh = {
+        'count': len(compute_values), 'p50': _percentile(compute_values, 50),
+        'p95': _percentile(compute_values, 95), 'max': max(compute_values),
+    }
+    return {
+        'captured_at': datetime.now(timezone.utc).isoformat(),
+        'method': 'live_api_staged_sample',
+        'run_samples': len(runs),
+        'sample': {
+            'sample_id': status['manifest'].get('sample_id'),
+            'sha256': status['manifest']['sha256'],
+            'entries_read': status['manifest']['entries_read'],
+            'record_id': status['manifest'].get('record_id'),
+        },
+        'fresh_compute_ms': fresh,
+        'request_wall_ms': {
+            'count': len(wall_values), 'p50': _percentile(wall_values, 50),
+            'p95': _percentile(wall_values, 95), 'max': max(wall_values),
+        },
+        'runs': runs,
+        'capture_wall_ms': round((time.monotonic() - started) * 1000),
+    }
+
+
 def main() -> int:
     import tempfile
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--base-url', help='Running Beamline origin; captures the staged live sample.')
+    parser.add_argument('--samples', type=int, default=3, choices=range(3, 11), metavar='3-10')
+    parser.add_argument('--output', help='Output JSON path (defaults to the tracked release timing artifact).')
+    args = parser.parse_args()
+    out = Path(args.output).resolve() if args.output else BACKEND / 'analysis' / 'baseline_timings.json'
+
+    targets = _product_targets()
+    if args.base_url:
+        try:
+            payload = _live_capture(args.base_url, args.samples)
+        except Exception as exc:
+            print(f'Live timing capture failed: {exc}', file=sys.stderr)
+            return 1
+        payload['product_targets'] = targets
+        payload['product_gates'] = _product_gates(payload['fresh_compute_ms'], targets)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(payload, indent=2) + '\n', encoding='utf-8')
+        print(f'Wrote {out}')
+        print(json.dumps(payload, indent=2))
+        return 0
 
     specs = [
         DEFAULT_SPEC,
@@ -68,7 +159,6 @@ def main() -> int:
                 return 1
         metrics = client.get('/api/investigations/metrics').get_json()
     fresh = metrics['fresh_compute_ms']
-    targets = _product_targets()
     payload = {
         'captured_at': datetime.now(timezone.utc).isoformat(),
         'method': 'flask_test_client_bounded_npz',
@@ -78,7 +168,7 @@ def main() -> int:
         'product_gates': _product_gates(fresh, targets),
         'capture_wall_ms': round((time.monotonic() - started) * 1000),
     }
-    out = BACKEND / 'analysis' / 'baseline_timings.json'
+    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2) + '\n', encoding='utf-8')
     print(f'Wrote {out}')
     print(json.dumps(payload['product_gates'], indent=2))

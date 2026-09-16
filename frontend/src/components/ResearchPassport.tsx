@@ -80,10 +80,10 @@ export default function ResearchPassport({
         )}
         {search?.investigation_binding && !search.investigation_binding.available && (
           <div className="passport-banner warn" role="status">
-            Home investigation stays on CMS 8 TeV record {search.investigation_binding.record_id}. This catalog result does not switch the runnable sample.
+            Catalog match only · the runnable lab remains on record {search.investigation_binding.record_id} at 8 TeV.
           </div>
         )}
-        {record.constraint_fit === "catalog_only_adapter" && (
+        {record.constraint_fit === "catalog_only_adapter" && !search?.investigation_binding && (
           <div className="passport-banner warn" role="status">
             Record {record.recid} is catalog-supported only — NanoAOD adapter is not wired into the investigation workspace yet.
           </div>
@@ -125,20 +125,20 @@ export default function ResearchPassport({
         </ul>
 
         {chart.length >= 2 && (
-          <section className="passport-chart" aria-label="Dataset size in this search">
-            <p className="microlabel">Volume in this search</p>
-            <ul>
-              {chart.map((row) => (
-                <li key={String(row.recid)} className={row.current ? "on" : ""}>
-                  <span className="passport-chart-label">{row.current ? "This record" : row.label}</span>
-                  <div className="passport-chart-track" aria-hidden>
-                    <div className="passport-chart-fill" style={{ width: `${row.pct}%` }} />
-                  </div>
-                  <span className="passport-chart-val tnum">{row.sizeLabel}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
+          <details className="passport-disclosure">
+            <summary>Compare dataset volumes</summary>
+            <section className="passport-chart" aria-label="Dataset size in this search">
+              <ul>
+                {chart.map((row) => (
+                  <li key={String(row.recid)} className={row.current ? "on" : ""}>
+                    <span className="passport-chart-label">{row.current ? "This record" : row.label}</span>
+                    <div className="passport-chart-track" aria-hidden><div className="passport-chart-fill" style={{ width: `${row.pct}%` }} /></div>
+                    <span className="passport-chart-val tnum">{row.sizeLabel}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </details>
         )}
 
         {why && (
@@ -147,38 +147,6 @@ export default function ResearchPassport({
             <p className="passport-takeaway-text">{why}</p>
           </section>
         )}
-
-        {showAbstract && (
-          <p className="passport-abstract">{abstract}</p>
-        )}
-
-        {glance.path && (
-          <details className="passport-path">
-            <summary>Catalog path</summary>
-            <code>{glance.path}</code>
-          </details>
-        )}
-
-        {record.doi && (
-          <p className="passport-doi">
-            DOI{" "}
-            <a href={`https://doi.org/${record.doi}`} target="_blank" rel="noreferrer">
-              {record.doi}
-            </a>
-          </p>
-        )}
-
-        <div className="passport-cmd-block">
-          <pre>{cmd}</pre>
-          <button
-            type="button"
-            className={`send-btn copy-float ${copied ? "copied" : ""}`}
-            onClick={copyCmd}
-            aria-live="polite"
-          >
-            {copied ? "Copied" : "Copy"}
-          </button>
-        </div>
 
         <div className="pass-actions">
           <a className="btn-passport" href={portal} target="_blank" rel="noreferrer">
@@ -206,6 +174,21 @@ export default function ResearchPassport({
             Export notebook
           </button>
         </div>
+
+        <details className="passport-disclosure passport-technical">
+          <summary>Record details and download command</summary>
+          {showAbstract && <p className="passport-abstract">{abstract}</p>}
+          {glance.path && <p className="passport-path"><span>Catalog path</span><code>{glance.path}</code></p>}
+          {record.doi && (
+            <p className="passport-doi">DOI <a href={`https://doi.org/${record.doi}`} target="_blank" rel="noreferrer">{record.doi}</a></p>
+          )}
+          <div className="passport-cmd-block">
+            <pre>{cmd}</pre>
+            <button type="button" className={`send-btn copy-float ${copied ? "copied" : ""}`} onClick={copyCmd} aria-live="polite">
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+        </details>
 
         {record.license && (
           <p className="passport-license">

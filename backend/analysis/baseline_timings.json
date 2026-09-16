@@ -1,13 +1,83 @@
 {
-  "captured_at": "2026-09-16T01:38:17.134061+00:00",
-  "method": "flask_test_client_bounded_npz",
-  "run_samples": 3,
-  "fresh_compute_ms": {
-    "count": 3,
-    "max": 4,
-    "p50": 1,
-    "p95": 4
+  "captured_at": "2026-09-16T22:06:26.352832+00:00",
+  "method": "live_api_staged_sample",
+  "run_samples": 5,
+  "sample": {
+    "sample_id": "724e2a90707f9fc5",
+    "sha256": "724e2a90707f9fc5e780919c6f048c0ffbedfa429e8c3c32509c0e4ca59d4d29",
+    "entries_read": 500000,
+    "record_id": 12341
   },
+  "fresh_compute_ms": {
+    "count": 5,
+    "p50": 155,
+    "p95": 163,
+    "max": 163
+  },
+  "request_wall_ms": {
+    "count": 5,
+    "p50": 542,
+    "p95": 549,
+    "max": 549
+  },
+  "runs": [
+    {
+      "run_id": "5c12ead9f367eb11710c",
+      "compute_ms": 162,
+      "wall_ms": 534,
+      "selected_events": 184674,
+      "spec": {
+        "charge": "opposite",
+        "max_abs_eta": 2.4,
+        "min_pt": 2.714497
+      }
+    },
+    {
+      "run_id": "a6c8a8bf2dc4dc1209f8",
+      "compute_ms": 163,
+      "wall_ms": 545,
+      "selected_events": 161741,
+      "spec": {
+        "charge": "opposite",
+        "max_abs_eta": 2.4,
+        "min_pt": 6.414497
+      }
+    },
+    {
+      "run_id": "7128d860bc2182beb9bd",
+      "compute_ms": 133,
+      "wall_ms": 516,
+      "selected_events": 110206,
+      "spec": {
+        "charge": "opposite",
+        "max_abs_eta": 2.4,
+        "min_pt": 10.114497
+      }
+    },
+    {
+      "run_id": "0d85d8c0526df8163c8e",
+      "compute_ms": 155,
+      "wall_ms": 549,
+      "selected_events": 65427,
+      "spec": {
+        "charge": "opposite",
+        "max_abs_eta": 2.4,
+        "min_pt": 13.814497
+      }
+    },
+    {
+      "run_id": "5922b60741e72a0d3b20",
+      "compute_ms": 110,
+      "wall_ms": 542,
+      "selected_events": 48505,
+      "spec": {
+        "charge": "opposite",
+        "max_abs_eta": 2.4,
+        "min_pt": 17.514497
+      }
+    }
+  ],
+  "capture_wall_ms": 2686,
   "product_targets": {
     "version": 1,
     "description": "Provisional release timing targets from HACKATHON_PLAN section 12 (measured, not advertised).",
@@ -19,6 +89,5 @@
   "product_gates": {
     "fresh_compute_p50_within_target": true,
     "fresh_compute_p95_within_target": true
-  },
-  "capture_wall_ms": 12
+  }
 }

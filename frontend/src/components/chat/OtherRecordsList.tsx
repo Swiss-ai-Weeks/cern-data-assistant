@@ -14,11 +14,11 @@ export default function OtherRecordsList({ records, heroRecid, onOpen }: Props) 
   const maxBytes = Math.max(...rest.map((r) => parseSizeBytes(r) ?? 0), 0);
 
   return (
-    <section className="beamline-card beamline-other-records" aria-label="Other catalog matches">
-      <header className="beamline-card-head">
-        <p className="microlabel">Other catalog matches</p>
-        <span className="beamline-card-count">{rest.length}</span>
-      </header>
+    <details className="beamline-card beamline-other-records" aria-label="Other catalog matches">
+      <summary>
+        <span>Other catalog matches</span>
+        <strong>{rest.length}</strong>
+      </summary>
       <ul className="other-records-list">
         {rest.slice(0, 5).map((r) => {
           const g = glanceFromRecord(r);
@@ -46,6 +46,6 @@ export default function OtherRecordsList({ records, heroRecid, onOpen }: Props) 
           );
         })}
       </ul>
-    </section>
+    </details>
   );
 }

@@ -645,6 +645,11 @@
 .iv-region-z { fill: color-mix(in srgb, var(--cobalt) 12%, transparent); }
 .iv-delta-up { fill: var(--signal-ok); }
 .iv-delta-down { fill: #b45309; }
+.iv-delta-strip { margin: -2px 0 8px; padding: 8px 10px 4px; border: 1px solid var(--line-soft); border-radius: 9px; background: color-mix(in srgb, var(--surface-muted) 55%, transparent); }
+.iv-delta-strip > div { display: flex; justify-content: space-between; gap: 10px; color: var(--ink-muted); font: 9px var(--font-mono); letter-spacing: .05em; text-transform: uppercase; }
+.iv-delta-strip > div strong { color: var(--ink); font-weight: 650; }
+.iv-delta-strip svg { margin: 2px 0 0; }
+.iv-delta-zero { stroke: var(--line); stroke-width: 1; }
 .iv-agent-card { margin: 16px 0; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow-sm); }
 .iv-agent-card header h3 { margin: 6px 0; font-family: var(--font-display); }
 .iv-agent-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; font-size: 12px; }

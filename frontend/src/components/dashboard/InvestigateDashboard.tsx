@@ -81,11 +81,11 @@ function TrustAbout({ onOpenTrust }: { onOpenTrust: () => void }) {
       </button>
       <ol className="trust-steps trust-inline about-trust-list">
         <li>
-          <strong>Ask</strong>
+          <strong>Explore</strong>
           <span>Search the live catalog or ask a detector question in plain English.</span>
         </li>
         <li>
-          <strong>Lab</strong>
+          <strong>Investigate</strong>
           <span>Compute the 8 TeV dimuon spectrum, change selections, and inspect events.</span>
         </li>
         <li>

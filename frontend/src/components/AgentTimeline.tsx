@@ -25,32 +25,11 @@ function activeStage(stages: TimelineStage[]): TimelineStage | null {
   );
 }
 
-function progressIndex(stages: TimelineStage[]): number {
-  const active = stages.findIndex((s) => s.state === "active" || s.state === "blocked");
-  if (active >= 0) return active;
-  const lastDone = [...stages].reverse().findIndex((s) => s.state === "complete" || s.state === "warning");
-  if (lastDone >= 0) return stages.length - 1 - lastDone;
-  return 0;
-}
-
 export default function AgentTimeline({ events, live, error, answerGrounded }: Props) {
   const stages = buildTimeline(events, live, error, answerGrounded);
   if (events.length === 0 && !error) return null;
 
   const current = activeStage(stages);
-  const idx = progressIndex(stages);
-  const total = stages.filter((s) => {
-    const searchPath = events.some((e) => e.type === "tool_done" && e.tool === "search");
-    const askPath = events.some((e) => e.type === "tool_done" && e.tool === "ask");
-    if (s.id === "search_catalog" || s.id === "rank_records" || s.id === "prepare_handoff") {
-      return searchPath || live;
-    }
-    if (s.id === "retrieve_docs" || s.id === "verify_grounding") {
-      return askPath || live;
-    }
-    return true;
-  }).length;
-
   if (!live) {
     if (!error && answerGrounded !== false) return null;
     return (
@@ -69,39 +48,15 @@ export default function AgentTimeline({ events, live, error, answerGrounded }: P
 
   return (
     <div className="beamline-progress" aria-live="polite" aria-busy="true" aria-label="Investigation in progress">
-      <div className="beamline-progress-dots" aria-hidden>
-        {stages.map((st, i) => {
-          if (st.state === "pending" && i > idx + 1) return null;
-          const dotClass =
-            st.state === "complete"
-              ? "done"
-              : st.state === "active"
-                ? "active"
-                : st.state === "warning"
-                  ? "warn"
-                  : st.state === "blocked"
-                    ? "blocked"
-                    : "pending";
-          return <span key={st.id} className={`beamline-progress-dot ${dotClass}`} />;
-        })}
-      </div>
-
+      <span className="beamline-progress-spinner" aria-hidden />
       <div className="beamline-progress-main">
         <div className="beamline-progress-row">
-          <span className="beamline-progress-pulse" aria-hidden />
           <span className="beamline-progress-label">{label}</span>
           {elapsed != null && (
             <span className="beamline-progress-time">{(elapsed / 1000).toFixed(1)}s</span>
           )}
         </div>
         {detail && <p className="beamline-progress-detail">{detail}</p>}
-      </div>
-
-      <div className="beamline-progress-bar" aria-hidden>
-        <span
-          className="beamline-progress-bar-fill"
-          style={{ width: `${Math.min(100, ((idx + 1) / Math.max(total, 1)) * 100)}%` }}
-        />
       </div>
     </div>
   );

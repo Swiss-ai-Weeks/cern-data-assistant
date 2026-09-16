@@ -68,7 +68,7 @@ export default function CommandPalette({
                 onClose();
               }}
             >
-              Open CMS lab
+              Open CMS investigation
             </button>
           )}
           <button

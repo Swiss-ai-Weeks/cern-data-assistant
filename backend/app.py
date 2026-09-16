@@ -681,7 +681,8 @@ def _agent_events(user_query: str, body: dict, history=None):
             },
             t0,
         )
-        sp, sstatus = _run_search(plan["search_query"], body.get("size"))
+        use_llm_rank = plan.get("strategy") != "deterministic"
+        sp, sstatus = _run_search(plan["search_query"], body.get("size"), use_llm_rank)
         if sstatus == 200:
             search_payload = sp
             tools_used.append("search")
@@ -697,7 +698,7 @@ def _agent_events(user_query: str, body: dict, history=None):
                         },
                         t0,
                     )
-                    sp2, s2 = _run_search(alt, body.get("size"))
+                    sp2, s2 = _run_search(alt, body.get("size"), use_llm_rank)
                     if s2 == 200 and (sp2.get("results") or []):
                         search_payload = sp2
                         retried_with = alt

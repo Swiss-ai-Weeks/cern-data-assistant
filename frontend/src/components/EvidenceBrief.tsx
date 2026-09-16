@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState } from "react";
 import { canShowCompare } from "../lib/compareDetect";
-import { citationNums, metricsCanChart, parseAnswerBrief } from "../lib/answerBrief";
+import { metricsCanChart, parseAnswerBrief } from "../lib/answerBrief";
 import type { AskResponse, AskSource } from "../types";
 import ComparePanel from "./ComparePanel";
 import GroundingReceipt from "./GroundingReceipt";
@@ -56,7 +56,6 @@ export default function EvidenceBrief({ result, query, onTryGrounded, generatedA
   const showCompare = compare.length < 2 && canShowCompare(query, result);
   const d = result.guardrail_detail;
   const low = result.guardrail === "grounded:low_confidence";
-  const takeawayCites = citationNums(takeaway);
 
   if (!result.grounded) {
     return (
@@ -69,68 +68,19 @@ export default function EvidenceBrief({ result, query, onTryGrounded, generatedA
   return (
     <div className="evidence-brief brief-board">
       <header className="brief-head">
-        <div>
-          <p className="microlabel">CERN-grounded answer</p>
-          <p className="brief-head-lead">
-            {low ? "Limited evidence — only cited claims are shown." : "Verified against indexed CERN documentation."}
-          </p>
-        </div>
-        <div className="brief-head-stats">
-          <span className={`answer-badge ${low ? "low" : "ok"}`}>{low ? "Limited" : "Grounded"}</span>
-          <span className="brief-src-count">
-            {cited.length || sourcePool.length} source{(cited.length || sourcePool.length) === 1 ? "" : "s"}
-          </span>
-        </div>
+        <span className={`answer-badge ${low ? "low" : "ok"}`}>{low ? "Limited evidence" : "CERN-grounded"}</span>
+        <p className="brief-head-lead">
+          {cited.length || sourcePool.length} cited source{(cited.length || sourcePool.length) === 1 ? "" : "s"}
+        </p>
       </header>
 
-      {d && <ScoreGauge score={d.top_score} floor={d.threshold} label="Evidence strength" />}
-
       <section className="brief-takeaway" aria-label="Answer in short">
-        <p className="microlabel">In short</p>
+        <p className="microlabel">Answer</p>
         <p className="brief-takeaway-text">{renderCited(takeaway, result.sources, setActiveCite)}</p>
-        {takeawayCites.length > 0 && (
-          <p className="brief-takeaway-cites">
-            Tied to {takeawayCites.map((n) => `[${n}]`).join(" ")}
-          </p>
-        )}
       </section>
 
-      {metrics.length > 0 && (
-        <section className="brief-metrics" aria-label="Figures from sources">
-          <p className="microlabel">Figures from sources</p>
-          <ul className="brief-metric-list">
-            {metrics.map((m, i) => {
-              const width =
-                chartable && m.numeric != null && maxMetric > 0
-                  ? Math.max(8, Math.round((m.numeric / maxMetric) * 100))
-                  : null;
-              return (
-                <li key={`${m.label}-${i}`} className="brief-metric">
-                  <div className="brief-metric-row">
-                    <span className="brief-metric-label">{m.label}</span>
-                    <span className="brief-metric-value">
-                      {renderCited(m.value, result.sources, setActiveCite)}
-                    </span>
-                  </div>
-                  {width != null && (
-                    <div className="brief-metric-track" aria-hidden>
-                      <div className="brief-metric-fill" style={{ width: `${width}%` }} />
-                    </div>
-                  )}
-                  {m.cites.length > 0 && (
-                    <p className="brief-metric-cites">
-                      {renderCited(m.cites.map((n) => `[${n}]`).join(" "), result.sources, setActiveCite)}
-                    </p>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
-
       {points.length > 0 && (
-        <ol className="brief-points">
+        <ol className="brief-points" aria-label="Supporting points">
           {points.map((p, i) => (
             <li key={i} className="brief-point">
               <span className="brief-point-n" aria-hidden>
@@ -142,6 +92,28 @@ export default function EvidenceBrief({ result, query, onTryGrounded, generatedA
             </li>
           ))}
         </ol>
+      )}
+
+      {metrics.length > 0 && (
+        <section className="brief-metrics" aria-label="Figures from sources">
+          <p className="microlabel">Key figures</p>
+          <ul className="brief-metric-list">
+            {metrics.map((m, i) => {
+              const width = chartable && m.numeric != null && maxMetric > 0
+                ? Math.max(8, Math.round((m.numeric / maxMetric) * 100))
+                : null;
+              return (
+                <li key={`${m.label}-${i}`} className="brief-metric">
+                  <div className="brief-metric-row">
+                    <span className="brief-metric-label">{m.label}</span>
+                    <span className="brief-metric-value">{renderCited(m.value, result.sources, setActiveCite)}</span>
+                  </div>
+                  {width != null && <div className="brief-metric-track" aria-hidden><div className="brief-metric-fill" style={{ width: `${width}%` }} /></div>}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
       )}
 
       {compare.length > 0 && (
@@ -165,7 +137,10 @@ export default function EvidenceBrief({ result, query, onTryGrounded, generatedA
       )}
 
       <section className="brief-sources" aria-label="CERN sources">
-        <p className="microlabel">Sources used</p>
+        <div className="brief-section-head">
+          <p className="microlabel">Sources</p>
+          <span>Select a source to read the supporting passage</span>
+        </div>
         <ul className="brief-source-list">
           {sourcePool.map((src) => (
             <li key={src.n}>
@@ -208,20 +183,22 @@ export default function EvidenceBrief({ result, query, onTryGrounded, generatedA
         </aside>
       )}
 
-      {unused.length > 0 && (
-        <details className="brief-unused">
-          <summary>Retrieved but not cited ({unused.length})</summary>
-          <ul>
-            {unused.map((s) => (
-              <li key={s.n}>
-                [{s.n}] {s.title}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-
-      <GroundingReceipt result={result} generatedAt={generatedAt ?? null} />
+      <details className="brief-audit">
+        <summary>
+          <span>How this answer was verified</span>
+          {d && <strong>{d.top_score.toFixed(2)} evidence score</strong>}
+        </summary>
+        <div className="brief-audit-body">
+          {d && <ScoreGauge score={d.top_score} floor={d.threshold} label="Evidence strength" />}
+          {unused.length > 0 && (
+            <details className="brief-unused">
+              <summary>Retrieved but not cited ({unused.length})</summary>
+              <ul>{unused.map((s) => <li key={s.n}>[{s.n}] {s.title}</li>)}</ul>
+            </details>
+          )}
+          <GroundingReceipt result={result} generatedAt={generatedAt ?? null} />
+        </div>
+      </details>
 
       {showCompare && <ComparePanel query={query} answer={result} />}
     </div>

@@ -75,6 +75,22 @@ class ChatTests(unittest.TestCase):
         self.assertEqual(captured["payload"]["options"]["temperature"], 0.0)
 
 
+class PlannerTests(unittest.TestCase):
+    def test_explicit_dataset_constraints_skip_model_planning(self):
+        with mock.patch.object(ollama_client, "_chat_json", side_effect=AssertionError("model should not run")):
+            plan = ollama_client.plan_tasks("I need proton-proton collisions at 13 TeV with muons")
+        self.assertEqual(plan["strategy"], "deterministic")
+        self.assertEqual(plan["search_query"], "I need proton-proton collisions at 13 TeV with muons")
+        self.assertIsNone(plan["ask_query"])
+
+    def test_combined_search_and_explanation_still_uses_model(self):
+        response = {"goal": "both", "search_query": "CMS muons", "ask_query": "Why a solenoid?"}
+        with mock.patch.object(ollama_client, "_chat_json", return_value=response):
+            plan = ollama_client.plan_tasks("Find CMS muon data and explain why CMS uses a solenoid")
+        self.assertEqual(plan["strategy"], "model")
+        self.assertEqual(plan["ask_query"], "Why a solenoid?")
+
+
 class EmbedTests(unittest.TestCase):
     def test_embed_adds_query_prefix_and_batches(self):
         captured = []

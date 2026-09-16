@@ -4,7 +4,6 @@ import type { AgentResponse, HealthResponse, RecordSummary } from "../../types";
 import AgentTimeline from "../AgentTimeline";
 import AnswerCard from "../AnswerCard";
 import IntegrityRail from "../IntegrityRail";
-import PassportSkeleton from "../PassportSkeleton";
 import ResearchPassport from "../ResearchPassport";
 import {
   type BeamlinePromptInputHandle,
@@ -89,11 +88,6 @@ export default function SimpleChatLayout({
   const allRecords = result?.search?.results ?? [];
   const answer = result?.answer ?? null;
   const answerGrounded = answer ? answer.grounded : null;
-  const searchPending =
-    Boolean(live?.live) &&
-    (live?.events.some((e) => e.type === "status" && e.step === "search") ?? false) &&
-    !hero &&
-    !result?.search;
   const otherRecords = allRecords.filter((r) => String(r.recid) !== String(hero?.recid));
 
   if (idle) {
@@ -159,25 +153,6 @@ export default function SimpleChatLayout({
             {live.error}
           </div>
         )}
-
-        {result?.search?.constraint_notes && result.search.constraint_notes.length > 0 && (
-          <div
-            className={`constraint-banner constraint-banner-${result.search.constraint_match ?? "catalog"}`}
-            role="status"
-            aria-live="polite"
-          >
-            <p className="constraint-banner-title">
-              {result.search.constraint_match === "energy_mismatch" || result.search.constraint_match === "experiment_mismatch"
-                ? "Catalog results only — the runnable sample did not change"
-                : "Dataset constraints applied to this search"}
-            </p>
-            {result.search.constraint_notes.map((note) => (
-              <p key={note}>{note}</p>
-            ))}
-          </div>
-        )}
-
-        {searchPending && <PassportSkeleton />}
 
         {result?.investigation && (
           <InvestigationAgentCard

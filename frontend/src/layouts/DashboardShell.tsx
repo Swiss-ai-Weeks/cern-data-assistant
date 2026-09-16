@@ -48,6 +48,7 @@ export default function DashboardShell({
 
   return (
     <div className={shellClass}>
+      <a className="skip-link" href="#main">Skip to content</a>
       <AppTopBar
         health={health}
         activeTab={activeTab}

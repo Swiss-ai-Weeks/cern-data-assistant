@@ -50,10 +50,10 @@ export default function HelpSheet({ open, onClose }: Props) {
             <h3 className="help-section-title">How to start</h3>
             <ul className="help-list">
               <li>
-                <strong>Ask</strong> — find datasets or ask how a detector works.
+                <strong>Explore</strong> — find datasets or ask how a detector works.
               </li>
               <li>
-                <strong>Lab</strong> — compute the 2012 CMS dimuon spectrum, change a selection, and
+                <strong>Investigate</strong> — compute the 2012 CMS dimuon spectrum, change a selection, and
                 inspect events behind a bin.
               </li>
               <li>
@@ -74,7 +74,7 @@ export default function HelpSheet({ open, onClose }: Props) {
                 <strong>Detector questions</strong> — answers include numbered citations you can open.
               </li>
               <li>
-                <strong>Lab commands</strong> — “require both muons above 10 GeV”, “undo”, or “what
+                <strong>Investigation commands</strong> — “require both muons above 10 GeV”, “undo”, or “what
                 does the 30 GeV feature mean?”
               </li>
             </ul>
@@ -84,10 +84,10 @@ export default function HelpSheet({ open, onClose }: Props) {
             <h3 className="help-section-title">Navigation</h3>
             <ul className="help-list help-shortcuts">
               <li>
-                <span>Ask</span> — catalog search and documentation answers
+                <span>Explore</span> — catalog search and documentation answers
               </li>
               <li>
-                <span>Lab</span> — CMS dimuon investigation
+                <span>Analysis</span> — CMS dimuon investigation
               </li>
               <li>
                 <span>History</span> — questions in this session

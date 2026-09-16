@@ -20,6 +20,22 @@ function Dot({ ok, pending }: { ok: boolean; pending: boolean }) {
   return <span className={`topbar-dot topbar-dot-${state}`} aria-hidden />;
 }
 
+function StatusSummary({ health }: { health: HealthResponse | null }) {
+  const checks = [
+    health?.cern_api === "ok",
+    health?.ollama === "ok",
+    Boolean(health?.investigation?.sample_prepared),
+  ];
+  const ready = checks.filter(Boolean).length;
+  const pending = health == null;
+  return (
+    <span className={`topbar-system-summary ${pending ? "is-pending" : ready === 3 ? "is-ready" : "is-warning"}`}>
+      <span className="topbar-system-pulse" aria-hidden />
+      {pending ? "Checking systems" : `${ready}/3 systems ready`}
+    </span>
+  );
+}
+
 export default function AppTopBar({
   health,
   activeTab,
@@ -39,8 +55,10 @@ export default function AppTopBar({
     <header className="app-topbar">
       <button type="button" className="app-topbar-brand" onClick={onGoHome} aria-label="Beamline home">
         <LogoMark className="app-topbar-mark" />
-        <span className="app-topbar-name">Beamline</span>
-        <span className="app-topbar-partner">CERN Open Data</span>
+        <span className="app-topbar-wordmark">
+          <span className="app-topbar-name">Beamline</span>
+          <span className="app-topbar-partner">CERN research workspace</span>
+        </span>
       </button>
 
       <nav className="app-topbar-nav" aria-label="Primary">
@@ -50,7 +68,7 @@ export default function AppTopBar({
           aria-current={askActive ? "page" : undefined}
           onClick={onGoHome}
         >
-          Ask
+          Explore
         </button>
         <button
           type="button"
@@ -58,11 +76,12 @@ export default function AppTopBar({
           aria-current={labActive ? "page" : undefined}
           onClick={onOpenLab}
         >
-          Lab
+          Investigate
         </button>
       </nav>
 
       <div className="app-topbar-end">
+        <StatusSummary health={health} />
         <div className="app-topbar-status" aria-label="Service status">
           <span title={health?.cern_api === "ok" ? "CERN catalog online" : "CERN catalog offline"}>
             <Dot ok={health?.cern_api === "ok"} pending={pending} />

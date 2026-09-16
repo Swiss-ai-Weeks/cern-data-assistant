@@ -78,6 +78,7 @@ export const BeamlinePromptInput = forwardRef<BeamlinePromptInputHandle, Beamlin
           }}
         >
           <textarea
+            id="beamline-query"
             ref={textareaRef}
             value={value}
             onChange={(e) => onChange(e.target.value)}

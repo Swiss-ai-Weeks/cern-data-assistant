@@ -6,29 +6,33 @@ Built for the HPE & NVIDIA Agentic AI Hackathon · [GitHub](https://github.com/S
 
 ## Try it now
 
-**Live demo (UI + API):** https://prostores-wallet-years-fifth.trycloudflare.com
+The release runs on NVIDIA LaunchPad. Open it through an SSH tunnel:
 
-This is a temporary public tunnel to our running server. From a laptop with SSH to LaunchPad:
+```bash
+ssh -N -L 5001:127.0.0.1:5001 launchpad-cern
+```
+
+Then visit **http://127.0.0.1:5001**. For a temporary public URL during judging, run:
 
 ```bash
 ./scripts/keep_demo_alive.sh
 ```
 
-(Paste the new `*.trycloudflare.com` URL into `PUBLIC_DEMO_URL` on the GPU box when it changes.)
-
-Health check: https://prostores-wallet-years-fifth.trycloudflare.com/api/health  
+(Quick-tunnel hostnames change on restart; publish only the URL printed by the running command.)
 
 Judges / CI snapshot: `/api/investigations/product-summary` (phase, gates, eval set, investigation status)
 
-### For hackathon judges (2 minutes)
+### For hackathon judges
 
-1. Open **Investigate** → default spectrum runs on real staged CMS data (500k entries).  
+1. Open **Lab** → default spectrum runs on real staged CMS data (500k entries).
 2. Change muon **pT** / **η** → **Run revised selection** (numbers are computed, not LLM-generated).  
 3. Click the **30 GeV region** → inspect real entries and CERN evidence labels.  
 4. **Export investigation** → ZIP with recipe, checksums, claims, notebook.  
 5. Try **13 TeV** in search → constraint banner explains catalog vs runnable 8 TeV adapter.
 
-CI: GitHub Actions **test** workflow on `main` (174+ pytest + product gates).
+Full walkthrough: [DEMO.md](DEMO.md). Automated rehearsal: `./scripts/judge_demo.sh`.
+
+CI: GitHub Actions **test** workflow on `main` (177 pytest + product gates).
 
 ## What it does
 

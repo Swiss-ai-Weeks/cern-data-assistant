@@ -1,10 +1,11 @@
 import type { HealthResponse } from "../../types";
 
 interface Props {
-  health: HealthResponse | null;
+  health: HealthResponse | null | undefined;
 }
 
 export default function SystemBanner({ health }: Props) {
+  if (health === undefined) return null;
   if (health === null) {
     return (
       <div className="system-banner system-banner-error" role="alert">

@@ -60,6 +60,7 @@ export default function InvestigationWorkspace({
 }) {
   const [saved] = useState(loadLocalFallback);
   const [status, setStatus] = useState<Status | null>(null);
+  const [statusLoading, setStatusLoading] = useState(true);
   const [session, setSession] = useState<InvestigationSession | null>(null);
   const [spec, setSpec] = useState<Selection>(saved?.spec ?? DEFAULT_SELECTION);
   const [run, setRun] = useState<Run | null>(saved?.run ?? null);
@@ -84,7 +85,12 @@ export default function InvestigationWorkspace({
   const sessionBoot = useRef(false);
   const handoffPending = useRef<ReturnType<typeof consumeAgentHandoff>>(null);
 
-  useEffect(() => { getInvestigationStatus().then(setStatus).catch((e) => setError(e.message)); }, []);
+  useEffect(() => {
+    getInvestigationStatus()
+      .then(setStatus)
+      .catch((e) => setError(e.message))
+      .finally(() => setStatusLoading(false));
+  }, []);
 
   useEffect(() => {
     handoffPending.current = consumeAgentHandoff();
@@ -260,8 +266,8 @@ export default function InvestigationWorkspace({
     catch (e) { setError(e instanceof Error ? e.message : "Entries could not be loaded."); }
   }
 
-  async function interpretCommand() {
-    const query = command.trim();
+  async function interpretCommand(raw?: string) {
+    const query = (raw ?? command).trim();
     if (!query || busy) return;
     setBusy(true); setError(""); setMessage("");
     try {
@@ -283,6 +289,7 @@ export default function InvestigationWorkspace({
           await runSelection(suggestion.spec);
         } else if (suggestion.action === "evidence") {
           setMessage(suggestion.message);
+          setEvidenceTab("sources");
           setExplaining(true);
           void askAssistant("What does the documented feature around 30 GeV in the CMS dimuon spectrum mean?")
             .then(setExplanation)
@@ -302,9 +309,9 @@ export default function InvestigationWorkspace({
     <section className="lab iv-workspace" aria-label="CMS dimuon investigation">
       <header className="lab-head iv-lab-toolbar">
         <div className="iv-lab-title">
-          <p className="lab-kicker">CMS dimuon lab · 8 TeV · 2012</p>
-          <h1>Particle signal or selection effect?</h1>
-          <p className="lab-lede">{goal ?? "Compute a muon-pair spectrum, change a selection, and keep counts separate from the published explanation."}</p>
+          <p className="lab-kicker">Investigation 01 <span aria-hidden>/</span> CMS dimuon spectrum</p>
+          <h1>Is the 30 GeV feature physics—or the selection?</h1>
+          <p className="lab-lede">{goal ?? "Revise a real analysis and keep every calculation, interpretation, and source in its proper place."}</p>
         </div>
         <div className="lab-head-actions iv-lab-actions">
           {health && !health.investigation?.sample_prepared && (
@@ -324,11 +331,11 @@ export default function InvestigationWorkspace({
                   .catch((e) => setError(e instanceof Error ? e.message : "Export failed."));
               }}
             >
-              Export evidence
+              Export reproducible package
             </button>
           )}
           <button type="button" className="btn-ghost" onClick={onOpenFindData}>
-            Find other data
+            Explore other data
           </button>
         </div>
       </header>
@@ -337,11 +344,11 @@ export default function InvestigationWorkspace({
 
       {constraints && (
         <div className="iv-constraint-row" aria-label="Locked dataset constraints">
-          <span>{constraints.experiment}</span>
-          <span>{constraints.energy_tev} TeV</span>
-          <span>{constraints.collision}</span>
-          <span>{constraints.objects}</span>
-          <span>record {constraints.record_id}</span>
+          <span><small>Experiment</small>{constraints.experiment}</span>
+          <span><small>Energy</small>{constraints.energy_tev} TeV</span>
+          <span><small>Collision</small>{constraints.collision}</span>
+          <span><small>Objects</small>{constraints.objects}</span>
+          <span><small>Dataset</small>record {constraints.record_id}</span>
         </div>
       )}
 
@@ -398,7 +405,13 @@ export default function InvestigationWorkspace({
 
       {busy && jobLabel && <p className="iv-job-status" role="status">{jobLabel}</p>}
 
-      {!status?.ready ? (
+      {statusLoading ? (
+        <div className="iv-not-ready" aria-busy="true" aria-live="polite">
+          <p className="iv-eyebrow">Checking sample</p>
+          <h2>Loading the verified investigation state…</h2>
+          <p>Reading the staged sample manifest, saved run, and provenance before showing a result.</p>
+        </div>
+      ) : !status?.ready ? (
         <div className="iv-not-ready">
           <p className="iv-eyebrow">Not ready</p>
           <h2>The real-data sample is not on this server yet.</h2>
@@ -408,23 +421,42 @@ export default function InvestigationWorkspace({
           </button>
         </div>
       ) : (
-        <div className="lab-grid iv-product-layout">
+        <>
+          <section className="iv-directive" aria-labelledby="directive-title">
+            <div className="iv-directive-heading">
+              <p className="iv-eyebrow" id="directive-title">Direct the investigation</p>
+              <p>Change the selection, compare a revision, or ask for the documented explanation.</p>
+            </div>
+            <div className="iv-command-row">
+              <input
+                value={command}
+                onChange={(e) => setCommand(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") void interpretCommand(); }}
+                placeholder="Tell Beamline what to change or explain…"
+                aria-label="Change or question this investigation"
+              />
+              <button type="button" onClick={() => void interpretCommand()} disabled={!command.trim() || busy}>
+                {busy ? "Working…" : "Apply"}
+              </button>
+            </div>
+            <div className="iv-command-examples" aria-label="Example investigation commands">
+              {[
+                "Make both muons harder",
+                "Compare with the original",
+                "What does this bump mean?",
+              ].map((text) => (
+                <button key={text} type="button" disabled={busy} onClick={() => void interpretCommand(text)}>{text}</button>
+              ))}
+            </div>
+            {message && <p className="iv-command-message" role="status">{message}</p>}
+          </section>
+
+          <div className="lab-grid iv-product-layout">
             <section className="lab-rail iv-controls" aria-label="Selection and run history">
-              <p className="iv-eyebrow">Change the analysis</p>
-              <div className="iv-command-row">
-                <input
-                  value={command}
-                  onChange={(e) => setCommand(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") void interpretCommand(); }}
-                  placeholder="Require both muons above 10 GeV"
-                  aria-label="Change selection in plain language"
-                />
-                <button type="button" onClick={() => void interpretCommand()} disabled={!command.trim() || busy}>
-                  Apply
-                </button>
+              <div className="iv-panel-heading">
+                <p className="iv-eyebrow">Selection protocol</p>
+                <span>Deterministic controls</span>
               </div>
-              {message && <p className="iv-command-message">{message}</p>}
-              <p className="iv-caption">Sliders recompute locally. The language model is not called.</p>
               <label>Muon pT minimum <span>{spec.min_pt} GeV</span><input type="range" min="0" max="50" step="1" value={spec.min_pt} onChange={(e) => setSpec({ ...spec, min_pt: Number(e.target.value) })} /></label>
               <label>Maximum |η| <span>{spec.max_abs_eta}</span><input type="range" min="0.5" max="5" step="0.1" value={spec.max_abs_eta} onChange={(e) => setSpec({ ...spec, max_abs_eta: Number(e.target.value) })} /></label>
               <label>Charge pairing
@@ -434,7 +466,8 @@ export default function InvestigationWorkspace({
                   <option value="any">Any charge</option>
                 </select>
               </label>
-              <button type="button" className="iv-run" disabled={busy} onClick={() => runSelection()}>{busy ? "Computing…" : run ? "Run revised selection" : "Compute spectrum"}</button>
+              <button type="button" className="iv-run" disabled={busy} onClick={() => runSelection()}>{busy ? "Computing…" : run ? "Recompute selection" : "Compute spectrum"}</button>
+              <p className="iv-caption iv-local-note">These controls execute the validated analysis code directly.</p>
               {run && (
                 <div className="iv-cutflow">
                   <p className="iv-eyebrow">Cut flow</p>
@@ -461,6 +494,13 @@ export default function InvestigationWorkspace({
             </section>
 
             <section className="lab-stage iv-main-panel" aria-label="Computed spectrum">
+              <div className="iv-panel-heading iv-stage-heading">
+                <div>
+                  <p className="iv-eyebrow">Computed result</p>
+                  <h2>Muon-pair invariant mass</h2>
+                </div>
+                {run && <span className="iv-run-id">run {run.id.slice(0, 8)}</span>}
+              </div>
               {!run ? (
                 <div className="iv-empty">
                   <p className="iv-eyebrow">{busy ? "Computing from CERN data" : "Ready"}</p>
@@ -508,6 +548,10 @@ export default function InvestigationWorkspace({
             </section>
 
             <aside className="lab-evidence iv-evidence-panel" aria-label="Evidence and documentation">
+              <div className="iv-panel-heading">
+                <p className="iv-eyebrow">Evidence ledger</p>
+                <span>Calculation → claim → source</span>
+              </div>
               <div className="iv-evidence-tabs" role="tablist" aria-label="Evidence views">
                 {([
                   ["result", "Counts"],
@@ -518,6 +562,8 @@ export default function InvestigationWorkspace({
                     key={id}
                     type="button"
                     role="tab"
+                    id={`iv-evidence-tab-${id}`}
+                    aria-controls={`iv-evidence-panel-${id}`}
                     aria-selected={evidenceTab === id}
                     className={evidenceTab === id ? "is-active" : ""}
                     onClick={() => setEvidenceTab(id)}
@@ -528,7 +574,7 @@ export default function InvestigationWorkspace({
               </div>
 
               {evidenceTab === "result" && (
-                <div className="iv-tab-panel" role="tabpanel">
+                <div className="iv-tab-panel" id="iv-evidence-panel-result" role="tabpanel" aria-labelledby="iv-evidence-tab-result">
                   {run ? (
                     <>
                       <section className="iv-calculated-card">
@@ -545,7 +591,7 @@ export default function InvestigationWorkspace({
               )}
 
               {evidenceTab === "claims" && (
-                <div className="iv-tab-panel" role="tabpanel">
+                <div className="iv-tab-panel" id="iv-evidence-panel-claims" role="tabpanel" aria-labelledby="iv-evidence-tab-claims">
                   {claimList.length > 0 ? <InvestigationClaims claims={claimList} /> : <p className="iv-caption">Claims appear after a computed run.</p>}
                   {evidenceLabels.length > 0 && (
                     <section className="iv-evidence-model" aria-label="Evidence labels">
@@ -564,7 +610,7 @@ export default function InvestigationWorkspace({
               )}
 
               {evidenceTab === "sources" && (
-                <div className="iv-tab-panel" role="tabpanel">
+                <div className="iv-tab-panel" id="iv-evidence-panel-sources" role="tabpanel" aria-labelledby="iv-evidence-tab-sources">
                   {explaining && <p className="iv-caption">Loading CERN-grounded explanation…</p>}
                   {explanation && (
                     <section className="iv-grounded-answer">
@@ -612,7 +658,8 @@ export default function InvestigationWorkspace({
                 </div>
               )}
             </aside>
-        </div>
+          </div>
+        </>
       )}
     </section>
   );

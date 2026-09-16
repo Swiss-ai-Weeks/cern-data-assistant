@@ -71,7 +71,7 @@ def enrich_search(query: str, payload: dict) -> dict:
         if abs(req_energy - 13.0) < 0.01:
             notes.append(
                 'CERN record 30555 (2016 DoubleMuon NanoAOD at 13 TeV) appears in catalog search, '
-                'but there is no second runnable adapter in this release. Opening those files does not change the home spectrum.'
+                'but there is no second runnable adapter in this release. Opening those files does not change the lab spectrum.'
             )
     elif requested.get('experiment') and requested['experiment'] != executable['experiment']:
         match = 'experiment_mismatch'

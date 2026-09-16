@@ -24,4 +24,4 @@ python -m pytest -q \
   tests/test_day_one_gate.py \
   tests/test_product_summary.py \
   tests/test_beginner_journey.py
-python ../scripts/capture_baseline_timings.py
+echo ">> Product checks passed; tracked live timing artifact preserved."

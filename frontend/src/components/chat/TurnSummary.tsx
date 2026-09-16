@@ -14,14 +14,7 @@ const CONSTRAINT_LABEL: Record<string, string> = {
   catalog: "Catalog only",
 };
 
-const TOOL_LABEL: Record<string, string> = {
-  search: "Catalog search",
-  ask: "Grounded answer",
-  fetch_record: "Record files",
-};
-
 export default function TurnSummary({ query, result, goal, search }: Props) {
-  const tools = result?.tools_used ?? [];
   const displayGoal = goal || result?.goal;
   const searchMeta = search ?? result?.search ?? null;
   const constraintMatch = searchMeta?.constraint_match;
@@ -42,28 +35,15 @@ export default function TurnSummary({ query, result, goal, search }: Props) {
           )}
           {binding && (
             <span className={`turn-binding-chip ${binding.available ? "ok" : "locked"}`}>
-              Home investigation · record {binding.record_id} · {binding.energy_tev} TeV
+              Runnable lab · record {binding.record_id} · {binding.energy_tev} TeV
               {!binding.available ? " (analysis not switched)" : ""}
             </span>
           )}
         </div>
       )}
-      {(displayGoal || tools.length > 0) && (
+      {displayGoal && displayGoal !== query && (
         <div className="turn-meta">
-          {displayGoal && displayGoal !== query && (
-            <p className="turn-goal">
-              <span className="microlabel">Plan</span> {displayGoal}
-            </p>
-          )}
-          {tools.length > 0 && (
-            <div className="turn-tools">
-              {tools.map((t) => (
-                <span key={t} className="turn-tool-chip">
-                  {TOOL_LABEL[t] ?? t}
-                </span>
-              ))}
-            </div>
-          )}
+          <p className="turn-goal">{displayGoal}</p>
         </div>
       )}
     </div>

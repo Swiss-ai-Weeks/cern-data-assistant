@@ -33,6 +33,7 @@ export default function Spectrum({
   const path = (counts: number[]) => counts.map((n, i) => `${i === 0 ? 'M' : 'L'}${x(i)},${y(n)} L${x(i + 1)},${y(n)}`).join(' ');
   const tickValues = log ? [0, ...Array.from({length: Math.ceil(Math.log10(ceiling))}, (_, i) => 10 ** (i + 1))] : [0, ceiling / 4, ceiling / 2, ceiling * .75, ceiling];
   const highlighted = hover ?? selectedBin;
+  const deltaMax = Math.max(1, ...(histogramDelta?.map((row) => Math.abs(row.delta)) ?? [1]));
   return <div className="iv-spectrum" ref={host}>
     <div className="iv-chart-meta"><span><i className="iv-swatch" /> Current{baseline && <><i className="iv-swatch baseline" /> Reference</>}</span><button type="button" onClick={() => setLog(!log)} aria-pressed={log}>{log ? 'Log scale' : 'Linear scale'}</button></div>
     <svg width="100%" viewBox={`0 0 ${width} 330`} role="img" aria-label="Computed muon-pair mass spectrum. Select a mass bin using the control below to inspect contributing data entries." onMouseLeave={() => setHover(null)}>
@@ -43,9 +44,6 @@ export default function Spectrum({
       <g clipPath="url(#iv-plot-clip)">
         <rect x={x(28)} y={top} width={x(33)-x(28)} height={bottom-top} className="iv-region" />
         <rect x={x(90)} y={top} width={Math.max(2, x(92)-x(90))} height={bottom-top} className="iv-region-z" />
-        {histogramDelta?.map((row, i) => row.delta !== 0 ? (
-          <rect key={`${row.low}-${i}`} x={x(row.low)} y={top + (bottom-top) * 0.72} width={Math.max(1, x(row.high)-x(row.low))} height={Math.min(18, Math.abs(row.delta))} className={row.delta > 0 ? 'iv-delta-up' : 'iv-delta-down'} opacity={0.35} />
-        ) : null)}
         {baseline && <path d={path(baseline.histogram.counts)} className="iv-reference-line" />}
         <path d={path(run.histogram.counts)} className="iv-spectrum-line" />
         {highlighted !== null && <rect x={x(highlighted)} y={top} width={Math.max(2,x(1)-x(0))} height={bottom-top} className="iv-highlight" />}
@@ -54,6 +52,22 @@ export default function Spectrum({
       {(width < 450 ? [0,40,80,120] : [0,20,40,60,80,100,120]).map(n => <text key={n} x={x(n)} y={bottom+22} textAnchor={n===120 ? 'end' : n===0 ? 'start' : 'middle'} className="iv-tick">{n}</text>)}
       <text x={(left+right)/2} y={bottom+46} textAnchor="middle" className="iv-axis-label">Muon-pair invariant mass (GeV)</text>
     </svg>
+    {histogramDelta && histogramDelta.some((row) => row.delta !== 0) && (
+      <div className="iv-delta-strip">
+        <div><strong>Δ events / 1 GeV</strong><span>current − reference</span></div>
+        <svg width="100%" viewBox={`0 0 ${width} 62`} role="img" aria-label="Bin-by-bin event count change versus the reference run. Bars above zero are gains; bars below zero are losses.">
+          <line x1={left} x2={right} y1="28" y2="28" className="iv-delta-zero" />
+          {histogramDelta.map((row, i) => {
+            if (row.delta === 0) return null;
+            const height = Math.max(1, Math.abs(row.delta) / deltaMax * 24);
+            return <rect key={`${row.low}-${i}`} x={x(row.low)} y={row.delta > 0 ? 28-height : 28} width={Math.max(1, x(row.high)-x(row.low)-.4)} height={height} className={row.delta > 0 ? 'iv-delta-up' : 'iv-delta-down'} />;
+          })}
+          <text x={left-8} y="31" textAnchor="end" className="iv-tick">0</text>
+          <text x={left} y="59" className="iv-tick">loss</text>
+          <text x={right} y="12" textAnchor="end" className="iv-tick">gain</text>
+        </svg>
+      </div>
+    )}
     <div className="iv-range-summary" aria-label="Histogram event accounting">
       <span><strong>{run.selected_events.toLocaleString()}</strong> selected</span>
       <span><strong>{run.plotted_events.toLocaleString()}</strong> plotted from 0–120 GeV</span>
@@ -63,7 +77,7 @@ export default function Spectrum({
     <p className="iv-caption">
       Shaded 28–33 GeV: region discussed in CERN’s reference analysis
       {referenceValidation?.z_visible ? ` · Z peak visible near ${referenceValidation.z_peak_bin_gev} GeV on this sample` : ""}.
-      Delta ticks (when comparing) show bin-level event shifts versus the reference run.
+      The comparison strip (when shown) reports bin-level event shifts versus the reference run.
     </p>
   </div>;
 }

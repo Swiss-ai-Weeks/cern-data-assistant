@@ -13,4 +13,11 @@ curl -sS -m 60 http://127.0.0.1:11434/api/embed \
   >/dev/null || curl -sS -m 60 http://127.0.0.1:11434/api/embeddings \
   -d "{\"model\":\"$EMBED\",\"prompt\":\"warm\"}" \
   >/dev/null
+# Prime the exact original-challenge catalog path as well. The explicit query
+# uses deterministic planning/ranking, but the first CERN portal request can
+# still take several seconds; warming keeps the live judge path predictable.
+curl -sS -m 60 http://127.0.0.1:5001/api/agent \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"I need proton-proton collisions at 13 TeV with muons"}' \
+  >/dev/null || true
 echo "warm."

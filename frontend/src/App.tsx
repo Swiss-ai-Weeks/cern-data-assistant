@@ -7,7 +7,8 @@ import TrustFlow from "./components/TrustFlow";
 import SystemBanner from "./components/ui/SystemBanner";
 
 export default function App() {
-  const [health, setHealth] = useState<HealthResponse | null>(null);
+  // undefined = first check in progress; null = a completed check failed.
+  const [health, setHealth] = useState<HealthResponse | null | undefined>(undefined);
   const [trustOpen, setTrustOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
@@ -46,7 +47,7 @@ export default function App() {
     <>
       <SystemBanner health={health} />
       <Chat
-        health={health}
+        health={health ?? null}
         helpOpen={helpOpen}
         onOpenHelp={() => {
           setHelpOpen(true);

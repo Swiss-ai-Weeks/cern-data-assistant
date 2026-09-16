@@ -8,7 +8,13 @@ Built for the HPE & NVIDIA Agentic AI Hackathon · [GitHub](https://github.com/S
 
 **Live demo (UI + API):** https://prostores-wallet-years-fifth.trycloudflare.com
 
-This is a temporary public tunnel to our running server. If it stops working, the team can bring it back with `./scripts/tunnel_public.sh` after starting the app.
+This is a temporary public tunnel to our running server. From a laptop with SSH to LaunchPad:
+
+```bash
+./scripts/keep_demo_alive.sh
+```
+
+(Paste the new `*.trycloudflare.com` URL into `PUBLIC_DEMO_URL` on the GPU box when it changes.)
 
 Health check: https://prostores-wallet-years-fifth.trycloudflare.com/api/health  
 

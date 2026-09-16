@@ -49,5 +49,7 @@ def build(*, sample_ready: bool, investigation_status: dict | None = None) -> di
         'verification': {
             'product_checks': 'scripts/run_product_checks.sh',
             'ship': 'scripts/ship.sh',
+            'ci': '.github/workflows/test.yml',
         },
+        'beginner_checklist': '/api/investigations/beginner-checklist',
     }

@@ -1,5 +1,10 @@
-import { useState } from "react";
-import { recordBeginnerSession, type BeginnerTask } from "../../lib/investigationApi";
+import { useEffect, useState } from "react";
+import {
+  getBeginnerChecklist,
+  recordBeginnerSession,
+  type BeginnerSession,
+  type BeginnerTask,
+} from "../../lib/investigationApi";
 
 type TaskState = { task_id: string; completed: boolean; notes: string };
 
@@ -18,6 +23,15 @@ export default function BeginnerChecklistPanel({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [sessions, setSessions] = useState<BeginnerSession[]>([]);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    void getBeginnerChecklist()
+      .then((data) => setSessions(data.sessions ?? []))
+      .catch(() => setSessions([]));
+  }, [open, sessionsRecorded]);
 
   if (!tasks.length) return null;
 
@@ -32,6 +46,7 @@ export default function BeginnerChecklistPanel({
         confusion_notes: confusion,
       });
       setMessage(`Recorded session ${res.entry.id} · ${res.sessions_recorded} total on this host.`);
+      void getBeginnerChecklist().then((data) => setSessions(data.sessions ?? [])).catch(() => {});
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save checklist.");
     } finally {
@@ -40,10 +55,20 @@ export default function BeginnerChecklistPanel({
   }
 
   return (
-    <details className="iv-beginner-checklist">
+    <details className="iv-beginner-checklist" onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
       <summary>
         Beginner checklist ({sessionsRecorded} recorded on server)
       </summary>
+      {sessions.length > 0 && (
+        <ul className="iv-beginner-prior">
+          {sessions.slice(-3).reverse().map((s) => (
+            <li key={s.id}>
+              <strong>{s.tester}</strong> · {new Date(s.recorded_at).toLocaleString()} ·{" "}
+              {s.results.filter((r) => r.completed).length}/{s.results.length} tasks
+            </li>
+          ))}
+        </ul>
+      )}
       <p className="iv-caption">
         For someone who did not build the UI: five tasks from the product plan. Save results to the investigation data directory on this host.
       </p>

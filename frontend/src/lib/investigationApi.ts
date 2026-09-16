@@ -282,6 +282,19 @@ export async function refreshVerbatimSources() {
   );
 }
 
+export type BeginnerSession = {
+  id: string;
+  tester: string;
+  recorded_at: string;
+  results: { task_id: string; completed: boolean; notes: string }[];
+  confusion_notes?: string;
+};
+
+export const getBeginnerChecklist = () =>
+  api<{ tasks: BeginnerTask[]; sessions: BeginnerSession[]; description?: string }>(
+    "/beginner-checklist",
+  );
+
 export async function recordBeginnerSession(body: {
   tester: string;
   results: { task_id: string; completed: boolean; notes?: string }[];

@@ -48,3 +48,5 @@ def test_product_summary_for_judges(client):
     assert body['feature_freeze_core'] is True
     assert body['investigation']['executable_record'] == '12341'
     assert 'verification' in body
+    assert body['stretch_adapter']['record_id'] == '30555'
+    assert body['stretch_adapter']['runnable_in_this_release'] is False

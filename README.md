@@ -20,6 +20,16 @@ Health check: https://prostores-wallet-years-fifth.trycloudflare.com/api/health
 
 Judges / CI snapshot: `/api/investigations/product-summary` (phase, gates, eval set, investigation status)
 
+### For hackathon judges (2 minutes)
+
+1. Open **Investigate** → default spectrum runs on real staged CMS data (500k entries).  
+2. Change muon **pT** / **η** → **Run revised selection** (numbers are computed, not LLM-generated).  
+3. Click the **30 GeV region** → inspect real entries and CERN evidence labels.  
+4. **Export investigation** → ZIP with recipe, checksums, claims, notebook.  
+5. Try **13 TeV** in search → constraint banner explains catalog vs runnable 8 TeV adapter.
+
+CI: GitHub Actions **test** workflow on `main` (174+ pytest + product gates).
+
 ## What it does
 
 1. **Find data** — Search [CERN Open Data](https://opendata.cern.ch/) in plain English. Energy and experiment constraints stay visible; we do not silently switch datasets.
@@ -67,7 +77,7 @@ Open http://localhost:5001
 After `git pull`, restart the server:
 
 ```bash
-PUBLIC_DEMO_URL=https://your-demo.trycloudflare.com ./scripts/restart_app.sh
+PUBLIC_DEMO_URL=https://your-demo.trycloudflare.com ./scripts/restart_app.sh --background
 ```
 
 **Real investigation data:** once on the server, prepare the bounded sample (large download):

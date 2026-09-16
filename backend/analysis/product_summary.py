@@ -52,4 +52,8 @@ def build(*, sample_ready: bool, investigation_status: dict | None = None) -> di
             'ci': '.github/workflows/test.yml',
         },
         'beginner_checklist': '/api/investigations/beginner-checklist',
+        'stretch_adapter': {
+            **adapters.STRETCH_CATALOG,
+            'runnable_in_this_release': False,
+        },
     }

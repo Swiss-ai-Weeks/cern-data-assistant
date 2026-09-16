@@ -22,5 +22,6 @@ python -m pytest -q \
   tests/test_worker_sync.py \
   tests/test_beginner_checklist.py \
   tests/test_day_one_gate.py \
-  tests/test_product_summary.py
+  tests/test_product_summary.py \
+  tests/test_beginner_journey.py
 python ../scripts/capture_baseline_timings.py

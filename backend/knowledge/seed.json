@@ -113,5 +113,11 @@
     "experiment": "",
     "text": "Every dataset on the CERN Open Data Portal is a record with a numeric identifier and a persistent DOI. The record lists the experiment (CMS, ATLAS, ALICE, LHCb and others), the data type (collision data, simulated data or derived data), the collision energy and collision type, the year and run period, the file format (for example ROOT, AOD, MiniAOD, NanoAOD or DAOD_PHYSLITE), the number and total size of files, the licence (data are released under the Creative Commons CC0 waiver) and a recommended citation. Files can be downloaded directly, with the cernopendata-client command-line tool, or streamed with XRootD.",
     "source": "https://opendata.cern.ch/docs/about"
+  },
+  {
+    "title": "CMS 2012 dimuon spectrum: the 30 GeV trigger feature",
+    "experiment": "CMS",
+    "text": "The CERN Open Data analysis of the CMS 2012 dimuon spectrum calculates the invariant mass of oppositely charged muon pairs. It states that the bump around 30 GeV is not a particle resonance; it is an effect of data taking caused by the trigger used to select recorded events. The same analysis shows established resonances across the spectrum, from the eta meson to the Z boson near 91 GeV. A visible bump alone therefore does not establish a new particle, and this educational analysis does not calculate discovery significance.",
+    "source": "https://opendata.cern.ch/record/12342"
   }
 ]

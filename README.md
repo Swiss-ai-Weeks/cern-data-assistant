@@ -20,6 +20,8 @@ http://127.0.0.1:5001  <---SSH 5001---  gunicorn :5001  (React + Flask)
 
 Product spec: [PRODUCT_PLAN.md](PRODUCT_PLAN.md). Production deploy: [HOSTING.md](HOSTING.md). On the GPU box: `scripts/start_h100.sh` then `scripts/warm_h100.sh`. Before you push, run `./scripts/ship.sh` (frontend build + backend tests).
 
+**Guided investigation:** Beamline now includes a bounded, reproducible CMS dimuon workspace. It computes a spectrum from a checksum-verified CERN sample, lets users revise muon selections, inspect contributing entries, and export the run provenance. See [HACKATHON_PLAN.md](HACKATHON_PLAN.md) for the five-day product direction. Prepare the sample on the GPU host with `backend/.venv/bin/python -m analysis.prepare --entries 500000` after installing `backend/analysis/requirements.txt`.
+
 **UI/UX:** [UI UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) is installed under `.cursor/skills/ui-ux-pro-max/`. Design tokens and page rules live in [`design-system/beamline/`](design-system/beamline/MASTER.md). Regenerate: `python3 .cursor/skills/ui-ux-pro-max/scripts/search.py "…" --design-system --persist -p Beamline --force`.
 
 ### Dev from a laptop
@@ -174,10 +176,8 @@ The model is never trusted to judge its own grounding. `guardrails.py` applies:
    `NOT_IN_SOURCES`, which becomes the same refusal.
 3. **Fact-check pass** — a second LLM call (temperature 0, so the verdict is
    reproducible) checks every claim in the answer against the cited passages only;
-   unsupported claims block the answer. A lexical arbiter vetoes verifier false
-   positives: a flagged claim whose content words all occur in the cited passages
-   (`RAG_LEXICAL_SUPPORT`, default 0.8) is a paraphrase, not new physics, and is
-   kept (`verifier_overridden` in `guardrail_detail`).
+   unsupported claims block the answer. Malformed verifier responses and verifier
+   outages also refuse the answer. Word overlap never overrides a rejected claim.
 4. **Input rail** — prompt-injection and unsafe requests are refused before any model call.
 5. **Glossary-graph expansion** (only when the gate would refuse) — the glossary terms
    form a small graph: the portal's "See also" links plus nearest neighbours among the
@@ -268,7 +268,7 @@ Before a pitch, warm the 32B model so the first question is not a GPU cold-start
 scripts/warm_h100.sh
 ```
 
-Judge queries (spoken + API): [DEMO.md](DEMO.md) · `./scripts/judge_demo.sh`
+Judge flow and full API/reproduction rehearsal: [DEMO.md](DEMO.md) · `./scripts/judge_demo.sh`
 
 From your laptop:
 

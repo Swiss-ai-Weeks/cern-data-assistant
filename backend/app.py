@@ -32,6 +32,7 @@ import cern_client
 import ollama_client
 import rag
 import guardrails
+from analysis.service import bp as investigations_bp
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 log = logging.getLogger("app")
@@ -45,6 +46,7 @@ DEFAULT_K = int(os.environ.get("RAG_TOP_K", "6"))
 
 app = Flask(__name__, static_folder=DIST_DIR if SERVE_FRONTEND else None, static_url_path="")
 CORS(app)  # dev-friendly: allow the Vite dev server to call this API
+app.register_blueprint(investigations_bp)
 
 DEFAULT_SIZE = 8
 MAX_SIZE = 25
@@ -381,22 +383,18 @@ def _run_ask(question: str, k=None):
     try:
         verdict = ollama_client.verify_grounding(answer, cited_passages)
         timing["verify"] = int((time.time() - t0) * 1000)
-        if not verdict.get("supported", True):
-            # Arbiter: a flagged claim whose words all come from the cited
-            # passages is a verifier false positive, not new physics.
-            arb = guardrails.filter_verifier_flags(verdict.get("unsupported", []), cited_passages)
-            detail["verifier_overridden"] = arb["overridden"]
-            if arb["overridden"]:
-                log.info("verifier flags overridden lexically: %d", arb["overridden"])
-            verdict = {"supported": not arb["unsupported"], "unsupported": arb["unsupported"]}
-        if not verdict.get("supported", True):
+        if verdict.get("supported") is not True or verdict.get("unsupported"):
             log.info("grounding rail rejected answer; unsupported=%s", verdict.get("unsupported"))
             detail["status"] = "unsupported"
             detail["unsupported"] = verdict.get("unsupported", [])
             return _refusal(question, guardrails.UNSUPPORTED_MESSAGE, "grounding:unsupported",
                             sources=_sources(hits, cited), detail=detail, timing=timing)
     except ollama_client.OllamaUnavailable:
-        rail = "grounded:unverified"  # fact-check unreachable; keep the cited answer
+        detail["status"] = "unverified"
+        return _refusal(
+            question, "I could not verify this answer against the CERN sources. Please try again.",
+            "grounding:unverified", sources=_sources(hits, cited), detail=detail, timing=timing,
+        )
 
     return {
         "question": question,

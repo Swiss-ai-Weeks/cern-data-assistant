@@ -20,3 +20,6 @@ backend/knowledge/raw_*.jsonl
 backend/knowledge/index_meta.json
 frontend/.tsbuild/
 frontend/tsconfig.tsbuildinfo
+
+# Derived analysis samples, manifests and saved runs
+backend/data/

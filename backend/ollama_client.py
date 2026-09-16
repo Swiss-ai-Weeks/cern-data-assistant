@@ -462,21 +462,22 @@ even if the wording differs slightly (e.g. "about" vs "roughly").
 def verify_grounding(
     answer: str, passages: list[dict], model: Optional[str] = None
 ) -> dict:
-    """Second-pass check: does `answer` stay within `passages`? Returns
-    {"supported": bool, "unsupported": [str]}. Fails open (supported=True) only
-    if the checker itself errors, so it never blocks a good answer on an
-    infra hiccup — callers can treat OllamaUnavailable separately."""
+    """Validate every claim against sources; malformed verdicts fail closed."""
     context_lines = [
         f"[{p['n']}] {p.get('title','')}\n{p.get('text','')}" for p in passages
     ]
     user_payload = f"ANSWER:\n{answer}\n\nCONTEXT:\n" + "\n\n".join(context_lines)
     # temperature 0: the verdict must be reproducible, not a coin flip
     data = _chat_json(GROUNDCHECK_SYSTEM_PROMPT, user_payload, model=model, temperature=0.0)
-    if "supported" not in data:
-        return {"supported": True, "unsupported": []}
-    unsupported = data.get("unsupported")
-    unsupported = unsupported if isinstance(unsupported, list) else []
-    return {"supported": bool(data.get("supported")), "unsupported": unsupported}
+    if (not isinstance(data, dict)
+            or type(data.get("supported")) is not bool
+            or not isinstance(data.get("unsupported"), list)
+            or any(not isinstance(item, str) for item in data["unsupported"])):
+        raise OllamaUnavailable("Malformed grounding verification response")
+    unsupported = [item for item in data["unsupported"] if item.strip()]
+    return {"supported": data["supported"] and not unsupported,
+            "unsupported": unsupported}
+
 
 
 # ---------------------------------------------------------------------------

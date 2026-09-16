@@ -1,4 +1,4 @@
-import type { Ref } from "react";
+import { useState, type Ref } from "react";
 import type { AgentStreamEvent } from "../../api";
 import type { BeamlinePromptInputHandle } from "../ui/beamline-prompt-input";
 import type { AgentResponse, HealthResponse, RecordSummary } from "../../types";
@@ -15,6 +15,7 @@ import ResearchBriefPanel from "./ResearchBriefPanel";
 import BeamlineComposerStrip from "../chat/BeamlineComposerStrip";
 import SessionThread, { type ThreadItem } from "../chat/SessionThread";
 import TurnSummary from "../chat/TurnSummary";
+import InvestigationWorkspace from "../investigation/InvestigationWorkspace";
 
 interface LiveTurn {
   steps: string[];
@@ -116,26 +117,34 @@ export default function InvestigateDashboard({
   activeAsstId = null,
   onSelectThread,
 }: Props) {
+  const [investigationOpen, setInvestigationOpen] = useState(false);
   if (activeTab === "investigate") {
+    if (investigationOpen) return <InvestigationWorkspace onClose={() => setInvestigationOpen(false)} />;
     return (
-      <SimpleChatLayout
-        health={health}
-        query={query}
-        composerValue={composerValue}
-        onComposerChange={onComposerChange}
-        onSubmitComposer={onSubmitComposer}
-        busy={busy}
-        idle={idle}
-        live={live}
-        followups={followups}
-        onStarter={onStarter}
-        onOpenRecord={onOpenRecord}
-        promptInputRef={promptInputRef}
-        onOpenHelp={onOpenHelp}
-        threadItems={threadItems}
-        activeAsstId={activeAsstId}
-        onSelectThread={onSelectThread}
-      />
+      <>
+        {idle && <section className="iv-launch-card" aria-label="Guided CERN investigation">
+          <div><p className="iv-eyebrow">NEW · WORKING WITH REAL DATA</p><h2>Run a CERN investigation, not just a search.</h2><p>Compute a CMS muon spectrum, change the selection, and inspect the evidence behind a documented feature.</p></div>
+          <button type="button" onClick={() => setInvestigationOpen(true)}>Open the dimuon lab →</button>
+        </section>}
+        <SimpleChatLayout
+          health={health}
+          query={query}
+          composerValue={composerValue}
+          onComposerChange={onComposerChange}
+          onSubmitComposer={onSubmitComposer}
+          busy={busy}
+          idle={idle}
+          live={live}
+          followups={followups}
+          onStarter={onStarter}
+          onOpenRecord={onOpenRecord}
+          promptInputRef={promptInputRef}
+          onOpenHelp={onOpenHelp}
+          threadItems={threadItems}
+          activeAsstId={activeAsstId}
+          onSelectThread={onSelectThread}
+        />
+      </>
     );
   }
 

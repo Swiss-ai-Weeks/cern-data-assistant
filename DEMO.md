@@ -1,97 +1,80 @@
-# Judge demo — Beamline (current UI)
+# Judge demo — Beamline
 
-Hard-refresh **http://127.0.0.1:5001** (H100 tunnel) or **http://127.0.0.1:5173** (local dev).
+Open the deployed app and hard-refresh once. Confirm the status strip says the catalog and model are online and shows 755 sources. Before judging, run `scripts/warm_h100.sh` and `./scripts/judge_demo.sh http://127.0.0.1:5001` on LaunchPad.
 
-You should see: **hero → search bar → three demo beat buttons** → bottom dock.
+Lead with the scientific task: **CERN data is open, but turning it into a result that can be questioned and reproduced still requires files, code, and detector knowledge.** Beamline connects those steps in one evidence trail.
 
-**Do not lead with “RAG” or “agent”.** Lead with objects: catalog record, citations, refusal.
+## Three-minute flagship
 
-If the first query hangs, the 32B model may still be loading — wait or run `scripts/warm_h100.sh` on the GPU box.
+### 0:00–0:30 — Start with a real result
 
-Full product plan: [PRODUCT_PLAN.md](PRODUCT_PLAN.md).
+Click **Open the dimuon lab**.
 
----
+Say: “This is a deterministic calculation over 500,000 source entries from CMS 2012 open data at 8 TeV. The model does not draw this spectrum.”
 
-## 1. Dataset handoff (~50s)
+Point to the CERN record/DOI, cut flow, selected count, plotted count, overflow, and the visible Z peak around 91 GeV.
 
-Click **Find 13 TeV muons** (or type the same query).
+### 0:30–1:10 — Challenge the interpretation
+
+Type:
+
+> what does this bump mean?
+
+Say: “A bump is an observation, not automatically a discovery. Beamline retrieves the CERN analysis that documents the feature around 30 GeV as a trigger effect and keeps that literature claim separate from our calculation.”
+
+Open the citation. Point out the grounded status and source match; do not describe the match score as scientific confidence.
+
+### 1:10–1:45 — Change the analysis conversationally
+
+Type:
+
+> make both muons harder
+
+The minimum pT changes to 10 GeV, the real sample recomputes, and the original remains as a dashed line. Point to the exact event delta. Then type:
+
+> compare with the original
+
+If useful, type `undo that change` to restore the preceding run.
+
+### 1:45–2:20 — Go from plot to source entry
+
+Choose the **30–31 GeV** bin. Open one of the eight shown entries.
+
+Say: “These are measured pT, eta, phi, charge, and reconstructed pair mass from the selected source entry. The rings are a schematic projection, clearly labeled as such. The reduced format does not contain raw detector hits or full event identifiers, so Beamline does not invent them.”
+
+### 2:20–2:50 — Take the evidence home
+
+Click **Export reproducible investigation**.
+
+Say: “The ZIP contains the bounded sample, exact canonical recipe, analysis parameters, result, histogram CSV, sources, notebook, dependency pins, provenance, and SHA-256 checksums. Its replay must reproduce the same count.”
+
+### 2:50–3:00 — Close
+
+“Beamline makes CERN data something a newcomer can investigate, question, and reproduce.”
+
+## Challenge-coverage follow-up
+
+Return to Beamline and ask:
 
 > proton-proton collisions at 13 TeV with muons
 
-**Say:** ChatGPT can invent a CMS dataset. This hit **opendata.cern.ch**. Recid, size, files, DOI, and `cernopendata-client` — not a language model.
+Show that the live CERN catalog returns records at the requested energy. The guided lab remains explicitly 8 TeV and refuses to silently substitute it for a 13 TeV request.
 
-**Do:** Copy the download command. Open portal or inspect files. Point at **Other catalog matches** if useful.
+Then ask:
 
-**Expect:** White **dataset handoff** card, no raw HTML in the abstract.
+> Why does CMS use a solenoid?
 
----
+Open a cited CERN source. For the guardrail demonstration, ask `How do black holes evaporate?` and show that Beamline refuses when its CERN corpus does not support the answer.
 
-## 2. Integrity rail (~40s)
+## Recovery
 
-Click **GPU lying demo**.
+| Symptom | Action |
+| --- | --- |
+| Browser cannot connect | Reopen the SSH tunnel to remote port 5001 and refresh |
+| Model is cold | Run `scripts/warm_h100.sh`; the numeric investigation remains independent of the model |
+| Explanation is slow | Continue with selection changes and entry inspection, then return to the answer |
+| CERN catalog is unavailable | Use the already-staged authentic investigation and disclose the catalog outage |
+| Page refreshed | Reopen the dimuon lab; the current runs return from browser session storage |
+| Need a complete proof | Run `scripts/judge_demo.sh http://127.0.0.1:5001` on LaunchPad |
 
-> How do black holes evaporate?
-
-**Say:** Same stack. No CERN passage clears the floor, so the cosmology lecture is **not** the product. Left: what the small model drafted. Right: Beamline refusal + rail id + score vs floor.
-
-**Expect:** Integrity card on the same page — no separate “stage”.
-
----
-
-## 3. Grounded answer (~40s)
-
-Click **CMS solenoid** (or ask *Why does CMS use a solenoid?*).
-
-**Say:** Every **[n]** is a retrieved CERN page. Open the grounding receipt.
-
-**Expect:** Answer card with citations; receipt at the bottom.
-
----
-
-## 4. Backup combo
-
-> find CMS muon datasets and explain why CMS uses a solenoid
-
-**Expect:** Dataset handoff **and** grounded answer in one turn; follow-up chips may appear.
-
----
-
-## Optional: glossary rescue
-
-> What is an atom made of?
-
-**Say:** “Atom” is not in the glossary; expansion maps to proton/electron/hadron entries once — still CERN-sourced, often low-confidence band.
-
----
-
-## Navigation (for you)
-
-| Control | Action |
-|---------|--------|
-| Bottom **Home** | Investigate (main chat) |
-| **New** (file icon) | Clear thread |
-| **Datasets** | Full list for current turn |
-| **Search** | Focus query bar |
-| **History** | Prior turns |
-| **Ctrl+K** | Command palette |
-| **?** | How Beamline earns trust |
-| **Shift+P** then **1/2/3** | Same as demo beats (presenter) |
-
----
-
-## If something dies
-
-| Symptom | Fix |
-|---------|-----|
-| UI won't load | Laptop: `ssh -N -L 5001:127.0.0.1:5001 launchpad-cern` |
-| Model offline in status strip | H100: `scripts/start_h100.sh` + `scripts/warm_h100.sh` |
-| Empty knowledge | H100: `scripts/start_h100.sh --rebuild` |
-| Draft column empty on refusal | llama3.2 missing — refusal still works |
-
-Rehearse API path:
-
-```bash
-./scripts/judge_demo.sh
-# on GPU:
-ssh launchpad-cern 'cd ~/cern-data-assistant && ./scripts/judge_demo.sh http://127.0.0.1:5001'
-```
+Never call the bounded first-entry sample representative of all CMS data. Never claim the selection change proves the trigger cause or that the plot establishes a new particle.

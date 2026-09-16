@@ -5,7 +5,7 @@ export default function InvestigationProvenance({ run }: { run: Run }) {
   const sample = run.manifest?.sha256?.slice(0, 12);
   return (
     <section className="iv-provenance" aria-label="Run provenance">
-      <p className="iv-eyebrow">REPRODUCIBILITY</p>
+      <p className="iv-eyebrow">Reproducibility</p>
       <dl className="iv-provenance-grid">
         <div>
           <dt>Run id</dt>

@@ -3,7 +3,6 @@ import { catalogPlainText } from "../lib/catalogText";
 import { downloadNotebook } from "../lib/notebook";
 import { glanceFromRecord, LHC_TEV, sizeBars } from "../lib/recordVisual";
 import type { HealthResponse, RecordSummary, SearchResponse } from "../types";
-import CollisionView from "./CollisionView";
 
 interface Props {
   record: RecordSummary;
@@ -91,13 +90,13 @@ export default function ResearchPassport({
         )}
         {record.constraint_fit === "executable_sample" && (
           <div className="passport-banner ok" role="status">
-            This record matches the bounded CMS investigation sample used on the Investigate tab.
+            This record matches the bounded CMS investigation sample used in the lab.
           </div>
         )}
 
         <div className="passport-header-row">
           <div className="passport-header-main">
-            <p className="microlabel">Dataset handoff</p>
+            <p className="microlabel">Catalog record</p>
             <div className="passport-header-badges">
               <span className="passport-recid-pill">recid {record.recid}</span>
               {record.experiment && <span className="experiment-badge">{record.experiment}</span>}
@@ -108,14 +107,6 @@ export default function ResearchPassport({
               Live
             </span>
           )}
-        </div>
-
-        <div className="passport-viz" aria-hidden>
-          <CollisionView hot compact />
-          <div className="passport-viz-overlay">
-            <span>{glance.collisionLabel || "collision data"}</span>
-            <strong>{glance.energyLabel !== "—" ? glance.energyLabel : glance.headline}</strong>
-          </div>
         </div>
 
         <h2 className="passport-title">{glance.headline}</h2>

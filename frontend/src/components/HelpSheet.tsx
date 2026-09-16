@@ -39,42 +39,43 @@ export default function HelpSheet({ open, onClose }: Props) {
               <a href="https://opendata.cern.ch" target="_blank" rel="noreferrer">
                 CERN Open Data
               </a>{" "}
-              catalog and to a curated index of CERN documentation. It returns either a{" "}
-              <strong>dataset you can download</strong>, a <strong>cited answer</strong> from those sources, or a{" "}
-              <strong>clear refusal</strong> when nothing authoritative supports the claim.
+              catalog and to a curated index of CERN documentation. It returns a{" "}
+              <strong>dataset you can download</strong>, a <strong>cited answer</strong>, a{" "}
+              <strong>computed CMS spectrum</strong>, or a <strong>clear refusal</strong> when nothing
+              authoritative supports the claim.
             </p>
+          </section>
+
+          <section>
+            <h3 className="help-section-title">How to start</h3>
+            <ul className="help-list">
+              <li>
+                <strong>Ask</strong> — find datasets or ask how a detector works.
+              </li>
+              <li>
+                <strong>Lab</strong> — compute the 2012 CMS dimuon spectrum, change a selection, and
+                inspect events behind a bin.
+              </li>
+              <li>
+                <strong>Evidence labels</strong> — calculated, documented, interpretation, or not
+                established. A bump is not a discovery.
+              </li>
+            </ul>
           </section>
 
           <section>
             <h3 className="help-section-title">How to ask</h3>
             <ul className="help-list">
               <li>
-                <strong>Datasets &amp; collisions</strong> — mention energy, detector, or physics channel (e.g. muons at
-                13 TeV).
+                <strong>Datasets</strong> — mention energy, detector, or physics channel (for example
+                muons at 13 TeV).
               </li>
               <li>
-                <strong>Detector questions</strong> — ask how CMS, ATLAS, or LHC equipment works; answers include{" "}
-                <code>[n]</code> citations.
+                <strong>Detector questions</strong> — answers include numbered citations you can open.
               </li>
               <li>
-                <strong>Follow-ups</strong> — use suggested chips or ask again; recent turns inform the planner.
-              </li>
-            </ul>
-          </section>
-
-          <section>
-            <h3 className="help-section-title">After you send</h3>
-            <ul className="help-list">
-              <li>
-                <strong>Dataset handoff</strong> — recid, metadata, download command, portal link, optional file
-                inspector.
-              </li>
-              <li>
-                <strong>Grounded answer</strong> — text with citations; open a citation to see the source passage.
-              </li>
-              <li>
-                <strong>Not grounded</strong> — explanation of why Beamline withheld an answer; unverified model text
-                may be shown separately for transparency.
+                <strong>Lab commands</strong> — “require both muons above 10 GeV”, “undo”, or “what
+                does the 30 GeV feature mean?”
               </li>
             </ul>
           </section>
@@ -83,19 +84,13 @@ export default function HelpSheet({ open, onClose }: Props) {
             <h3 className="help-section-title">Navigation</h3>
             <ul className="help-list help-shortcuts">
               <li>
-                <span>Home</span> — main search and results
+                <span>Ask</span> — catalog search and documentation answers
               </li>
               <li>
-                <span>New</span> — start a fresh thread
+                <span>Lab</span> — CMS dimuon investigation
               </li>
               <li>
-                <span>Datasets</span> — catalog matches for the current investigation
-              </li>
-              <li>
-                <span>Search</span> — focus the query field
-              </li>
-              <li>
-                <span>History</span> — previous questions in this session
+                <span>History</span> — questions in this session
               </li>
               <li>
                 <span>Help</span> — this panel

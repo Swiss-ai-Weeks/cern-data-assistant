@@ -28,27 +28,8 @@ type Turn = {
   generatedAt: string | null;
 };
 
-const INVESTIGATION_PANEL_KEY = "beamline-investigation-panel-open";
-
 function uid() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function investigationPanelOpen(): boolean {
-  try {
-    return sessionStorage.getItem(INVESTIGATION_PANEL_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function setInvestigationPanelOpen(open: boolean) {
-  try {
-    if (open) sessionStorage.setItem(INVESTIGATION_PANEL_KEY, "1");
-    else sessionStorage.removeItem(INVESTIGATION_PANEL_KEY);
-  } catch {
-    /* ignore */
-  }
 }
 
 function historyForApi(turns: Turn[]): { role: string; content: string }[] {
@@ -149,7 +130,7 @@ export default function Chat({ health, helpOpen, onOpenHelp, onCloseHelp, onOpen
     return last?.id ?? null;
   });
   const [activeTab, setActiveTab] = useState<DashTab>("investigate");
-  const [investigationOpen, setInvestigationOpen] = useState(investigationPanelOpen);
+  const [investigationOpen, setInvestigationOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
@@ -187,8 +168,7 @@ export default function Chat({ health, helpOpen, onOpenHelp, onCloseHelp, onOpen
     setHistoryOpen(false);
     onCloseHelp();
     setActiveTab("investigate");
-    setInvestigationOpen(true);
-    setInvestigationPanelOpen(true);
+    setInvestigationOpen(false);
     const user: Turn = {
       id: uid(),
       role: "user",
@@ -245,7 +225,6 @@ export default function Chat({ health, helpOpen, onOpenHelp, onCloseHelp, onOpen
     setActiveTab("investigate");
     setHistoryOpen(false);
     setInvestigationOpen(false);
-    setInvestigationPanelOpen(false);
     clearInvestigationSession();
   }
 
@@ -286,10 +265,35 @@ export default function Chat({ health, helpOpen, onOpenHelp, onCloseHelp, onOpen
     if (q) void send(q);
   }
 
-  function focusComposer() {
-    setActiveTab("investigate");
+  function openLab() {
     setHistoryOpen(false);
     onCloseHelp();
+    setActiveTab("investigate");
+    setInvestigationOpen(true);
+    window.history.replaceState(null, "", "?view=lab");
+  }
+
+  function goHome() {
+    setHistoryOpen(false);
+    onCloseHelp();
+    setInvestigationOpen(false);
+    setActiveTab("investigate");
+    window.history.replaceState(null, "", window.location.pathname);
+  }
+
+  useEffect(() => {
+    const view = new URLSearchParams(window.location.search).get("view");
+    if (view === "lab") {
+      setActiveTab("investigate");
+      setInvestigationOpen(true);
+    } else if (view === "about") {
+      setActiveTab("about");
+      setInvestigationOpen(false);
+    }
+  }, []);
+
+  function focusComposer() {
+    goHome();
     requestAnimationFrame(() => {
       document.getElementById("beamline-composer")?.scrollIntoView({ behavior: "smooth", block: "start" });
       promptRef.current?.focus();
@@ -308,7 +312,14 @@ export default function Chat({ health, helpOpen, onOpenHelp, onCloseHelp, onOpen
         onTabChange={(tab) => {
           setHistoryOpen(false);
           onCloseHelp();
+          if (tab !== "investigate") {
+            setInvestigationOpen(false);
+          }
           setActiveTab(tab);
+          if (tab === "about") window.history.replaceState(null, "", "?view=about");
+          else if (tab === "investigate" && !investigationOpen) {
+            window.history.replaceState(null, "", window.location.pathname);
+          }
         }}
         onNewInvestigation={newInvestigation}
         onToggleHistory={() => {
@@ -319,6 +330,11 @@ export default function Chat({ health, helpOpen, onOpenHelp, onCloseHelp, onOpen
         onFocusComposer={focusComposer}
         onOpenHelp={openHelp}
         helpOpen={helpOpen}
+        health={health}
+        investigationOpen={investigationOpen}
+        onOpenInvestigation={openLab}
+        onGoHome={goHome}
+        landing={turns.length === 0 && !investigationOpen && activeTab === "investigate"}
       >
         <InvestigateDashboard
           promptInputRef={promptRef}
@@ -356,16 +372,9 @@ export default function Chat({ health, helpOpen, onOpenHelp, onCloseHelp, onOpen
             setActiveTab("investigate");
           }}
           onOpenFindData={focusComposer}
-          onFocusInvestigation={() => setActiveTab("investigate")}
+          onFocusInvestigation={openLab}
           investigationOpen={investigationOpen}
-          onOpenInvestigation={() => {
-            setInvestigationOpen(true);
-            setInvestigationPanelOpen(true);
-          }}
-          onCloseInvestigation={() => {
-            setInvestigationOpen(false);
-            setInvestigationPanelOpen(false);
-          }}
+          onOpenInvestigation={openLab}
         />
         <AppFooter onOpenHelp={openHelp} onOpenTrust={onOpenTrust} />
       </DashboardShell>
@@ -386,6 +395,7 @@ export default function Chat({ health, helpOpen, onOpenHelp, onCloseHelp, onOpen
         onValueChange={setValue}
         onSubmit={submitComposer}
         scroller={scroller}
+        onNewSession={newInvestigation}
       />
 
       <RecordDrawer recid={openRecid} onClose={() => setOpenRecid(null)} />
@@ -399,7 +409,9 @@ export default function Chat({ health, helpOpen, onOpenHelp, onCloseHelp, onOpen
           setHistoryOpen(false);
           onCloseHelp();
           setActiveTab("about");
+          window.history.replaceState(null, "", "?view=about");
         }}
+        onOpenLab={openLab}
       />
     </>
   );

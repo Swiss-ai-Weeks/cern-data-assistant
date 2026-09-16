@@ -1,22 +1,17 @@
 import type { ReactNode } from "react";
 import type { DashTab } from "../../layouts/DashboardShell";
-import {
-  DatasetIcon,
-  FilePlusIcon,
-  HelpIcon,
-  HistoryIcon,
-  HomeIcon,
-  SearchIcon,
-} from "../icons/BeamlineIcons";
+import { GridIcon, HelpIcon, HistoryIcon, HomeIcon } from "../icons/BeamlineIcons";
 
 interface Props {
   activeTab: DashTab;
   historyOpen: boolean;
+  investigationOpen: boolean;
   onTabChange: (tab: DashTab) => void;
   onNewInvestigation: () => void;
   onToggleHistory: () => void;
-  onFocusComposer: () => void;
   onOpenHelp: () => void;
+  onGoHome: () => void;
+  onOpenLab: () => void;
   helpOpen: boolean;
 }
 
@@ -37,67 +32,42 @@ function DockBtn({
       className={`dock-btn ${active ? "dock-btn-active" : ""}`}
       aria-label={label}
       aria-current={active ? "page" : undefined}
-      title={label}
       onClick={onClick}
     >
       {children}
+      <span className="dock-btn-label">{label}</span>
     </button>
   );
-}
-
-function DockDivider() {
-  return <div className="dock-divider" aria-hidden />;
 }
 
 export default function BottomDock({
   activeTab,
   historyOpen,
-  onTabChange,
-  onNewInvestigation,
+  investigationOpen,
   onToggleHistory,
-  onFocusComposer,
   onOpenHelp,
+  onGoHome,
+  onOpenLab,
   helpOpen,
 }: Props) {
-  const homeActive = activeTab === "investigate" && !historyOpen;
+  const askActive = activeTab === "investigate" && !investigationOpen && !historyOpen;
+  const labActive = investigationOpen && activeTab === "investigate" && !historyOpen;
 
   return (
     <div className="bottom-dock-wrap">
       <nav className="bottom-dock" aria-label="Main navigation">
-        <div className="dock-group dock-group-start">
-          <DockBtn label="Home — investigate" active={homeActive} onClick={() => onTabChange("investigate")}>
-            <HomeIcon />
-          </DockBtn>
-        </div>
-
-        <DockDivider />
-
-        <div className="dock-group dock-group-mid">
-          <DockBtn label="New investigation" onClick={onNewInvestigation}>
-            <FilePlusIcon />
-          </DockBtn>
-          <DockBtn
-            label="Datasets"
-            active={activeTab === "datasets" && !historyOpen}
-            onClick={() => onTabChange("datasets")}
-          >
-            <DatasetIcon />
-          </DockBtn>
-          <DockBtn label="Search — ask a question" onClick={onFocusComposer}>
-            <SearchIcon />
-          </DockBtn>
-        </div>
-
-        <DockDivider />
-
-        <div className="dock-group dock-group-end">
-          <DockBtn label="Conversation history" active={historyOpen} onClick={onToggleHistory}>
-            <HistoryIcon />
-          </DockBtn>
-          <DockBtn label="Help" active={helpOpen} onClick={onOpenHelp}>
-            <HelpIcon />
-          </DockBtn>
-        </div>
+        <DockBtn label="Ask" active={askActive} onClick={onGoHome}>
+          <HomeIcon />
+        </DockBtn>
+        <DockBtn label="Lab" active={labActive} onClick={onOpenLab}>
+          <GridIcon />
+        </DockBtn>
+        <DockBtn label="History" active={historyOpen} onClick={onToggleHistory}>
+          <HistoryIcon />
+        </DockBtn>
+        <DockBtn label="Help" active={helpOpen} onClick={onOpenHelp}>
+          <HelpIcon />
+        </DockBtn>
       </nav>
     </div>
   );

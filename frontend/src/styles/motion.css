@@ -162,6 +162,13 @@
   animation: motion-fade-in var(--duration-component) var(--ease-out) backwards;
   animation-delay: 280ms;
 }
+.iv-home-investigation-cta {
+  animation: motion-fade-up var(--duration-component) var(--ease-out) backwards;
+  animation-delay: 200ms;
+}
+.app-topbar {
+  animation: motion-fade-in var(--duration-ui) var(--ease-out) both;
+}
 .bottom-dock-wrap {
   animation: motion-fade-up var(--duration-section) var(--ease-out) backwards;
   animation-delay: 160ms;
@@ -338,6 +345,8 @@
   .simple-chat-idle .demo-beat-btn,
   .simple-chat-idle .simple-chat-chips,
   .simple-chat-idle .simple-chat-onboarding,
+  .iv-home-investigation-cta,
+  .app-topbar,
   .simple-chat-results > *,
   .brief-passage,
   .citation-drawer,

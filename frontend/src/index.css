@@ -2,14 +2,16 @@
 @import "./styles/dashboard.css";
 @import "./styles/components.css";
 @import "./styles/motion.css";
+@import "./styles/product.css";
 
 * {
   box-sizing: border-box;
 }
 
 html {
-  scroll-padding-top: 52px;
-  scroll-padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  color-scheme: light;
+  scroll-padding-top: var(--topbar-h);
+  scroll-padding-bottom: calc(var(--dock-h) + env(safe-area-inset-bottom, 0px));
 }
 
 html,
@@ -17,22 +19,19 @@ body,
 #root {
   margin: 0;
   padding: 0;
+  min-height: 100%;
   height: 100%;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-body, var(--font-ui));
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
   font-size: 16px;
-  line-height: 1.5;
+  line-height: var(--leading-normal);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 body {
-  background-image:
-    radial-gradient(920px 420px at 50% -14%, color-mix(in srgb, var(--cobalt) 16%, transparent), transparent 72%),
-    radial-gradient(640px 280px at 88% 8%, color-mix(in srgb, var(--citation-gold) 7%, transparent), transparent 70%);
-  background-repeat: no-repeat;
-  background-attachment: fixed;
+  background: var(--paper);
 }
 
 .skip-link {
@@ -1141,11 +1140,11 @@ a,
 }
 .microlabel {
   font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.18em;
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-micro);
   text-transform: uppercase;
-  color: var(--text-faint);
-  margin: 0 0 12px;
+  color: var(--ink-faint);
+  margin: 0 0 8px;
 }
 .logo-mark {
   width: 32px;

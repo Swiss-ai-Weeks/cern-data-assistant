@@ -1,40 +1,50 @@
 /**
- * Beamline design tokens — Swiss Modernism 2.0 / Research Lab (ui-ux-pro-max MASTER)
- * Density 8 · Motion 4 · Variance 3
+ * Beamline design tokens
+ * Quiet scientific instrument: paper, scholarly navy, one cobalt for the live measurement.
  */
 :root {
   --paper: #ecece6;
-  --surface: #f7f6f1;
-  --surface-muted: #ffffff;
+  --surface: #f4f3ee;
+  --surface-muted: #fbfaf6;
+  --elevated: #ffffff;
   --bone: var(--surface);
-  --ink: #0f172a;
+
+  --ink: #12151c;
   --ink-scholarly: #1e3a5f;
-  --ink-muted: #475569;
-  --line: #d5d8d0;
-  --line-soft: #e4e6df;
+  --ink-muted: #4b5563;
+  --ink-faint: #6b7280;
+
+  --line: #d6d4cb;
+  --line-soft: #e6e4db;
+
   --cobalt: #2563eb;
   --cobalt-deep: #1e3a5f;
-  --citation-gold: #b45309;
-  --cobalt-soft: #e8eefc;
+  --cobalt-soft: #e7eefc;
   --sky: #d7e2f8;
   --sky-soft: var(--cobalt-soft);
-  --signal-warning: #9a6700;
-  --signal-danger: #dc2626;
-  --signal-ok: #047857;
+  --citation-gold: #a16207;
+  --citation-soft: #f4ead6;
 
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-panel: 16px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  --signal-ok: #047857;
+  --signal-ok-soft: #e6f4ee;
+  --signal-warning: #9a6700;
+  --signal-warning-soft: #f6eedc;
+  --signal-danger: #dc2626;
+  --signal-danger-soft: #fdecec;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-panel: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 12px;
   --radius-pill: 999px;
 
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
-  --shadow-md: 0 4px 12px -6px rgba(30, 58, 95, 0.18);
-  --shadow-lg: 0 16px 32px -20px rgba(30, 58, 95, 0.28);
-  --shadow-xl: 0 28px 48px -28px rgba(30, 58, 95, 0.38);
-  --shadow-soft: var(--shadow-lg);
-  --shadow-active: var(--shadow-xl);
+  --shadow-sm: 0 1px 2px rgba(18, 21, 28, 0.04);
+  --shadow-md: 0 8px 24px -16px rgba(30, 58, 95, 0.22);
+  --shadow-lg: 0 18px 36px -24px rgba(30, 58, 95, 0.28);
+  --shadow-xl: 0 24px 48px -28px rgba(30, 58, 95, 0.32);
+  --shadow-soft: var(--shadow-md);
+  --shadow-active: var(--shadow-lg);
 
   --font-display: "General Sans", "Atkinson Hyperlegible", ui-sans-serif, system-ui, sans-serif;
   --font-body: "Atkinson Hyperlegible", ui-sans-serif, system-ui, sans-serif;
@@ -42,16 +52,23 @@
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
   --font-ui: var(--font-body);
 
-  --focus-ring: 2px solid var(--ink-scholarly);
-  --focus-ring-offset: 3px;
+  --text-2xs: 0.6875rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-md: 0.9375rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-display: clamp(1.75rem, 3.4vw, 2.25rem);
+  --tracking-micro: 0.08em;
+  --tracking-tight: -0.03em;
+  --leading-tight: 1.15;
+  --leading-snug: 1.35;
+  --leading-normal: 1.55;
+  --leading-relaxed: 1.65;
+  --measure: 62ch;
 
-  --space-xs: 0.25rem;
-  --space-sm: 0.5rem;
-  --space-md: 1rem;
-  --space-lg: 1.5rem;
-  --space-xl: 2rem;
-  --space-2xl: 3rem;
-  --space-3xl: 4rem;
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -59,17 +76,26 @@
   --space-5: 1.25rem;
   --space-6: 1.5rem;
   --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-xs: var(--space-1);
+  --space-sm: var(--space-2);
+  --space-md: var(--space-4);
+  --space-lg: var(--space-6);
+  --space-xl: var(--space-8);
+  --space-2xl: var(--space-12);
+  --space-3xl: var(--space-16);
 
-  --text-xs: 0.6875rem;
-  --text-sm: 0.8125rem;
-  --text-md: 0.9375rem;
-  --text-lg: 1.125rem;
-  --text-display: clamp(2rem, 4vw, 3rem);
-  --tracking-micro: 0.16em;
-  --tracking-tight: -0.04em;
-  --leading-tight: 1.08;
-  --leading-normal: 1.55;
-  --stage-min-height: 420px;
+  --control-h: 2.25rem;
+  --control-h-lg: 2.75rem;
+  --icon-sm: 16px;
+  --icon-md: 18px;
+  --topbar-h: 52px;
+  --dock-h: 72px;
+
+  --focus-ring: 2px solid var(--ink-scholarly);
+  --focus-ring-offset: 2px;
 
   --color-primary: var(--ink-scholarly);
   --color-on-primary: #ffffff;
@@ -77,30 +103,29 @@
   --color-accent: var(--citation-gold);
   --color-background: var(--paper);
   --color-foreground: var(--ink);
-  --color-card: var(--surface-muted);
+  --color-card: var(--elevated);
   --color-muted: #e9eef5;
   --color-muted-foreground: var(--ink-muted);
   --color-border: var(--line);
   --color-destructive: var(--signal-danger);
   --color-ring: var(--ink-scholarly);
-
   --color-bg: var(--paper);
   --color-surface: var(--surface);
-  --color-surface-raised: var(--surface-muted);
+  --color-surface-raised: var(--elevated);
   --color-border-hairline: var(--line-soft);
   --color-text: var(--ink);
   --color-text-muted: var(--ink-muted);
-  --color-text-faint: #64748b;
+  --color-text-faint: var(--ink-faint);
   --color-accent-soft: var(--cobalt-soft);
   --color-refusal: var(--signal-danger);
   --bg: var(--paper);
   --panel: var(--surface);
-  --panel-raised: var(--surface-muted);
+  --panel-raised: var(--elevated);
   --border: var(--line);
   --border-soft: var(--line-soft);
   --text: var(--ink);
   --text-muted: var(--ink-muted);
-  --text-faint: var(--color-text-faint);
+  --text-faint: var(--ink-faint);
   --accent: var(--cobalt);
   --accent-soft: var(--cobalt-soft);
   --accent-2: var(--cobalt);
@@ -110,17 +135,20 @@
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
-  --duration-micro: 140ms;
+  --duration-micro: 120ms;
   --duration-fast: 160ms;
-  --duration-ui: 220ms;
-  --duration-normal: 220ms;
-  --duration-component: 320ms;
-  --duration-slow: 360ms;
-  --duration-overlay: 380ms;
-  --duration-exit: 280ms;
-  --duration-section: 480ms;
-  --motion-distance: 8px;
-  --motion-distance-sm: 4px;
-  --content-max: 80rem;
-  --composer-max: 32rem;
+  --duration-ui: 200ms;
+  --duration-normal: 200ms;
+  --duration-component: 280ms;
+  --duration-slow: 320ms;
+  --duration-overlay: 320ms;
+  --duration-exit: 220ms;
+  --duration-section: 360ms;
+  --motion-distance: 6px;
+  --motion-distance-sm: 3px;
+
+  --content-max: 76rem;
+  --content-ask: 42rem;
+  --composer-max: 36rem;
+  --stage-min-height: 420px;
 }

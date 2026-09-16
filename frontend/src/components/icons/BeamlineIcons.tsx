@@ -21,10 +21,8 @@ export function FilePlusIcon({ className = "icon" }: IconProps) {
 export function GridIcon({ className = "icon" }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
-      <rect x="4" y="4" width="7" height="7" rx="2" />
-      <rect x="13" y="4" width="7" height="7" rx="2" />
-      <rect x="4" y="13" width="7" height="7" rx="2" />
-      <rect x="13" y="13" width="7" height="7" rx="2" />
+      <path strokeLinejoin="round" d="M4 16.5l3.2-5.2 2.6 3.4L14 8l6 8.5" />
+      <path strokeLinecap="round" d="M4 19h16" />
     </svg>
   );
 }

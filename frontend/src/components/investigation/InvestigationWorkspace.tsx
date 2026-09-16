@@ -78,6 +78,7 @@ export default function InvestigationWorkspace({
   const [claimList, setClaimList] = useState<InvestigationClaim[]>([]);
   const [revisionStory, setRevisionStory] = useState<RevisionNarrative | null>(null);
   const [sourceRefreshMsg, setSourceRefreshMsg] = useState("");
+  const [evidenceTab, setEvidenceTab] = useState<"result" | "claims" | "sources">("result");
   const [exportMsg, setExportMsg] = useState("");
   const autoStarted = useRef(false);
   const sessionBoot = useRef(false);
@@ -298,130 +299,132 @@ export default function InvestigationWorkspace({
   const goal = session?.goal ?? status?.goal;
 
   return (
-    <section className="iv-workspace" aria-label="CMS dimuon investigation">
-      <div className="iv-header">
-        <div>
-          <p className="iv-eyebrow">CERN INVESTIGATION</p>
+    <section className="lab iv-workspace" aria-label="CMS dimuon investigation">
+      <header className="lab-head iv-lab-toolbar">
+        <div className="iv-lab-title">
+          <p className="lab-kicker">CMS dimuon lab · 8 TeV · 2012</p>
           <h1>Particle signal or selection effect?</h1>
-          <p className="iv-lede">{goal ?? "Compute a real CMS muon-pair spectrum, change the selection, and inspect the evidence behind the interpretation."}</p>
+          <p className="lab-lede">{goal ?? "Compute a muon-pair spectrum, change a selection, and keep counts separate from the published explanation."}</p>
         </div>
-        <div className="iv-header-actions">
-          <div className="iv-service-pill" aria-label="Service status">
-            <span className={health?.cern_api === "ok" ? "ok" : "down"}>CERN {health?.cern_api ?? "…"}</span>
-            <span className={health?.ollama === "ok" ? "ok" : "down"}>Model {health?.ollama ?? "…"}</span>
-            <span className={health?.investigation?.sample_prepared ? "ok" : "down"}>
-              Sample {health?.investigation?.sample_prepared ? "staged" : "missing"}
-            </span>
-            {status?.product_phase?.feature_freeze_core && (
-              <span className="ok" title={status.product_phase.scope_locked?.join(" · ")}>
-                Phase {status.product_phase.phase} · core frozen
-              </span>
-            )}
-            {status?.eval_cases_frozen != null && status.eval_cases_frozen > 0 && (
-              <span>Eval {status.eval_cases_frozen} frozen</span>
-            )}
-          </div>
-          {session?.id && (
-            <span className="iv-session-pill" title={`Investigation session ${session.id}`}>
-              Saved · {session.id.slice(0, 8)}
-            </span>
+        <div className="lab-head-actions iv-lab-actions">
+          {health && !health.investigation?.sample_prepared && (
+            <span className="iv-gate-chip warn">Sample not staged</span>
+          )}
+          {status?.day_one_gate && !status.day_one_gate.passed && (
+            <span className="iv-gate-chip warn">Sample needs review</span>
           )}
           {run && (
             <button
               type="button"
-              className="iv-export iv-export-header"
+              className="btn-primary"
               onClick={() => {
                 setExportMsg("");
                 void exportRun(run.id, baseline?.id)
-                  .then(() => setExportMsg("Export ZIP downloaded (recipe, sample checksums, claims, notebook)."))
+                  .then(() => setExportMsg("Export downloaded — recipe, checksums, claims, and notebook."))
                   .catch((e) => setError(e instanceof Error ? e.message : "Export failed."));
               }}
             >
-              Export investigation
+              Export evidence
             </button>
           )}
-          <button type="button" className="iv-close" onClick={onOpenFindData}>Find data or ask docs →</button>
-          {exportMsg && <p className="iv-export-msg" role="status">{exportMsg}</p>}
+          <button type="button" className="btn-ghost" onClick={onOpenFindData}>
+            Find other data
+          </button>
         </div>
-      </div>
+      </header>
+      {exportMsg && <p className="iv-export-msg" role="status">{exportMsg}</p>}
+      {error && <p className="iv-error" role="alert">{error}</p>}
+
       {constraints && (
-        <div className="iv-constraints" aria-label="Dataset constraints">
-          <p className="iv-eyebrow">ACTIVE CONSTRAINTS</p>
-          <div className="iv-constraint-tags">
-            <span>{constraints.experiment}</span>
-            <span>{constraints.energy_tev} TeV</span>
-            <span>{constraints.collision}</span>
-            <span>{constraints.objects}</span>
-            <span>{constraints.format}</span>
-            <span>record {constraints.record_id}</span>
-          </div>
-          <p className="iv-caption">Locked for this analysis. Use Find data to search other energies or formats; the sample will not change silently.</p>
+        <div className="iv-constraint-row" aria-label="Locked dataset constraints">
+          <span>{constraints.experiment}</span>
+          <span>{constraints.energy_tev} TeV</span>
+          <span>{constraints.collision}</span>
+          <span>{constraints.objects}</span>
+          <span>record {constraints.record_id}</span>
         </div>
       )}
-      {status?.day_one_gate && <DayOneGateBanner gate={status.day_one_gate} />}
-      {status?.adapters && <AdapterCapabilityBand adapters={status.adapters} />}
-      {status?.beginner_checklist && status.beginner_checklist.length > 0 && (
-        <BeginnerChecklistPanel
-          tasks={status.beginner_checklist}
-          sessionsRecorded={status.beginner_sessions_recorded ?? 0}
-        />
-      )}
-      <div className="iv-source-strip">
-        <span>CMS · reduced muons · 2012 · 8 TeV</span>
-        <span>{status?.ready ? `${status.manifest?.entries_read.toLocaleString()} source entries staged` : status?.message || "Checking prepared sample…"}</span>
-        {status?.manifest && <a href={status.manifest.record_url} target="_blank" rel="noreferrer">CERN record {status.manifest.record_id} ↗</a>}
-        {status?.manifest && <span>DOI {status.manifest.doi}</span>}
-      {session?.id && <span>Session {session.id.slice(0, 8)}</span>}
-      {status?.reference_validation && (
-        <span title={status.reference_validation.note}>
-          Reference check · Z {status.reference_validation.z_events.toLocaleString()} · 28–33 GeV {status.reference_validation.region_28_33_gev_events.toLocaleString()}
-          {status.reference_validation.reference_feature_visible ? " · feature above local baseline" : " · feature not confirmed on this sample"}
-        </span>
-      )}
-      {status?.ready && (
-        <button
-          type="button"
-          className="iv-source-refresh"
-          onClick={() => {
-            setSourceRefreshMsg("");
-            void refreshVerbatimSources()
-              .then((r) => {
-                setStatus((prev) => (prev ? { ...prev, sources: r.sources } : prev));
-                setSourceRefreshMsg(
-                  r.errors.length
-                    ? `Refreshed ${r.refreshed.length}; ${r.errors.length} failed.`
-                    : `Refreshed ${r.refreshed.length} CERN passages.`,
-                );
-              })
-              .catch((e) => setError(e instanceof Error ? e.message : "Source refresh failed."));
-          }}
-        >
-          Refresh CERN passages
-        </button>
-      )}
-      {sourceRefreshMsg && <span>{sourceRefreshMsg}</span>}
-    </div>
-    {busy && jobLabel && <p className="iv-job-status" role="status">{jobLabel}</p>}
+
+      <details className="iv-lab-notes">
+        <summary>
+          Sample &amp; coverage
+          {status?.ready && status.manifest ? ` · ${status.manifest.entries_read.toLocaleString()} events` : ""}
+        </summary>
+        {status?.day_one_gate && <DayOneGateBanner gate={status.day_one_gate} />}
+        {status?.adapters && <AdapterCapabilityBand adapters={status.adapters} />}
+        {status?.beginner_checklist && status.beginner_checklist.length > 0 && (
+          <BeginnerChecklistPanel
+            tasks={status.beginner_checklist}
+            sessionsRecorded={status.beginner_sessions_recorded ?? 0}
+          />
+        )}
+        <div className="iv-source-strip">
+          <span>CMS · reduced muons · 2012 · 8 TeV</span>
+          {status?.manifest && (
+            <a href={status.manifest.record_url} target="_blank" rel="noreferrer">
+              Record {status.manifest.record_id} ↗
+            </a>
+          )}
+          {status?.manifest && <span>DOI {status.manifest.doi}</span>}
+          {status?.reference_validation && (
+            <span title={status.reference_validation.note}>
+              Z {status.reference_validation.z_events.toLocaleString()} · 28–33 GeV {status.reference_validation.region_28_33_gev_events.toLocaleString()}
+            </span>
+          )}
+          {status?.ready && (
+            <button
+              type="button"
+              className="iv-source-refresh"
+              onClick={() => {
+                setSourceRefreshMsg("");
+                void refreshVerbatimSources()
+                  .then((r) => {
+                    setStatus((prev) => (prev ? { ...prev, sources: r.sources } : prev));
+                    setSourceRefreshMsg(
+                      r.errors.length
+                        ? `Refreshed ${r.refreshed.length}; ${r.errors.length} failed.`
+                        : `Refreshed ${r.refreshed.length} CERN passages.`,
+                    );
+                  })
+                  .catch((e) => setError(e instanceof Error ? e.message : "Source refresh failed."));
+              }}
+            >
+              Refresh passages
+            </button>
+          )}
+          {sourceRefreshMsg && <span>{sourceRefreshMsg}</span>}
+        </div>
+      </details>
+
+      {busy && jobLabel && <p className="iv-job-status" role="status">{jobLabel}</p>}
+
       {!status?.ready ? (
         <div className="iv-not-ready">
-          <h2>The real-data sample is not prepared on this server yet.</h2>
-          <p>{error || status?.message || "Prepare the bounded CERN sample on the host."}</p>
-          <p>This workspace will not invent a plot. Once the verified sample is staged, the spectrum runs here.</p>
+          <p className="iv-eyebrow">Not ready</p>
+          <h2>The real-data sample is not on this server yet.</h2>
+          <p>{status?.message || "This lab will not invent a plot. Once the verified CMS sample is staged, the spectrum runs here."}</p>
+          <button type="button" className="btn-ghost" onClick={onOpenFindData}>
+            Search the catalog instead
+          </button>
         </div>
       ) : (
-        <>
-          <section className="iv-conversation" aria-label="Conversational analysis controls">
-            <p className="iv-eyebrow">CHANGE THE ANALYSIS</p>
-            <div className="iv-command-row">
-              <input value={command} onChange={(e) => setCommand(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void interpretCommand(); }} placeholder="Require both muons above 10 GeV, or ask what a peak means" aria-label="Investigation request" />
-              <button type="button" onClick={() => void interpretCommand()} disabled={!command.trim() || busy}>Apply</button>
-            </div>
-            {message && <p className="iv-command-message">{message}</p>}
-          </section>
-          <div className="iv-product-layout">
-            <section className="iv-controls">
-              <p className="iv-eyebrow">ACTIVE SELECTION</p>
-              <p className="iv-caption">Sliders change the recipe locally. Run recomputes the histogram without calling the language model.</p>
+        <div className="lab-grid iv-product-layout">
+            <section className="lab-rail iv-controls" aria-label="Selection and run history">
+              <p className="iv-eyebrow">Change the analysis</p>
+              <div className="iv-command-row">
+                <input
+                  value={command}
+                  onChange={(e) => setCommand(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") void interpretCommand(); }}
+                  placeholder="Require both muons above 10 GeV"
+                  aria-label="Change selection in plain language"
+                />
+                <button type="button" onClick={() => void interpretCommand()} disabled={!command.trim() || busy}>
+                  Apply
+                </button>
+              </div>
+              {message && <p className="iv-command-message">{message}</p>}
+              <p className="iv-caption">Sliders recompute locally. The language model is not called.</p>
               <label>Muon pT minimum <span>{spec.min_pt} GeV</span><input type="range" min="0" max="50" step="1" value={spec.min_pt} onChange={(e) => setSpec({ ...spec, min_pt: Number(e.target.value) })} /></label>
               <label>Maximum |η| <span>{spec.max_abs_eta}</span><input type="range" min="0.5" max="5" step="0.1" value={spec.max_abs_eta} onChange={(e) => setSpec({ ...spec, max_abs_eta: Number(e.target.value) })} /></label>
               <label>Charge pairing
@@ -434,13 +437,13 @@ export default function InvestigationWorkspace({
               <button type="button" className="iv-run" disabled={busy} onClick={() => runSelection()}>{busy ? "Computing…" : run ? "Run revised selection" : "Compute spectrum"}</button>
               {run && (
                 <div className="iv-cutflow">
-                  <p className="iv-eyebrow">CUT FLOW</p>
+                  <p className="iv-eyebrow">Cut flow</p>
                   {run.cutflow.map((step) => <div key={step.label}><span>{step.label}</span><strong>{step.count.toLocaleString()}</strong></div>)}
                 </div>
               )}
               {history.length > 0 && (
                 <div className="iv-history">
-                  <p className="iv-eyebrow">RUN HISTORY</p>
+                  <p className="iv-eyebrow">Runs</p>
                   {history.map((item, index) => (
                     <button type="button" key={item.id} aria-pressed={run?.id === item.id} onClick={() => { setRun(item); setSpec(item.spec); setEntries(null); setBin(null); }}>
                       <span>{index === 0 ? "Reference" : `Revision ${index}`}</span>
@@ -450,19 +453,19 @@ export default function InvestigationWorkspace({
                   ))}
                 </div>
               )}
-              {baseline && <button type="button" className="iv-compare" onClick={() => setMessage("The dashed line is the original selection; the solid line is the current revision.")}>Compare with original</button>}
               {run && (
                 <button type="button" className="iv-region-btn" onClick={() => void inspect(30)}>
-                  Inspect documented 30 GeV region
+                  Inspect 30 GeV region
                 </button>
               )}
             </section>
-            <section className="iv-main-panel">
+
+            <section className="lab-stage iv-main-panel" aria-label="Computed spectrum">
               {!run ? (
                 <div className="iv-empty">
-                  <p className="iv-eyebrow">{busy ? "COMPUTING FROM CERN DATA" : "READY TO RUN"}</p>
-                  <h2>{busy ? "Building the reference spectrum…" : "Start with the documented reference selection."}</h2>
-                  <p>Exactly two muons, opposite charge, and the published kinematic variables. Every number in the plot comes from the staged CERN sample.</p>
+                  <p className="iv-eyebrow">{busy ? "Computing from CERN data" : "Ready"}</p>
+                  <h2>{busy ? "Building the reference spectrum…" : "The plot will appear here."}</h2>
+                  <p>Exactly two muons, opposite charge, published kinematics. Every number comes from the staged sample.</p>
                 </div>
               ) : (
                 <>
@@ -476,7 +479,7 @@ export default function InvestigationWorkspace({
                   />
                   {revisionStory && (
                     <div className="iv-revision-narrative" role="status">
-                      <p className="iv-eyebrow">REVISION LOG</p>
+                      <p className="iv-eyebrow">Revision</p>
                       <p>{revisionStory.summary}</p>
                       {revisionStory.histogram_shifts.length > 0 && (
                         <ul>{revisionStory.histogram_shifts.map((line) => <li key={line}>{line}</li>)}</ul>
@@ -499,80 +502,117 @@ export default function InvestigationWorkspace({
                       })()}
                     </div>
                   )}
+                  {entries && <EntryInspector data={entries} variableDocs={status?.variable_docs ?? []} />}
                 </>
               )}
             </section>
-            <aside className="iv-evidence-panel" aria-label="Evidence and documentation">
-              {run && <InvestigationProvenance run={run} />}
-              {run && (
-                <section className="iv-calculated-card">
-                  <p className="iv-eyebrow">CALCULATED FROM THIS SAMPLE</p>
-                  <p><strong>{run.selected_events.toLocaleString()}</strong> selected events · <strong>{run.plotted_events.toLocaleString()}</strong> plotted 0–120 GeV</p>
-                  <p className="iv-caption">Counts come from the staged sample and validated recipe, not from the language model.</p>
-                </section>
-              )}
-              {claimList.length > 0 && <InvestigationClaims claims={claimList} />}
-              {evidenceLabels.length > 0 && (
-                <section className="iv-evidence-model" aria-label="Evidence labels">
-                  <p className="iv-eyebrow">EVIDENCE MODEL</p>
-                  <div className="iv-evidence-grid">
-                    {evidenceLabels.map((item) => (
-                      <article key={item.id}>
-                        <strong>{item.label}</strong>
-                        <p>{item.meaning}</p>
-                      </article>
-                    ))}
-                  </div>
-                </section>
-              )}
-              {explaining && <p className="iv-caption">Loading CERN-grounded explanation…</p>}
-              {explanation && (
-                <section className="iv-grounded-answer">
-                  <div>
-                    <p className="iv-eyebrow">DOCUMENTED BY CERN/CMS</p>
-                    <h2>{explanation.grounded ? "What the source says" : "Beamline withheld an unsupported explanation"}</h2>
-                    <p>{explanation.answer}</p>
-                  </div>
-                  <div className="iv-links">
-                    {explanation.sources.filter((source) => source.used).map((source) => (
-                      <a key={source.n} href={source.source} target="_blank" rel="noreferrer">
-                        <span>Source [{source.n}] · {source.score.toFixed(2)} match</span>
-                        {source.title} ↗
-                      </a>
-                    ))}
-                  </div>
-                </section>
-              )}
-              <section className="iv-evidence">
-                <div>
-                  <p className="iv-eyebrow">INTERPRETATION (WITH LIMITS)</p>
-                  <h2>A bump is an observation, not a discovery.</h2>
-                  <p>CERN’s reference analysis discusses a feature around 30 GeV as a trigger effect rather than a particle resonance. Beamline keeps that published explanation separate from what this calculation itself establishes.</p>
+
+            <aside className="lab-evidence iv-evidence-panel" aria-label="Evidence and documentation">
+              <div className="iv-evidence-tabs" role="tablist" aria-label="Evidence views">
+                {([
+                  ["result", "Counts"],
+                  ["claims", "Claims"],
+                  ["sources", "Sources"],
+                ] as const).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="tab"
+                    aria-selected={evidenceTab === id}
+                    className={evidenceTab === id ? "is-active" : ""}
+                    onClick={() => setEvidenceTab(id)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {evidenceTab === "result" && (
+                <div className="iv-tab-panel" role="tabpanel">
+                  {run ? (
+                    <>
+                      <section className="iv-calculated-card">
+                        <p className="iv-eyebrow">Calculated from this sample</p>
+                        <p><strong>{run.selected_events.toLocaleString()}</strong> selected · <strong>{run.plotted_events.toLocaleString()}</strong> in 0–120 GeV</p>
+                        <p className="iv-caption">Counts come from the staged sample and validated recipe, not from the language model.</p>
+                      </section>
+                      <InvestigationProvenance run={run} />
+                    </>
+                  ) : (
+                    <p className="iv-caption">Run the reference selection to see counts and provenance.</p>
+                  )}
                 </div>
-                <div className="iv-links">
-                  {(status?.sources || []).map((source) => (
-                    source.verbatim ? (
-                      <details key={source.id} className="iv-source-verbatim">
-                        <summary>
-                          <span>{source.kind} · sha256 {source.sha256?.slice(0, 12)}…</span>
-                          {source.title}
-                        </summary>
-                        <p>{source.excerpt || source.summary}</p>
-                        <a href={source.url} target="_blank" rel="noreferrer">Open CERN record ↗</a>
-                      </details>
-                    ) : (
-                      <a key={source.id} href={source.url} target="_blank" rel="noreferrer">
-                        <span>{source.kind}</span>
-                        {source.title} ↗
-                      </a>
-                    )
-                  ))}
+              )}
+
+              {evidenceTab === "claims" && (
+                <div className="iv-tab-panel" role="tabpanel">
+                  {claimList.length > 0 ? <InvestigationClaims claims={claimList} /> : <p className="iv-caption">Claims appear after a computed run.</p>}
+                  {evidenceLabels.length > 0 && (
+                    <section className="iv-evidence-model" aria-label="Evidence labels">
+                      <p className="iv-eyebrow">How to read labels</p>
+                      <div className="iv-evidence-grid">
+                        {evidenceLabels.map((item) => (
+                          <article key={item.id}>
+                            <strong>{item.label}</strong>
+                            <p>{item.meaning}</p>
+                          </article>
+                        ))}
+                      </div>
+                    </section>
+                  )}
                 </div>
-              </section>
+              )}
+
+              {evidenceTab === "sources" && (
+                <div className="iv-tab-panel" role="tabpanel">
+                  {explaining && <p className="iv-caption">Loading CERN-grounded explanation…</p>}
+                  {explanation && (
+                    <section className="iv-grounded-answer">
+                      <div>
+                        <p className="iv-eyebrow">Documented by CERN/CMS</p>
+                        <h2>{explanation.grounded ? "What the source says" : "Unsupported explanation withheld"}</h2>
+                        <p>{explanation.answer}</p>
+                      </div>
+                      <div className="iv-links">
+                        {explanation.sources.filter((source) => source.used).map((source) => (
+                          <a key={source.n} href={source.source} target="_blank" rel="noreferrer">
+                            <span>Source [{source.n}] · {source.score.toFixed(2)} match</span>
+                            {source.title} ↗
+                          </a>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                  <section className="iv-evidence">
+                    <div>
+                      <p className="iv-eyebrow">Interpretation</p>
+                      <h2>A bump is an observation, not a discovery.</h2>
+                      <p>CERN’s reference analysis discusses a feature around 30 GeV as a trigger effect rather than a particle resonance. Beamline keeps that published explanation separate from what this calculation itself establishes.</p>
+                    </div>
+                    <div className="iv-links">
+                      {(status?.sources || []).map((source) => (
+                        source.verbatim ? (
+                          <details key={source.id} className="iv-source-verbatim">
+                            <summary>
+                              <span>{source.kind} · sha256 {source.sha256?.slice(0, 12)}…</span>
+                              {source.title}
+                            </summary>
+                            <p>{source.excerpt || source.summary}</p>
+                            <a href={source.url} target="_blank" rel="noreferrer">Open CERN record ↗</a>
+                          </details>
+                        ) : (
+                          <a key={source.id} href={source.url} target="_blank" rel="noreferrer">
+                            <span>{source.kind}</span>
+                            {source.title} ↗
+                          </a>
+                        )
+                      ))}
+                    </div>
+                  </section>
+                </div>
+              )}
             </aside>
-          </div>
-          {entries && <EntryInspector data={entries} variableDocs={status?.variable_docs ?? []} />}
-        </>
+        </div>
       )}
     </section>
   );

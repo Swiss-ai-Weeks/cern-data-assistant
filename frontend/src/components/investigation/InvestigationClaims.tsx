@@ -11,7 +11,7 @@ export default function InvestigationClaims({ claims }: { claims: InvestigationC
   if (!claims.length) return null;
   return (
     <section className="iv-claims" aria-label="Structured evidence claims">
-      <p className="iv-eyebrow">CLAIMS · LINKED TO DATA</p>
+      <p className="iv-eyebrow">Claims linked to data</p>
       <ul className="iv-claims-list">
         {claims.map((claim) => (
           <li key={claim.id} className={toneClass[claim.evidence_label] ?? ""}>

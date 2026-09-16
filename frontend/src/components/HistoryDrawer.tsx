@@ -26,6 +26,7 @@ interface Props {
   onValueChange: (v: string) => void;
   onSubmit: () => void;
   scroller: RefObject<HTMLDivElement | null>;
+  onNewSession?: () => void;
 }
 
 export default function HistoryDrawer({
@@ -41,6 +42,7 @@ export default function HistoryDrawer({
   onValueChange,
   onSubmit,
   scroller,
+  onNewSession,
 }: Props) {
   const panelRef = useRef<HTMLElement>(null);
   const { shown, motion } = usePresence(open);
@@ -60,12 +62,19 @@ export default function HistoryDrawer({
       >
         <header className="drawer-head">
           <h2 className="thread-head-title">History</h2>
-          <button type="button" className="drawer-close" onClick={onClose}>
-            Close
-          </button>
+          <div className="drawer-head-actions">
+            {onNewSession && (
+              <button type="button" className="btn-ghost" onClick={onNewSession}>
+                New session
+              </button>
+            )}
+            <button type="button" className="drawer-close" onClick={onClose}>
+              Close
+            </button>
+          </div>
         </header>
         <div className="thread-scroll" ref={scroller as RefObject<HTMLDivElement>}>
-          {turns.length === 0 && <p className="thread-empty">No investigations yet.</p>}
+          {turns.length === 0 && <p className="thread-empty">No questions in this session yet.</p>}
           {turns.map((t) => (
             <button
               key={t.id}

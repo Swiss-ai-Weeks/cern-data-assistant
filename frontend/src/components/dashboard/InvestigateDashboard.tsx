@@ -7,7 +7,6 @@ import AnswerCard from "../AnswerCard";
 import IntegrityRail from "../IntegrityRail";
 import PassportSkeleton from "../PassportSkeleton";
 import ResearchPassport from "../ResearchPassport";
-import Panel from "../ui/Panel";
 import SimpleChatLayout from "../chat/SimpleChatLayout";
 import EvidenceCoveragePanel from "./EvidenceCoveragePanel";
 import RecordsListPanel from "./RecordsListPanel";
@@ -51,7 +50,6 @@ interface Props {
   onFocusInvestigation?: () => void;
   investigationOpen: boolean;
   onOpenInvestigation: () => void;
-  onCloseInvestigation: () => void;
 }
 
 function heroRecord(result: AgentResponse | null): RecordSummary | null {
@@ -71,33 +69,35 @@ function heroRecord(result: AgentResponse | null): RecordSummary | null {
 
 function TrustAbout({ onOpenTrust }: { onOpenTrust: () => void }) {
   return (
-    <Panel title="About Beamline">
+    <section className="about-page" aria-labelledby="about-title">
+      <h1 id="about-title">About Beamline</h1>
       <p className="about-lede">
-        Beamline is a hosted assistant for CERN Open Data: catalog search, cited documentation answers, and explicit
-        refusals when sources do not support a claim.
+        Beamline helps you investigate CERN Open Data: find a record, ask a detector question with
+        citations, or compute a real CMS dimuon spectrum. Counts come from the staged sample.
+        Interpretations stay labeled.
       </p>
       <button type="button" className="text-link about-trust-link" onClick={onOpenTrust}>
         Trust &amp; safety details
       </button>
       <ol className="trust-steps trust-inline about-trust-list">
         <li>
-          <strong>English intent</strong>
-          <span>Planner routes to live catalog search, CERN docs, or both.</span>
+          <strong>Ask</strong>
+          <span>Search the live catalog or ask a detector question in plain English.</span>
         </li>
         <li>
-          <strong>CERN catalog &amp; documents</strong>
-          <span>Real calls to opendata.cern.ch and a local grounding index.</span>
+          <strong>Lab</strong>
+          <span>Compute the 8 TeV dimuon spectrum, change selections, and inspect events.</span>
         </li>
         <li>
-          <strong>Evidence checks</strong>
-          <span>Retrieval floor, citation validation, fact-check before release.</span>
+          <strong>Evidence</strong>
+          <span>Every claim is labeled calculated, documented, interpretation, or not established.</span>
         </li>
         <li>
-          <strong>Research handoff</strong>
-          <span>recid, DOI, files, download command — or cited answers with receipts.</span>
+          <strong>Handoff</strong>
+          <span>Export the recipe, sample checksums, claims, and notebook — or copy a CERN record.</span>
         </li>
       </ol>
-    </Panel>
+    </section>
   );
 }
 
@@ -125,90 +125,61 @@ export default function InvestigateDashboard({
   onFocusInvestigation,
   investigationOpen,
   onOpenInvestigation,
-  onCloseInvestigation,
 }: Props) {
   if (activeTab === "investigate") {
-    const showWorkspace = !idle || investigationOpen;
-
-    if (idle && !investigationOpen) {
+    if (investigationOpen) {
       return (
-        <>
-          <div id="beamline-composer">
-            <SimpleChatLayout
-              health={health}
-              query={query}
-              composerValue={composerValue}
-              onComposerChange={onComposerChange}
-              onSubmitComposer={onSubmitComposer}
-              busy={busy}
-              idle
-              live={live}
-              followups={followups}
-              onStarter={onStarter}
-              onOpenRecord={onOpenRecord}
-              onOpenHelp={onOpenHelp}
-              promptInputRef={promptInputRef}
-              threadItems={threadItems}
-              activeAsstId={activeAsstId}
-              onSelectThread={onSelectThread}
-              onFocusInvestigation={onFocusInvestigation}
-            />
-          </div>
-          <section className="iv-home-investigation-cta" aria-labelledby="iv-home-cta-title">
-            <p className="iv-eyebrow">Staged real data</p>
-            <h2 id="iv-home-cta-title">CMS dimuon investigation</h2>
-            <p className="iv-home-cta-lede">
-              Compute a muon-pair spectrum from CERN record 12341, change the selection, and keep calculated counts
-              separate from the published explanation of the ~30 GeV feature.
-            </p>
-            <button type="button" className="iv-open-investigation" onClick={onOpenInvestigation}>
-              Open investigation workspace
-            </button>
-            {health?.investigation?.sample_prepared === false && (
-              <p className="iv-home-cta-warn">Sample not prepared on this host — workspace opens but the plot will not run.</p>
-            )}
-          </section>
-        </>
+        <InvestigationWorkspace health={health} onOpenFindData={onOpenFindData} />
+      );
+    }
+
+    if (idle) {
+      return (
+        <SimpleChatLayout
+            health={health}
+            query={query}
+            composerValue={composerValue}
+            onComposerChange={onComposerChange}
+            onSubmitComposer={onSubmitComposer}
+            busy={busy}
+            idle
+            live={live}
+            followups={followups}
+            onStarter={onStarter}
+            onOpenRecord={onOpenRecord}
+            onOpenHelp={onOpenHelp}
+            promptInputRef={promptInputRef}
+            threadItems={threadItems}
+            activeAsstId={activeAsstId}
+            onSelectThread={onSelectThread}
+            onFocusInvestigation={onFocusInvestigation}
+          onOpenLab={onOpenInvestigation}
+          />
       );
     }
 
     return (
-      <>
-        {idle && investigationOpen && (
-          <div className="iv-home-back-row">
-            <button type="button" className="iv-home-back" onClick={onCloseInvestigation}>
-              ← Back to Beamline home
-            </button>
-          </div>
-        )}
-        {showWorkspace && (
-          <InvestigationWorkspace health={health} onOpenFindData={onOpenFindData} />
-        )}
-        {!idle && (
-          <section className="iv-catalog-band" aria-label="Catalog and documentation results">
-            <p className="iv-eyebrow">FIND DATA · ASK DOCS</p>
-            <SimpleChatLayout
-              health={health}
-              query={query}
-              composerValue={composerValue}
-              onComposerChange={onComposerChange}
-              onSubmitComposer={onSubmitComposer}
-              busy={busy}
-              idle={false}
-              live={live}
-              followups={followups}
-              onStarter={onStarter}
-              onOpenRecord={onOpenRecord}
-              promptInputRef={promptInputRef}
-              onOpenHelp={onOpenHelp}
-              threadItems={threadItems}
-              activeAsstId={activeAsstId}
-              onSelectThread={onSelectThread}
-              onFocusInvestigation={onFocusInvestigation}
-            />
-          </section>
-        )}
-      </>
+      <section className="iv-catalog-band" id="beamline-composer" aria-label="Catalog and documentation results">
+        <SimpleChatLayout
+          health={health}
+          query={query}
+          composerValue={composerValue}
+          onComposerChange={onComposerChange}
+          onSubmitComposer={onSubmitComposer}
+          busy={busy}
+          idle={false}
+          live={live}
+          followups={followups}
+          onStarter={onStarter}
+          onOpenRecord={onOpenRecord}
+          promptInputRef={promptInputRef}
+          onOpenHelp={onOpenHelp}
+          threadItems={threadItems}
+          activeAsstId={activeAsstId}
+          onSelectThread={onSelectThread}
+          onFocusInvestigation={onFocusInvestigation}
+        />
+      </section>
     );
   }
 
@@ -224,6 +195,7 @@ export default function InvestigateDashboard({
 
   return (
     <div className="dash-tab-view motion-section" key={activeTab}>
+      {activeTab !== "about" && (
       <BeamlineComposerStrip
         health={health}
         value={composerValue}
@@ -233,6 +205,7 @@ export default function InvestigateDashboard({
         promptInputRef={promptInputRef}
         compact
       />
+      )}
 
       <div className="simple-chat-results dash-tab-results">
         {threadItems.length > 0 && onSelectThread && (
@@ -272,8 +245,7 @@ export default function InvestigateDashboard({
             <div className="beamline-card beamline-empty-result">
               <p className="microlabel">No datasets yet</p>
               <p>
-                Run a catalog search from Home — for example, collisions at 13 TeV with muons — then return here for
-                the full list.
+                Ask for a dataset first — for example, collisions at 13 TeV with muons. Matching records will appear here.
               </p>
             </div>
           )}

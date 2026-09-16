@@ -6,7 +6,7 @@ export default function DayOneGateBanner({ gate }: { gate: DayOneGate }) {
       className={`iv-day-one-gate ${gate.passed ? "iv-day-one-ok" : "iv-day-one-warn"}`}
       role="status"
     >
-      <p className="iv-eyebrow">{gate.passed ? "DAY-1 GATE · PASSED" : "DAY-1 GATE · REVIEW SAMPLE"}</p>
+      <p className="iv-eyebrow">{gate.passed ? "Sample check passed" : "Sample needs review"}</p>
       <p>{gate.message}</p>
       {!gate.passed && gate.entries_read != null && (
         <p className="iv-caption">

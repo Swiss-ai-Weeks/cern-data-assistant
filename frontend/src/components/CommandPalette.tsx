@@ -9,6 +9,7 @@ interface Props {
   onOpenTrust: () => void;
   onOpenHelp: () => void;
   onOpenAbout?: () => void;
+  onOpenLab?: () => void;
 }
 
 const SHORTCUTS = [
@@ -26,6 +27,7 @@ export default function CommandPalette({
   onOpenTrust,
   onOpenHelp,
   onOpenAbout,
+  onOpenLab,
 }: Props) {
   const panelRef = useRef<HTMLElement>(null);
   const { shown, motion } = usePresence(open);
@@ -55,8 +57,20 @@ export default function CommandPalette({
               onClose();
             }}
           >
-            New investigation
+            New session
           </button>
+          {onOpenLab && (
+            <button
+              type="button"
+              className="palette-action"
+              onClick={() => {
+                onOpenLab();
+                onClose();
+              }}
+            >
+              Open CMS lab
+            </button>
+          )}
           <button
             type="button"
             className="palette-action"

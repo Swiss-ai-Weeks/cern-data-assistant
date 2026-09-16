@@ -34,7 +34,7 @@ export default function Spectrum({
   const tickValues = log ? [0, ...Array.from({length: Math.ceil(Math.log10(ceiling))}, (_, i) => 10 ** (i + 1))] : [0, ceiling / 4, ceiling / 2, ceiling * .75, ceiling];
   const highlighted = hover ?? selectedBin;
   return <div className="iv-spectrum" ref={host}>
-    <div className="iv-chart-meta"><span><i className="iv-swatch" /> Current selection {baseline && <><i className="iv-swatch baseline" /> Reference selection</>}</span><button type="button" onClick={() => setLog(!log)} aria-pressed={log}>{log ? 'Log scale' : 'Linear scale'} ↕</button></div>
+    <div className="iv-chart-meta"><span><i className="iv-swatch" /> Current{baseline && <><i className="iv-swatch baseline" /> Reference</>}</span><button type="button" onClick={() => setLog(!log)} aria-pressed={log}>{log ? 'Log scale' : 'Linear scale'}</button></div>
     <svg width="100%" viewBox={`0 0 ${width} 330`} role="img" aria-label="Computed muon-pair mass spectrum. Select a mass bin using the control below to inspect contributing data entries." onMouseLeave={() => setHover(null)}>
       <title>CMS 2012 · muon-pair invariant mass · real bounded sample</title>
       <defs><clipPath id="iv-plot-clip"><rect x={left} y={top} width={right-left} height={bottom-top} /></clipPath></defs>

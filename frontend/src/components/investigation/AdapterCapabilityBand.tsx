@@ -13,7 +13,7 @@ export default function AdapterCapabilityBand({ adapters }: { adapters: DataAdap
   if (!adapters.length) return null;
   return (
     <section className="iv-adapters" aria-label="Supported data adapters">
-      <p className="iv-eyebrow">DATA ADAPTERS</p>
+      <p className="iv-eyebrow">Supported samples</p>
       <div className="iv-adapter-grid">
         {adapters.map((adapter) => (
           <article

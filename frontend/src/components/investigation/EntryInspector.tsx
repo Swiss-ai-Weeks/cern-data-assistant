@@ -6,7 +6,7 @@ export default function EntryInspector({ data, variableDocs = [] }: { data: Entr
   useEffect(() => setIndex(0), [data]);
   const event = data.entries[Math.min(index, data.entries.length-1)];
   return <section className="iv-entry-panel" aria-label="Contributing data entries">
-    <div className="iv-panel-heading"><div><p className="iv-eyebrow">FROM THE ACTUAL DATA</p><h3>Inside {data.low}–{data.high} GeV</h3></div><span className="iv-pill">{data.total.toLocaleString()} entries</span></div>
+    <div className="iv-panel-heading"><div><p className="iv-eyebrow">From the sample</p><h3>Inside {data.low}–{data.high} GeV</h3></div><span className="iv-pill">{data.total.toLocaleString()} entries</span></div>
     {!event ? <p className="iv-muted">No events in this bin pass the current selection. Try a neighboring bin or loosen the selection.</p> : <>
       <div className="iv-entry-tabs">{data.entries.map((e,i) => <button type="button" key={e.entry} aria-pressed={i===index} onClick={() => setIndex(i)}>Entry {e.entry.toLocaleString()}</button>)}</div>
       <div className="iv-event-detail iv-event-dual">
@@ -39,7 +39,7 @@ export default function EntryInspector({ data, variableDocs = [] }: { data: Entr
       <p className="iv-caption">Directions use measured φ; detector rings are schematic, not recorded hits. {data.identity} {data.ordering}</p>
       {variableDocs.length > 0 && (
         <div className="iv-variable-docs">
-          <p className="iv-eyebrow">WHAT THESE QUANTITIES CONNECT TO</p>
+          <p className="iv-eyebrow">What these quantities connect to</p>
           <div className="iv-links">
             {variableDocs.map((doc) => (
               <a key={doc.id} href={doc.url} target="_blank" rel="noreferrer">

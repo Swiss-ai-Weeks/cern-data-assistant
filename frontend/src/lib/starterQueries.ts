@@ -1,10 +1,21 @@
-/** Suggested starter questions shown on the home screen */
 export const STARTER_QUERIES = [
-  "Find proton-proton collisions at 13 TeV with muons",
-  "Why does CMS use a solenoid?",
-  "Find datasets suitable for a first muon analysis",
-  "Compare CMS NanoAOD and MiniAOD",
+  {
+    label: "13 TeV collisions with muons",
+    query: "Find proton-proton collisions at 13 TeV with muons",
+  },
+  {
+    label: "Why CMS uses a solenoid",
+    query: "Why does CMS use a solenoid?",
+  },
+  {
+    label: "First muon analysis datasets",
+    query: "Find datasets suitable for a first muon analysis",
+  },
+  {
+    label: "NanoAOD vs MiniAOD",
+    query: "Compare CMS NanoAOD and MiniAOD",
+  },
 ] as const;
 
 /** @deprecated use STARTER_QUERIES */
-export const EXAMPLE_QUERIES = STARTER_QUERIES;
+export const EXAMPLE_QUERIES = STARTER_QUERIES.map((item) => item.query);
